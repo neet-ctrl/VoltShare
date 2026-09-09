@@ -619,7 +619,8 @@ private fun SetupLockScreen(onComplete: () -> Unit) {
     var pattern by remember { mutableStateOf<List<Int>>(emptyList()) }
     var confirmPattern by remember { mutableStateOf<List<Int>>(emptyList()) }
     var error by remember { mutableStateOf("") }
-    val manager = remember { LockManager(LocalContext.current) }
+    val context = LocalContext.current
+    val manager = remember { LockManager(context) }
 
     LockScaffold(
         eyebrow = "PRIVATE BY DESIGN",
