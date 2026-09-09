@@ -10,6 +10,7 @@ import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Bundle
 import android.os.ParcelFileDescriptor
+import android.provider.OpenableColumns
 import android.text.format.Formatter
 import android.view.ViewGroup
 import android.widget.ImageView
@@ -26,6 +27,7 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.RepeatMode
@@ -299,6 +301,11 @@ private enum class AppTab(val label: String, val icon: ImageVector) {
     SECURITY("Lock", Icons.Default.Security),
 }
 
+private enum class ShareMode(val label: String) {
+    SEND("Send"),
+    RECEIVE("Receive"),
+}
+
 @Composable
 private fun VoltShareApp(
     activity: MainActivity,
@@ -320,7 +327,7 @@ private fun VoltShareApp(
     var showRenameFolder by remember { mutableStateOf(false) }
     var showSort by remember { mutableStateOf(false) }
     var importFolder by remember { mutableStateOf("/") }
-    var lastSharedFiles by remember { mutableStateOf<List<VaultFile>>(emptyList()) }
+    var pendingShares by remember { mutableStateOf<List<PendingShare>>(emptyList()) }
     val scope = rememberCoroutineScope()
     val incomingShare = activity.pendingIncomingShare
 
@@ -372,68 +379,27 @@ private fun VoltShareApp(
         ActivityResultContracts.OpenMultipleDocuments(),
     ) { uris ->
         if (uris.isEmpty()) return@rememberLauncherForActivityResult
-        scope.launch {
-            val imported = withContext(Dispatchers.IO) {
-                uris.mapNotNull { uri ->
-                    runCatching {
-                        activity.contentResolver.takePersistableUriPermission(
-                            uri,
-                            Intent.FLAG_GRANT_READ_URI_PERMISSION,
-                        )
-                    }
-                    vault.importUri(uri)
-                }
-            }
-            if (imported.isNotEmpty()) {
-                files = vault.listFiles()
-                lastSharedFiles = imported
-            }
-        }
+        val picked = uris.mapNotNull { pendingShareFromUri(activity, it) }
+        pendingShares = (pendingShares + picked).distinctBy { it.id }
     }
     val mediaPicker = rememberLauncherForActivityResult(
         ActivityResultContracts.OpenMultipleDocuments(),
     ) { uris ->
         if (uris.isEmpty()) return@rememberLauncherForActivityResult
-        scope.launch {
-            val imported = withContext(Dispatchers.IO) {
-                uris.mapNotNull { uri ->
-                    runCatching {
-                        activity.contentResolver.takePersistableUriPermission(
-                            uri,
-                            Intent.FLAG_GRANT_READ_URI_PERMISSION,
-                        )
-                    }
-                    vault.importUri(uri)
-                }
-            }
-            if (imported.isNotEmpty()) {
-                files = vault.listFiles()
-                lastSharedFiles = imported
-            }
-        }
+        val picked = uris.mapNotNull { pendingShareFromUri(activity, it) }
+        pendingShares = (pendingShares + picked).distinctBy { it.id }
     }
     val folderPicker = rememberLauncherForActivityResult(
         ActivityResultContracts.OpenDocumentTree(),
     ) { uri ->
         uri ?: return@rememberLauncherForActivityResult
         scope.launch {
-            val imported = withContext(Dispatchers.IO) {
+            val pending = withContext(Dispatchers.IO) {
                 createFolderArchive(activity, uri)?.let { archive ->
-                    try {
-                        vault.importGeneratedFile(
-                            source = archive,
-                            displayName = "${archive.nameWithoutExtension}.zip",
-                            mimeType = "application/zip",
-                        )
-                    } finally {
-                        archive.delete()
-                    }
+                    pendingShareFromFile(archive, archive.nameWithoutExtension + ".zip", "application/zip")
                 }
             }
-            imported?.let {
-                files = vault.listFiles()
-                lastSharedFiles = listOf(it)
-            }
+            pending?.let { pendingShares = (pendingShares + it).distinctBy { share -> share.id } }
         }
     }
 
@@ -614,22 +580,17 @@ private fun VoltShareApp(
                 )
 
                 AppTab.SHARE -> ShareHome(
-                    files = files,
                     transfer = transfer,
-                    vault = vault,
-                    newlyPreparedFiles = lastSharedFiles,
+                    pendingFiles = pendingShares,
                     onPickFile = { shareFilePicker.launch(arrayOf("*/*")) },
                     onPickMedia = { mediaPicker.launch(arrayOf("image/*", "video/*")) },
                     onPickFolder = { folderPicker.launch(null) },
                     onCreateText = { text ->
                         scope.launch {
                             val created = withContext(Dispatchers.IO) {
-                                vault.createTextFile(text)
+                                createTextShare(activity, text)
                             }
-                            created?.let {
-                                files = vault.listFiles()
-                                lastSharedFiles = listOf(it)
-                            }
+                            created?.let { pendingShares = (pendingShares + it).distinctBy { share -> share.id } }
                         }
                     },
                     onPickInstalledApp = { apps ->
@@ -637,23 +598,33 @@ private fun VoltShareApp(
                             val created = withContext(Dispatchers.IO) {
                                 apps.mapNotNull { app ->
                                     createInstalledAppPackage(activity, app)?.let { packageFile ->
-                                        try {
-                                            val extension = if (app.apkPaths.size > 1) "apks" else "apk"
-                                            vault.importGeneratedFile(
-                                                source = packageFile,
-                                                displayName = "${safeFileName(app.label)}.$extension",
-                                                mimeType = "application/vnd.android.package-archive",
-                                            )
-                                        } finally {
-                                            packageFile.delete()
-                                        }
+                                        pendingShareFromFile(
+                                            packageFile,
+                                            "${safeFileName(app.label)}.${if (app.apkPaths.size > 1) "apks" else "apk"}",
+                                            "application/vnd.android.package-archive",
+                                        )
                                     }
                                 }
                             }
-                            if (created.isNotEmpty()) {
-                                files = vault.listFiles()
-                                lastSharedFiles = created
+                            pendingShares = (pendingShares + created).distinctBy { it.id }
+                        }
+                    },
+                    onRemovePending = { share ->
+                        pendingShares = pendingShares.filterNot { it.id == share.id }
+                        disposePendingShare(activity, share)
+                    },
+                    onClearPending = {
+                        pendingShares.forEach { disposePendingShare(activity, it) }
+                        pendingShares = emptyList()
+                    },
+                    onTransferFinished = { successful ->
+                        scope.launch {
+                            val committed = withContext(Dispatchers.IO) {
+                                successful.filter { commitPendingShare(activity, vault, it) }.map { it.id }.toSet()
                             }
+                            pendingShares = pendingShares.filterNot { it.id in committed }
+                            files = vault.listFiles()
+                            folders = vault.listFolders()
                         }
                     },
                 )
@@ -1395,37 +1366,24 @@ private fun calculateSampleSize(width: Int, height: Int, targetWidth: Int, targe
 
 @Composable
 private fun ShareHome(
-    files: List<VaultFile>,
-    vault: VaultRepository,
     transfer: PeerTransferManager,
-    newlyPreparedFiles: List<VaultFile>,
+    pendingFiles: List<PendingShare>,
     onPickFile: () -> Unit,
     onPickMedia: () -> Unit,
     onPickFolder: () -> Unit,
     onCreateText: (String) -> Unit,
     onPickInstalledApp: (List<InstalledAppChoice>) -> Unit,
+    onRemovePending: (PendingShare) -> Unit,
+    onClearPending: () -> Unit,
+    onTransferFinished: (List<PendingShare>) -> Unit,
 ) {
     val peers by transfer.peers.collectAsStateWithLifecycle()
     val status by transfer.status.collectAsStateWithLifecycle()
     val deviceIsActive = status.active || status.hosting
-    var selectedIds by remember(files, newlyPreparedFiles) {
-        mutableStateOf((newlyPreparedFiles.ifEmpty { files.take(1) }).map { it.id }.toSet())
-    }
-    var fileQuery by remember { mutableStateOf("") }
+    var mode by remember { mutableStateOf(ShareMode.SEND) }
     var showTextEditor by remember { mutableStateOf(false) }
     var showInstalledApps by remember { mutableStateOf(false) }
     var showErrorLog by remember { mutableStateOf(false) }
-
-    LaunchedEffect(newlyPreparedFiles.map { it.id }.joinToString(",")) {
-        if (newlyPreparedFiles.isNotEmpty()) selectedIds = newlyPreparedFiles.map { it.id }.toSet()
-    }
-
-    val selectedFiles = files.filter { it.id in selectedIds }
-    val visibleShareFiles = files.filter {
-        fileQuery.isBlank() ||
-            it.name.contains(fileQuery.trim(), ignoreCase = true) ||
-            it.transferDirection.label.contains(fileQuery.trim(), ignoreCase = true)
-    }
 
     if (showTextEditor) {
         TextComposerDialog(
@@ -1465,7 +1423,14 @@ private fun ShareHome(
             Text("VoltShare connects devices directly over the same local network. Nothing routes through a cloud.", color = VoltTextMuted, lineHeight = 21.sp)
         }
         item {
-            Text("Choose what to send", color = Color.White, fontSize = 17.sp, fontWeight = FontWeight.Bold)
+            ShareModeSwitch(
+                mode = mode,
+                onModeChange = { mode = it },
+            )
+        }
+        if (mode == ShareMode.SEND) {
+            item {
+                Text("Choose what to send", color = Color.White, fontSize = 17.sp, fontWeight = FontWeight.Bold)
             Spacer(Modifier.height(10.dp))
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
@@ -1508,7 +1473,9 @@ private fun ShareHome(
                     modifier = Modifier.fillMaxWidth(),
                 )
             }
+            }
         }
+        if (mode == ShareMode.SEND) {
         item {
             GlassCard(modifier = Modifier.fillMaxWidth(), accent = VoltGreen) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -1550,94 +1517,12 @@ private fun ShareHome(
             }
         }
         item {
-            Text("1. Choose files to send", color = Color.White, fontSize = 17.sp, fontWeight = FontWeight.Bold)
-            Spacer(Modifier.height(10.dp))
-            OutlinedTextField(
-                value = fileQuery,
-                onValueChange = { fileQuery = it },
-                modifier = Modifier.fillMaxWidth(),
-                singleLine = true,
-                label = { Text("Search files to send") },
-                leadingIcon = { Icon(Icons.Default.Search, null, tint = VoltGreen) },
-                trailingIcon = {
-                    if (fileQuery.isNotEmpty()) {
-                        IconButton(onClick = { fileQuery = "" }) {
-                            Icon(Icons.Default.Close, "Clear search", tint = VoltTextMuted)
-                        }
-                    }
-                },
-                shape = RoundedCornerShape(18.dp),
-                colors = androidx.compose.material3.OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = VoltGreen,
-                    focusedLabelColor = VoltGreen,
-                    cursorColor = VoltGreen,
-                    unfocusedBorderColor = Color.White.copy(alpha = 0.16f),
-                    focusedTextColor = Color.White,
-                    unfocusedTextColor = Color.White,
-                ),
+            PendingShareQueue(
+                pendingFiles = pendingFiles,
+                onRemove = onRemovePending,
+                onClear = onClearPending,
+                editingEnabled = !status.transferring,
             )
-            Spacer(Modifier.height(10.dp))
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween,
-            ) {
-                Text("${selectedFiles.size} selected", color = VoltGreen, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                TextButton(
-                    onClick = {
-                        selectedIds = if (selectedIds.size == visibleShareFiles.size) {
-                            emptySet()
-                        } else {
-                            visibleShareFiles.map { it.id }.toSet()
-                        }
-                    },
-                    colors = ButtonDefaults.textButtonColors(contentColor = VoltGreen),
-                ) {
-                    Text(if (selectedIds.size == visibleShareFiles.size) "Clear all" else "Select all")
-                }
-            }
-            Column(verticalArrangement = Arrangement.spacedBy(9.dp)) {
-                visibleShareFiles.forEach { file ->
-                    val selected = file.id in selectedIds
-                    Surface(
-                        modifier = Modifier.fillMaxWidth().clickable {
-                            selectedIds = if (selected) selectedIds - file.id else selectedIds + file.id
-                        },
-                        shape = RoundedCornerShape(18.dp),
-                        color = if (selected) VoltGreen.copy(alpha = 0.13f) else VoltSurface,
-                        border = BorderStroke(1.dp, if (selected) VoltGreen else Color.White.copy(alpha = 0.08f)),
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(10.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            FileThumbnail(vault, file)
-                            Spacer(Modifier.width(12.dp))
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(file.name, color = Color.White, maxLines = 1, fontSize = 13.sp, fontWeight = FontWeight.Bold)
-                                Text(
-                                    "${file.transferDirection.label} • ${formatSize(file.sizeBytes)}",
-                                    color = VoltTextMuted,
-                                    fontSize = 11.sp,
-                                )
-                            }
-                            Box(
-                                modifier = Modifier
-                                    .size(28.dp)
-                                    .background(if (selected) VoltGreen else Color.Transparent, CircleShape)
-                                    .border(1.dp, if (selected) VoltGreen else VoltTextMuted, CircleShape),
-                                contentAlignment = Alignment.Center,
-                            ) {
-                                if (selected) Icon(Icons.Default.Check, null, tint = Color.Black, modifier = Modifier.size(18.dp))
-                            }
-                        }
-                    }
-                }
-            }
-            if (visibleShareFiles.isEmpty()) {
-                Spacer(Modifier.height(6.dp))
-                Text("No protected files match your search.", color = VoltTextMuted, fontSize = 12.sp)
-            }
         }
         item {
             Text("2. Choose a nearby device", color = Color.White, fontSize = 17.sp, fontWeight = FontWeight.Bold)
@@ -1679,13 +1564,13 @@ private fun ShareHome(
                             Text("Direct local connection", color = VoltTextMuted, fontSize = 12.sp)
                         }
                         TextButton(
-                            onClick = { transfer.send(peer, selectedFiles) },
-                            enabled = selectedFiles.isNotEmpty() && !status.transferring,
+                            onClick = { transfer.send(peer, pendingFiles, onTransferFinished) },
+                            enabled = pendingFiles.isNotEmpty() && !status.transferring,
                             colors = ButtonDefaults.textButtonColors(contentColor = VoltGreen),
                         ) {
                             Icon(Icons.Default.ArrowUpward, null, modifier = Modifier.size(16.dp))
                             Spacer(Modifier.width(5.dp))
-                            Text("Send ${selectedFiles.size}")
+                            Text("Send ${pendingFiles.size}")
                         }
                     }
                 }
@@ -1729,6 +1614,246 @@ private fun ShareHome(
                         }
                     }
                 }
+            }
+        }
+        } else {
+            item {
+                GlassCard(modifier = Modifier.fillMaxWidth(), accent = VoltGreen, padding = 20.dp) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        DeviceRadar(active = status.hosting || status.transferring)
+                        Spacer(Modifier.width(14.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text("Receive mode", color = Color.White, fontWeight = FontWeight.Bold)
+                            Text(
+                                if (status.hosting) "Listening for nearby VoltShare devices" else "Turn on receiving to become discoverable",
+                                color = VoltTextMuted,
+                                fontSize = 12.sp,
+                            )
+                        }
+                        PremiumSwitch(
+                            checked = status.hosting,
+                            onCheckedChange = { if (it) transfer.startHosting() else transfer.close() },
+                        )
+                    }
+                    Spacer(Modifier.height(18.dp))
+                    Text(
+                        "Files sent from another VoltShare device are verified and saved to your encrypted vault only after the transfer completes.",
+                        color = Color.White.copy(alpha = 0.78f),
+                        fontSize = 13.sp,
+                        lineHeight = 19.sp,
+                    )
+                }
+            }
+            item {
+                TransferStatusCard(
+                    title = "Receiving",
+                    status = status,
+                    visible = status.transferring || status.label.startsWith("Received") || status.errorLog != null,
+                    onShowError = { showErrorLog = true },
+                )
+            }
+            item {
+                GlassCard(modifier = Modifier.fillMaxWidth(), accent = VoltTeal, padding = 18.dp) {
+                    Text("Ready for a private handoff", color = Color.White, fontWeight = FontWeight.Bold)
+                    Spacer(Modifier.height(7.dp))
+                    Text(
+                        "Keep receiving enabled on this screen. The other device can find you, choose its pending files, and send them directly over the local network.",
+                        color = VoltTextMuted,
+                        fontSize = 13.sp,
+                        lineHeight = 19.sp,
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ShareModeSwitch(
+    mode: ShareMode,
+    onModeChange: (ShareMode) -> Unit,
+) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        color = VoltSurface,
+        shape = RoundedCornerShape(22.dp),
+        border = BorderStroke(1.dp, Color.White.copy(alpha = 0.08f)),
+    ) {
+        Row(
+            modifier = Modifier.padding(5.dp),
+            horizontalArrangement = Arrangement.spacedBy(5.dp),
+        ) {
+            ShareMode.values().forEach { option ->
+                val selected = option == mode
+                Surface(
+                    modifier = Modifier.weight(1f).clickable { onModeChange(option) },
+                    color = if (selected) VoltGreen else Color.Transparent,
+                    contentColor = if (selected) Color.Black else VoltTextMuted,
+                    shape = RoundedCornerShape(17.dp),
+                ) {
+                    Row(
+                        modifier = Modifier.padding(vertical = 13.dp),
+                        horizontalArrangement = Arrangement.Center,
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Icon(
+                            if (option == ShareMode.SEND) Icons.Default.ArrowUpward else Icons.Default.ArrowDownward,
+                            contentDescription = null,
+                            modifier = Modifier.size(17.dp),
+                        )
+                        Spacer(Modifier.width(7.dp))
+                        Text(option.label, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun PendingShareQueue(
+    pendingFiles: List<PendingShare>,
+    onRemove: (PendingShare) -> Unit,
+    onClear: () -> Unit,
+    editingEnabled: Boolean,
+) {
+    Column {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween,
+        ) {
+            Column {
+                Text("1. Queue files to send", color = Color.White, fontSize = 17.sp, fontWeight = FontWeight.Bold)
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    if (pendingFiles.isEmpty()) "Only files picked in this session appear here."
+                    else "${pendingFiles.size} file${if (pendingFiles.size == 1) "" else "s"} ready",
+                    color = VoltTextMuted,
+                    fontSize = 12.sp,
+                )
+            }
+            if (pendingFiles.isNotEmpty()) {
+                TextButton(
+                    onClick = onClear,
+                    enabled = editingEnabled,
+                    colors = ButtonDefaults.textButtonColors(contentColor = Color(0xFFFFA49C)),
+                ) {
+                    Text("Clear queue")
+                }
+            }
+        }
+        Spacer(Modifier.height(10.dp))
+        if (pendingFiles.isEmpty()) {
+            GlassCard(modifier = Modifier.fillMaxWidth(), accent = VoltTeal, padding = 18.dp) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Default.Add, null, tint = VoltGreen, modifier = Modifier.size(22.dp))
+                    Spacer(Modifier.width(12.dp))
+                    Text(
+                        "Pick a file, folder, photo, note, or installed app above to start a temporary share queue.",
+                        color = VoltTextMuted,
+                        fontSize = 13.sp,
+                        lineHeight = 19.sp,
+                    )
+                }
+            }
+        } else {
+            Column(verticalArrangement = Arrangement.spacedBy(9.dp)) {
+                pendingFiles.forEach { file ->
+                    Surface(
+                        modifier = Modifier.fillMaxWidth(),
+                        color = VoltSurface,
+                        shape = RoundedCornerShape(18.dp),
+                        border = BorderStroke(1.dp, VoltGreen.copy(alpha = 0.2f)),
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(start = 13.dp, top = 10.dp, bottom = 10.dp, end = 7.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Box(
+                                modifier = Modifier.size(40.dp).background(VoltGreen.copy(alpha = 0.11f), RoundedCornerShape(13.dp)),
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                Icon(shareIconFor(file), null, tint = VoltGreen, modifier = Modifier.size(20.dp))
+                            }
+                            Spacer(Modifier.width(11.dp))
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(file.name, color = Color.White, maxLines = 1, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                                Text(
+                                    "${file.mimeType.substringAfterLast('/').replace('-', ' ')} • ${formatSize(file.sizeBytes)}",
+                                    color = VoltTextMuted,
+                                    fontSize = 11.sp,
+                                    maxLines = 1,
+                                )
+                            }
+                            IconButton(
+                                onClick = { onRemove(file) },
+                                enabled = editingEnabled,
+                            ) {
+                                Icon(Icons.Default.Close, "Remove ${file.name}", tint = VoltTextMuted, modifier = Modifier.size(19.dp))
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+private fun shareIconFor(file: PendingShare): ImageVector = when {
+    file.mimeType.startsWith("image/") -> Icons.Default.Image
+    file.mimeType.startsWith("video/") -> Icons.Default.VideoLibrary
+    file.mimeType == "application/zip" || file.name.endsWith(".apk", true) || file.name.endsWith(".apks", true) -> Icons.Default.Folder
+    else -> Icons.Default.Description
+}
+
+@Composable
+private fun TransferStatusCard(
+    title: String,
+    status: TransferStatus,
+    visible: Boolean,
+    onShowError: () -> Unit,
+) {
+    if (!visible) return
+    GlassCard(modifier = Modifier.fillMaxWidth(), accent = VoltGreen, padding = 18.dp) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Icon(
+                if (status.errorLog == null) Icons.Default.Bolt else Icons.Default.Close,
+                null,
+                tint = if (status.errorLog == null) VoltGreen else Color(0xFFFF8A80),
+            )
+            Spacer(Modifier.width(10.dp))
+            Text(title, color = Color.White, fontWeight = FontWeight.Bold)
+        }
+        Spacer(Modifier.height(8.dp))
+        Text(status.label, color = VoltTextMuted, fontSize = 13.sp)
+        if (status.totalFiles > 0) {
+            Spacer(Modifier.height(7.dp))
+            Text(
+                "${status.completedFiles}/${status.totalFiles} files • ${formatSize(status.bytesTransferred)} / ${formatSize(status.totalBytes)}",
+                color = VoltTextMuted,
+                fontSize = 12.sp,
+            )
+        }
+        Spacer(Modifier.height(12.dp))
+        LinearProgressIndicator(
+            progress = { status.progress },
+            modifier = Modifier.fillMaxWidth().height(5.dp).clip(CircleShape),
+            color = VoltGreen,
+            trackColor = Color.White.copy(alpha = 0.1f),
+        )
+        if (status.errorLog != null) {
+            Spacer(Modifier.height(12.dp))
+            OutlinedButton(
+                onClick = onShowError,
+                modifier = Modifier.fillMaxWidth().height(48.dp),
+                shape = RoundedCornerShape(16.dp),
+                border = BorderStroke(1.dp, Color(0xFFFF6B6B).copy(alpha = 0.65f)),
+                colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFFFF8A80)),
+            ) {
+                Icon(Icons.Default.Description, null, modifier = Modifier.size(17.dp))
+                Spacer(Modifier.width(8.dp))
+                Text("View detailed error report")
             }
         }
     }
@@ -2762,6 +2887,97 @@ private fun GlassCard(modifier: Modifier, accent: Color, padding: androidx.compo
             .padding(padding),
         content = content,
     )
+}
+
+private fun pendingShareFromUri(context: MainActivity, uri: Uri): PendingShare? {
+    var displayName: String? = null
+    var sizeBytes: Long? = null
+    runCatching {
+        context.contentResolver.query(
+            uri,
+            arrayOf(OpenableColumns.DISPLAY_NAME, OpenableColumns.SIZE),
+            null,
+            null,
+            null,
+        )?.use { cursor ->
+            if (cursor.moveToFirst()) {
+                displayName = cursor.getString(cursor.getColumnIndexOrThrow(OpenableColumns.DISPLAY_NAME))
+                sizeBytes = cursor.getLong(cursor.getColumnIndexOrThrow(OpenableColumns.SIZE)).takeIf { it >= 0L }
+            }
+        }
+    }
+    val name = safeFileName(displayName ?: uri.lastPathSegment?.substringAfterLast('/') ?: "shared-file")
+    val descriptorLength = runCatching {
+        context.contentResolver.openAssetFileDescriptor(uri, "r")?.use { it.length } ?: -1L
+    }.getOrDefault(-1L)
+    val size = sizeBytes ?: descriptorLength.takeIf { it >= 0L } ?: 0L
+    runCatching {
+        context.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+    }
+    return PendingShare(
+        id = "uri:$uri",
+        name = name,
+        mimeType = context.contentResolver.getType(uri) ?: shareMimeFromName(name),
+        sizeBytes = size,
+        source = PendingShareSource.UriSource(uri),
+    )
+}
+
+private fun pendingShareFromFile(file: File, displayName: String = file.name, mimeType: String = shareMimeFromName(displayName)): PendingShare? {
+    if (!file.isFile) return null
+    return PendingShare(
+        id = "file:${file.absolutePath}",
+        name = safeFileName(displayName),
+        mimeType = mimeType,
+        sizeBytes = file.length(),
+        source = PendingShareSource.FileSource(file),
+    )
+}
+
+private fun createTextShare(context: MainActivity, text: String): PendingShare? {
+    val file = File(context.cacheDir, "voltshare-note-${System.currentTimeMillis()}.txt")
+    return runCatching {
+        file.writeText(text, Charsets.UTF_8)
+        pendingShareFromFile(file, file.name, "text/plain")
+    }.getOrElse {
+        file.delete()
+        null
+    }
+}
+
+private fun commitPendingShare(context: MainActivity, vault: VaultRepository, pending: PendingShare): Boolean {
+    val imported = runCatching {
+        when (val source = pending.source) {
+            is PendingShareSource.UriSource -> vault.importUri(source.uri)
+            is PendingShareSource.FileSource -> vault.importGeneratedFile(source.file, pending.name, pending.mimeType)
+        }
+    }.getOrNull() ?: return false
+    vault.markSent(imported)
+    disposePendingShare(context, pending)
+    return true
+}
+
+private fun disposePendingShare(context: MainActivity, pending: PendingShare) {
+    when (val source = pending.source) {
+        is PendingShareSource.UriSource -> runCatching {
+            context.contentResolver.releasePersistableUriPermission(
+                source.uri,
+                Intent.FLAG_GRANT_READ_URI_PERMISSION,
+            )
+        }
+        is PendingShareSource.FileSource -> source.file.delete()
+    }
+}
+
+private fun shareMimeFromName(name: String): String = when (name.substringAfterLast('.', "").lowercase()) {
+    "jpg", "jpeg", "png", "webp", "gif", "heic" -> "image/*"
+    "mp4", "mkv", "webm", "mov", "avi" -> "video/*"
+    "mp3", "wav", "m4a", "flac" -> "audio/*"
+    "pdf" -> "application/pdf"
+    "apk", "xapk", "apks" -> "application/vnd.android.package-archive"
+    "zip" -> "application/zip"
+    "txt", "md", "json", "xml", "csv", "log", "kt", "java", "js", "ts", "html", "css" -> "text/plain"
+    else -> "application/octet-stream"
 }
 
 private fun createFolderArchive(context: MainActivity, treeUri: Uri): File? {

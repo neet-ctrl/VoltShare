@@ -1,6 +1,7 @@
 package app.voltshare
 
 import android.content.Context
+import android.net.Uri
 import android.net.nsd.NsdManager
 import android.net.nsd.NsdServiceInfo
 import android.os.Build
@@ -11,13 +12,29 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.io.BufferedInputStream
 import java.io.BufferedOutputStream
 import java.io.DataInputStream
 import java.io.DataOutputStream
+import java.io.File
+import java.io.InputStream
 import java.net.InetAddress
 import java.net.ServerSocket
 import java.net.Socket
+
+sealed interface PendingShareSource {
+    data class UriSource(val uri: Uri) : PendingShareSource
+    data class FileSource(val file: File) : PendingShareSource
+}
+
+data class PendingShare(
+    val id: String,
+    val name: String,
+    val mimeType: String,
+    val sizeBytes: Long,
+    val source: PendingShareSource,
+)
 
 data class PeerDevice(
     val name: String,
@@ -143,30 +160,31 @@ class PeerTransferManager(
         nsd.discoverServices(SERVICE_TYPE, NsdManager.PROTOCOL_DNS_SD, discoveryListener)
     }
 
-    fun send(peer: PeerDevice, file: VaultFile) {
-        send(peer, listOf(file))
-    }
-
-    fun send(peer: PeerDevice, files: List<VaultFile>) {
+    fun send(peer: PeerDevice, files: List<PendingShare>, onFinished: (List<PendingShare>) -> Unit = {}) {
         if (files.isEmpty()) return
         scope.launch {
-            val totalBytes = files.sumOf { it.sizeBytes }.coerceAtLeast(1L)
+            val preparedFiles = files.map { file ->
+                if (file.sizeBytes > 0L) file else file.copy(sizeBytes = sourceSize(file.source) ?: 0L)
+            }
+            val totalBytes = preparedFiles.sumOf { it.sizeBytes }.coerceAtLeast(1L)
             var completedBytes = 0L
             var completedFiles = 0
             val errors = mutableListOf<String>()
-            files.forEachIndexed { index, file ->
+            val successfulFiles = mutableListOf<PendingShare>()
+            preparedFiles.forEachIndexed { index, file ->
                 try {
                     transferOne(
                         peer = peer,
                         file = file,
                         fileIndex = index,
-                        totalFiles = files.size,
+                        totalFiles = preparedFiles.size,
                         completedFiles = completedFiles,
                         completedBytes = completedBytes,
                         totalBytes = totalBytes,
                     )
                     completedFiles += 1
                     completedBytes += file.sizeBytes
+                    successfulFiles += file
                 } catch (error: Throwable) {
                     errors += buildErrorReport(file, error)
                     _status.emit(
@@ -176,7 +194,7 @@ class PeerTransferManager(
                             active = true,
                             transferring = true,
                             completedFiles = completedFiles,
-                            totalFiles = files.size,
+                            totalFiles = preparedFiles.size,
                             currentFile = file.name,
                             bytesTransferred = completedBytes,
                             totalBytes = totalBytes,
@@ -189,7 +207,7 @@ class PeerTransferManager(
             _status.emit(
                 TransferStatus(
                     label = if (errors.isEmpty()) {
-                        "Sent and verified ${files.size} file${if (files.size == 1) "" else "s"}"
+                        "Sent and verified ${preparedFiles.size} file${if (preparedFiles.size == 1) "" else "s"}"
                     } else {
                         "Finished with ${errors.size} transfer error${if (errors.size == 1) "" else "s"}"
                     },
@@ -198,18 +216,21 @@ class PeerTransferManager(
                     hosting = server != null,
                     transferring = false,
                     completedFiles = completedFiles,
-                    totalFiles = files.size,
+                    totalFiles = preparedFiles.size,
                     bytesTransferred = completedBytes,
                     totalBytes = totalBytes,
                     errorLog = errors.takeIf { it.isNotEmpty() }?.joinToString("\n\n"),
                 ),
             )
+            withContext(Dispatchers.Main) {
+                onFinished(successfulFiles)
+            }
         }
     }
 
     private suspend fun transferOne(
         peer: PeerDevice,
-        file: VaultFile,
+        file: PendingShare,
         fileIndex: Int,
         totalFiles: Int,
         completedFiles: Int,
@@ -229,7 +250,7 @@ class PeerTransferManager(
                 totalBytes = totalBytes,
             ),
         )
-        val checksum = vault.sha256(file) ?: error("Could not read encrypted vault file")
+        val checksum = sha256(file.source) ?: error("Could not read pending share")
         Socket(peer.host, peer.port).use { socket ->
             socket.tcpNoDelay = true
             socket.sendBufferSize = BUFFER_SIZE
@@ -241,8 +262,8 @@ class PeerTransferManager(
                 output.writeUTF(file.mimeType)
                 output.writeLong(file.sizeBytes)
                 output.writeUTF(checksum)
-                output.writeUTF(file.folderPath)
-                vault.openDecrypted(file)?.use { input ->
+                output.writeUTF("/")
+                openSource(file.source)?.use { input ->
                     val buffer = ByteArray(BUFFER_SIZE)
                     var sent = 0L
                     var lastUpdate = 0L
@@ -271,13 +292,51 @@ class PeerTransferManager(
                             )
                         }
                     }
-                } ?: error("Could not open decrypted stream for ${file.name}")
+                } ?: error("Could not open pending share stream for ${file.name}")
             }
         }
-        vault.markSent(file)
     }
 
-    private fun buildErrorReport(file: VaultFile, error: Throwable): String {
+    private fun openSource(source: PendingShareSource): InputStream? = runCatching {
+        when (source) {
+            is PendingShareSource.UriSource -> context.contentResolver.openInputStream(source.uri)
+            is PendingShareSource.FileSource -> source.file.inputStream()
+        }
+    }.getOrNull()
+
+    private fun sha256(source: PendingShareSource): String? {
+        val input = openSource(source) ?: return null
+        return runCatching {
+            val digest = java.security.MessageDigest.getInstance("SHA-256")
+            input.use { stream ->
+                val buffer = ByteArray(BUFFER_SIZE)
+                while (true) {
+                    val read = stream.read(buffer)
+                    if (read <= 0) break
+                    digest.update(buffer, 0, read)
+                }
+            }
+            digest.digest().joinToString("") { "%02x".format(it) }
+        }.getOrNull()
+    }
+
+    private fun sourceSize(source: PendingShareSource): Long? {
+        val input = openSource(source) ?: return null
+        return runCatching {
+            input.use { stream ->
+                val buffer = ByteArray(BUFFER_SIZE)
+                var size = 0L
+                while (true) {
+                    val read = stream.read(buffer)
+                    if (read <= 0) break
+                    size += read
+                }
+                size
+            }
+        }.getOrNull()
+    }
+
+    private fun buildErrorReport(file: PendingShare, error: Throwable): String {
         return buildString {
             appendLine("VoltShare transfer error")
             appendLine("File: ${file.name}")
