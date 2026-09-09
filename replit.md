@@ -4,7 +4,7 @@ Native Android vault and app-to-app sharing app. Files are encrypted in app-priv
 
 ## Build
 
-Open the repository as an Android Gradle project and build the `app` module. The release workflow is `.github/workflows/release.yml`; it runs `assembleRelease` only and attaches the signed APK to a GitHub Release.
+Open the repository as an Android Gradle project and build the `app` module. The release workflow is `.github/workflows/release.yml`; every push runs `:app:assembleRelease` only, without lint/tests/debug builds. A `v*` tag also attaches the signed APK to a GitHub Release.
 
 ## Product
 

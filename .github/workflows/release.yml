@@ -2,6 +2,8 @@ name: Release signed APK
 
 on:
   push:
+    branches:
+      - "**"
     tags:
       - "v*"
   workflow_dispatch:
@@ -11,7 +13,7 @@ permissions:
 
 jobs:
   release:
-    name: Build and publish release APK
+    name: Build signed release APK
     runs-on: ubuntu-latest
     env:
       ANDROID_KEYSTORE_PATH: ${{ github.workspace }}/app/release.keystore
@@ -41,9 +43,17 @@ jobs:
           printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "$ANDROID_KEYSTORE_PATH"
 
       - name: Build release APK only
-        run: gradle --no-daemon clean assembleRelease
+        run: |
+          gradle --no-daemon :app:assembleRelease \
+            -x lint \
+            -x lintVitalRelease \
+            -x lintVitalAnalyzeRelease \
+            -x lintVitalReportRelease \
+            -x test \
+            -x testReleaseUnitTest
 
       - name: Create GitHub Release and attach APK
+        if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.ref_name }}

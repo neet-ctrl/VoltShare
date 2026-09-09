@@ -17,7 +17,7 @@ VoltShare is a native Android vault and device-to-device sharing app. Files are 
 
 ## GitHub release build
 
-The only CI build is `assembleRelease`; no debug APK is built or uploaded. On a `v*` tag, GitHub Actions attaches the signed APK directly to the GitHub Release and does not use an Actions artifact.
+Every branch push and every manual dispatch runs only `:app:assembleRelease`. It does not run lint, unit tests, connected tests, a debug build, or any other Gradle task. Ordinary pushes only verify/build the signed APK; a `v*` tag additionally attaches that APK directly to a GitHub Release. No Actions artifact is uploaded.
 
 Configure these repository secrets:
 
@@ -25,6 +25,8 @@ Configure these repository secrets:
 - `KEYSTORE_PASSWORD`
 - `KEY_ALIAS`
 - `KEY_PASSWORD`
+
+The workflow uses GitHub's automatic `GITHUB_TOKEN`; you do not need to create or paste a personal access token.
 
 Create a release with:
 
