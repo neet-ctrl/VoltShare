@@ -3,7 +3,7 @@ name: Release signed APK
 on:
   push:
     branches:
-      - "**"
+      - main
     tags:
       - "v*"
   workflow_dispatch:
@@ -53,9 +53,12 @@ jobs:
             -x testReleaseUnitTest
 
       - name: Create GitHub Release and attach APK
-        if: startsWith(github.ref, 'refs/tags/v')
+        if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ github.ref_name }}
+          tag_name: ${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || 'latest' }}
+          target_commitish: ${{ github.sha }}
+          name: ${{ startsWith(github.ref, 'refs/tags/v') && format('VoltShare {0}', github.ref_name) || 'VoltShare latest' }}
           generate_release_notes: true
+          prerelease: false
           files: app/build/outputs/apk/release/app-release.apk
