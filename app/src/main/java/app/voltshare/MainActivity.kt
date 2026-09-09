@@ -9,7 +9,9 @@ import android.content.pm.ApplicationInfo
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Bundle
+import android.os.Build
 import android.os.ParcelFileDescriptor
+import android.provider.Settings
 import android.provider.OpenableColumns
 import android.text.format.Formatter
 import android.view.ViewGroup
@@ -169,6 +171,9 @@ import androidx.media3.common.MediaItem
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.PlayerView
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.BufferedOutputStream
@@ -200,7 +205,10 @@ class MainActivity : FragmentActivity() {
     private lateinit var vault: VaultRepository
     private lateinit var lockManager: LockManager
     private lateinit var transfer: PeerTransferManager
+    private val installScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private var pendingIncomingShareState by mutableStateOf<IncomingShare?>(null)
+    private var pendingInstallFile: File? = null
+    private var installPermissionOpened = false
 
     val pendingIncomingShare: IncomingShare?
         get() = pendingIncomingShareState
@@ -250,7 +258,40 @@ class MainActivity : FragmentActivity() {
         )
     }
 
+    fun installVaultPackage(vault: VaultRepository, file: VaultFile) {
+        installScope.launch {
+            val prepared = withContext(Dispatchers.IO) { vault.prepareViewing(file) } ?: return@launch
+            pendingInstallFile = prepared
+            continuePendingInstall()
+        }
+    }
+
+    private fun continuePendingInstall() {
+        val prepared = pendingInstallFile ?: return
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && !packageManager.canRequestPackageInstalls()) {
+            if (!installPermissionOpened) {
+                installPermissionOpened = true
+                startActivity(
+                    Intent(
+                        Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,
+                        Uri.parse("package:$packageName"),
+                    ),
+                )
+            }
+            return
+        }
+        installPermissionOpened = false
+        ApkInstaller.install(this, prepared)
+        pendingInstallFile = null
+    }
+
+    override fun onResume() {
+        super.onResume()
+        if (pendingInstallFile != null) continuePendingInstall()
+    }
+
     override fun onDestroy() {
+        installScope.cancel()
         transfer.close()
         vault.clearViewCache()
         super.onDestroy()
@@ -446,7 +487,11 @@ private fun VoltShareApp(
             onConfirm = { secret ->
                 if (lockManager.verify(secret)) {
                     fileToUnlock = null
-                    viewerFile = target
+                    if (isInstallable(target)) {
+                        activity.installVaultPackage(vault, target)
+                    } else {
+                        viewerFile = target
+                    }
                 }
             },
         )
@@ -596,6 +641,16 @@ private fun VoltShareApp(
         )
     }
 
+    fun openVaultFile(file: VaultFile) {
+        if (file.locked) {
+            fileToUnlock = file
+        } else if (isInstallable(file)) {
+            activity.installVaultPackage(vault, file)
+        } else {
+            viewerFile = file
+        }
+    }
+
     Scaffold(
         containerColor = VoltBlack,
         bottomBar = {
@@ -635,7 +690,7 @@ private fun VoltShareApp(
                         picker.launch(arrayOf("*/*"))
                     },
                     onOpen = { file ->
-                        if (file.locked) fileToUnlock = file else viewerFile = file
+                        openVaultFile(file)
                     },
                     onToggleLock = {
                         vault.toggleLocked(it)
@@ -666,7 +721,9 @@ private fun VoltShareApp(
                     onOpen = { file ->
                         if (selectedFileIds.isNotEmpty()) {
                             selectedFileIds = if (file.id in selectedFileIds) selectedFileIds - file.id else selectedFileIds + file.id
-                        } else if (file.locked) fileToUnlock = file else viewerFile = file
+                        } else {
+                            openVaultFile(file)
+                        }
                     },
                     onToggleLock = {
                         vault.toggleLocked(it)
