@@ -10,6 +10,7 @@ import java.io.File
 import java.io.FileInputStream
 import java.io.FileOutputStream
 import java.io.InputStream
+import java.io.ByteArrayInputStream
 import java.security.MessageDigest
 import java.security.KeyStore
 import java.util.UUID
@@ -89,6 +90,31 @@ class VaultRepository(private val context: Context) {
             val record = VaultFile(id, displayName, mimeType, size, locked = false, folderPath = targetFolder, createdAt = now, order = now)
             writeFiles(listFiles() + record)
             record
+        }.getOrNull()
+    }
+
+    fun importGeneratedFile(
+        source: File,
+        displayName: String,
+        mimeType: String,
+        folderPath: String = "/",
+    ): VaultFile? {
+        return runCatching {
+            source.inputStream().use { input ->
+                importStream(input, displayName, mimeType, folderPath)
+            }
+        }.getOrNull()
+    }
+
+    fun createTextFile(
+        text: String,
+        displayName: String = "VoltShare-note-${System.currentTimeMillis()}.txt",
+        folderPath: String = "/",
+    ): VaultFile? {
+        return runCatching {
+            ByteArrayInputStream(text.toByteArray(Charsets.UTF_8)).use { input ->
+                importStream(input, displayName, "text/plain", folderPath)
+            }
         }.getOrNull()
     }
 
@@ -259,6 +285,37 @@ class VaultRepository(private val context: Context) {
 
     fun clearViewCache() {
         viewCacheDir.listFiles()?.forEach { it.delete() }
+    }
+
+    private fun importStream(
+        input: InputStream,
+        displayName: String,
+        mimeType: String,
+        folderPath: String,
+    ): VaultFile {
+        val id = UUID.randomUUID().toString()
+        val encryptedFile = File(vaultDir, "$id.vault")
+        return try {
+            val size = encrypt(input, encryptedFile)
+            val now = System.currentTimeMillis()
+            val targetFolder = normalizeFolderPath(folderPath)
+            ensureFolderPath(targetFolder)
+            val record = VaultFile(
+                id = id,
+                name = displayName.sanitizeName(),
+                mimeType = mimeType,
+                sizeBytes = size,
+                locked = false,
+                folderPath = targetFolder,
+                createdAt = now,
+                order = now,
+            )
+            writeFiles(listFiles() + record)
+            record
+        } catch (error: Throwable) {
+            encryptedFile.delete()
+            throw error
+        }
     }
 
     private fun writeFiles(files: List<VaultFile>) {

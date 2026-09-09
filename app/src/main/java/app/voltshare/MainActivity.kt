@@ -2,6 +2,10 @@ package app.voltshare
 
 import android.graphics.BitmapFactory
 import android.graphics.pdf.PdfRenderer
+import android.content.Intent
+import android.content.pm.ApplicationInfo
+import android.content.pm.PackageManager
+import android.net.Uri
 import android.os.Bundle
 import android.text.format.Formatter
 import android.view.ViewGroup
@@ -58,6 +62,7 @@ import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ContentCopy
+import androidx.compose.material.icons.filled.ContentPaste
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.Fingerprint
 import androidx.compose.material.icons.filled.Folder
@@ -87,6 +92,7 @@ import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SmallTopAppBar
 import androidx.compose.material3.Surface
@@ -102,6 +108,7 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -113,7 +120,9 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -123,13 +132,19 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.fragment.app.FragmentActivity
+import androidx.documentfile.provider.DocumentFile
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.media3.common.MediaItem
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.PlayerView
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.io.BufferedOutputStream
 import java.io.File
+import java.io.FileOutputStream
+import java.util.zip.ZipEntry
+import java.util.zip.ZipOutputStream
 
 private val VoltGreen = Color(0xFF00E676)
 private val VoltBlack = Color(0xFF000000)
@@ -138,13 +153,29 @@ private val VoltSurfaceRaised = Color(0xFF1B1F1E)
 private val VoltTextMuted = Color.White.copy(alpha = 0.52f)
 private val VoltTeal = Color(0xFF00796B)
 
+data class IncomingShare(
+    val uris: List<Uri> = emptyList(),
+    val text: String? = null,
+)
+
+data class InstalledAppChoice(
+    val label: String,
+    val packageName: String,
+    val apkPaths: List<String>,
+)
+
 class MainActivity : FragmentActivity() {
     private lateinit var vault: VaultRepository
     private lateinit var lockManager: LockManager
     private lateinit var transfer: PeerTransferManager
+    private var pendingIncomingShareState by mutableStateOf<IncomingShare?>(null)
+
+    val pendingIncomingShare: IncomingShare?
+        get() = pendingIncomingShareState
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        pendingIncomingShareState = intent.toIncomingShare()
         vault = VaultRepository(this)
         lockManager = LockManager(this)
         transfer = PeerTransferManager(this, vault)
@@ -153,6 +184,16 @@ class MainActivity : FragmentActivity() {
                 VoltShareApp(this, vault, lockManager, transfer)
             }
         }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        pendingIncomingShareState = intent.toIncomingShare()
+    }
+
+    fun consumePendingIncomingShare() {
+        pendingIncomingShareState = null
     }
 
     fun authenticateWithBiometric(onSuccess: () -> Unit) {
@@ -182,6 +223,25 @@ class MainActivity : FragmentActivity() {
         vault.clearViewCache()
         super.onDestroy()
     }
+}
+
+private fun Intent.toIncomingShare(): IncomingShare? {
+    if (action != Intent.ACTION_SEND && action != Intent.ACTION_SEND_MULTIPLE) return null
+    val uris = buildList {
+        clipData?.let { clip ->
+            for (index in 0 until clip.itemCount) {
+                clip.getItemAt(index).uri?.let(::add)
+            }
+        }
+        if (action == Intent.ACTION_SEND) {
+            getParcelableExtra<Uri>(Intent.EXTRA_STREAM)?.let(::add)
+        } else {
+            @Suppress("DEPRECATION")
+            getParcelableArrayListExtra<Uri>(Intent.EXTRA_STREAM)?.forEach(::add)
+        }
+    }.distinct()
+    val text = getStringExtra(Intent.EXTRA_TEXT)?.takeIf { it.isNotBlank() }
+    return IncomingShare(uris, text).takeIf { it.uris.isNotEmpty() || it.text != null }
 }
 
 @Composable
@@ -233,6 +293,10 @@ private fun VoltShareApp(
     var showRenameFolder by remember { mutableStateOf(false) }
     var showSort by remember { mutableStateOf(false) }
     var importFolder by remember { mutableStateOf("/") }
+    var lastSharedFile by remember { mutableStateOf<VaultFile?>(null) }
+    val scope = rememberCoroutineScope()
+    val incomingShare = activity.pendingIncomingShare
+
     LaunchedEffect(transfer) {
         transfer.status.collect { status ->
             if (status.label.startsWith("Received and verified")) {
@@ -241,17 +305,97 @@ private fun VoltShareApp(
             }
         }
     }
+
+    LaunchedEffect(configured, unlocked, incomingShare) {
+        if (!configured || !unlocked || incomingShare == null) return@LaunchedEffect
+        withContext(Dispatchers.IO) {
+            incomingShare.uris.forEach { uri ->
+                runCatching {
+                    activity.contentResolver.takePersistableUriPermission(
+                        uri,
+                        Intent.FLAG_GRANT_READ_URI_PERMISSION,
+                    )
+                }
+                vault.importUri(uri)
+            }
+            incomingShare.text?.let { text ->
+                vault.createTextFile(text, "shared-text-${System.currentTimeMillis()}.txt")
+            }
+        }
+        files = vault.listFiles()
+        folders = vault.listFolders()
+        activity.consumePendingIncomingShare()
+    }
+
     val picker = rememberLauncherForActivityResult(
         ActivityResultContracts.OpenMultipleDocuments(),
     ) { uris ->
         uris.forEach { uri ->
-            activity.contentResolver.takePersistableUriPermission(
-                uri,
-                android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION,
-            )
+            runCatching {
+                activity.contentResolver.takePersistableUriPermission(
+                    uri,
+                    Intent.FLAG_GRANT_READ_URI_PERMISSION,
+                )
+            }
             vault.importUri(uri, importFolder)
         }
         files = vault.listFiles()
+    }
+    val shareFilePicker = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocument(),
+    ) { uri ->
+        uri ?: return@rememberLauncherForActivityResult
+        scope.launch {
+            val imported = withContext(Dispatchers.IO) {
+                runCatching {
+                    activity.contentResolver.takePersistableUriPermission(
+                        uri,
+                        Intent.FLAG_GRANT_READ_URI_PERMISSION,
+                    )
+                }
+                vault.importUri(uri)
+            }
+            imported?.let {
+                files = vault.listFiles()
+                lastSharedFile = it
+            }
+        }
+    }
+    val mediaPicker = rememberLauncherForActivityResult(
+        ActivityResultContracts.GetContent(),
+    ) { uri ->
+        uri ?: return@rememberLauncherForActivityResult
+        scope.launch {
+            val imported = withContext(Dispatchers.IO) { vault.importUri(uri) }
+            imported?.let {
+                files = vault.listFiles()
+                lastSharedFile = it
+            }
+        }
+    }
+    val folderPicker = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocumentTree(),
+    ) { uri ->
+        uri ?: return@rememberLauncherForActivityResult
+        scope.launch {
+            val imported = withContext(Dispatchers.IO) {
+                createFolderArchive(activity, uri)?.let { archive ->
+                    try {
+                        vault.importGeneratedFile(
+                            source = archive,
+                            displayName = "${archive.nameWithoutExtension}.zip",
+                            mimeType = "application/zip",
+                        )
+                    } finally {
+                        archive.delete()
+                    }
+                }
+            }
+            imported?.let {
+                files = vault.listFiles()
+                lastSharedFile = it
+            }
+        }
     }
 
     if (!configured) {
@@ -409,6 +553,43 @@ private fun VoltShareApp(
                 AppTab.SHARE -> ShareHome(
                     files = files,
                     transfer = transfer,
+                    newlyPreparedFile = lastSharedFile,
+                    onPickFile = { shareFilePicker.launch(arrayOf("*/*")) },
+                    onPickMedia = { mediaPicker.launch("image/*") },
+                    onPickFolder = { folderPicker.launch(null) },
+                    onCreateText = { text ->
+                        scope.launch {
+                            val created = withContext(Dispatchers.IO) {
+                                vault.createTextFile(text)
+                            }
+                            created?.let {
+                                files = vault.listFiles()
+                                lastSharedFile = it
+                            }
+                        }
+                    },
+                    onPickInstalledApp = { app ->
+                        scope.launch {
+                            val created = withContext(Dispatchers.IO) {
+                                createInstalledAppPackage(activity, app)?.let { packageFile ->
+                                    try {
+                                        val extension = if (app.apkPaths.size > 1) "apks" else "apk"
+                                        vault.importGeneratedFile(
+                                            source = packageFile,
+                                            displayName = "${safeFileName(app.label)}.$extension",
+                                            mimeType = "application/vnd.android.package-archive",
+                                        )
+                                    } finally {
+                                        packageFile.delete()
+                                    }
+                                }
+                            }
+                            created?.let {
+                                files = vault.listFiles()
+                                lastSharedFile = it
+                            }
+                        }
+                    },
                 )
 
                 AppTab.SECURITY -> SecurityHome(
@@ -882,10 +1063,44 @@ private fun FileRow(
 }
 
 @Composable
-private fun ShareHome(files: List<VaultFile>, transfer: PeerTransferManager) {
+private fun ShareHome(
+    files: List<VaultFile>,
+    transfer: PeerTransferManager,
+    newlyPreparedFile: VaultFile?,
+    onPickFile: () -> Unit,
+    onPickMedia: () -> Unit,
+    onPickFolder: () -> Unit,
+    onCreateText: (String) -> Unit,
+    onPickInstalledApp: (InstalledAppChoice) -> Unit,
+) {
     val peers by transfer.peers.collectAsStateWithLifecycle()
     val status by transfer.status.collectAsStateWithLifecycle()
     var selectedFile by remember(files) { mutableStateOf(files.firstOrNull()) }
+    var showTextEditor by remember { mutableStateOf(false) }
+    var showInstalledApps by remember { mutableStateOf(false) }
+
+    LaunchedEffect(newlyPreparedFile?.id) {
+        newlyPreparedFile?.let { selectedFile = it }
+    }
+
+    if (showTextEditor) {
+        TextComposerDialog(
+            onDismiss = { showTextEditor = false },
+            onCreate = {
+                showTextEditor = false
+                onCreateText(it)
+            },
+        )
+    }
+    if (showInstalledApps) {
+        InstalledAppsDialog(
+            onDismiss = { showInstalledApps = false },
+            onSelected = {
+                showInstalledApps = false
+                onPickInstalledApp(it)
+            },
+        )
+    }
 
     LazyColumn(
         modifier = Modifier.fillMaxSize().background(VoltBlack),
@@ -898,6 +1113,51 @@ private fun ShareHome(files: List<VaultFile>, transfer: PeerTransferManager) {
             Text("Share, without a server", style = MaterialTheme.typography.headlineMedium, color = Color.White)
             Spacer(Modifier.height(8.dp))
             Text("VoltShare connects devices directly over the same local network. Nothing routes through a cloud.", color = VoltTextMuted, lineHeight = 21.sp)
+        }
+        item {
+            Text("Choose what to send", color = Color.White, fontSize = 17.sp, fontWeight = FontWeight.Bold)
+            Spacer(Modifier.height(10.dp))
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
+                    ShareOptionTile(
+                        title = "Any file",
+                        subtitle = "Documents, APKs, archives",
+                        icon = Icons.Default.Description,
+                        onClick = onPickFile,
+                        modifier = Modifier.weight(1f),
+                    )
+                    ShareOptionTile(
+                        title = "Full folder",
+                        subtitle = "Send as one ZIP",
+                        icon = Icons.Default.Folder,
+                        onClick = onPickFolder,
+                        modifier = Modifier.weight(1f),
+                    )
+                }
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
+                    ShareOptionTile(
+                        title = "Text note",
+                        subtitle = "Type or paste a .txt",
+                        icon = Icons.Default.TextSnippet,
+                        onClick = { showTextEditor = true },
+                        modifier = Modifier.weight(1f),
+                    )
+                    ShareOptionTile(
+                        title = "Photos",
+                        subtitle = "Choose from gallery",
+                        icon = Icons.Default.Image,
+                        onClick = onPickMedia,
+                        modifier = Modifier.weight(1f),
+                    )
+                }
+                ShareOptionTile(
+                    title = "Installed Android app",
+                    subtitle = "Share a user-installed APK or split APKS package",
+                    icon = Icons.Default.Smartphone,
+                    onClick = { showInstalledApps = true },
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
         }
         item {
             GlassCard(modifier = Modifier.fillMaxWidth(), accent = VoltGreen) {
@@ -1004,6 +1264,185 @@ private fun ShareHome(files: List<VaultFile>, transfer: PeerTransferManager) {
             }
         }
     }
+}
+
+@Composable
+private fun ShareOptionTile(
+    title: String,
+    subtitle: String,
+    icon: ImageVector,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    GlassCard(
+        modifier = modifier.clickable(onClick = onClick),
+        accent = VoltGreen,
+        padding = 14.dp,
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Box(
+                modifier = Modifier.size(40.dp).background(VoltGreen.copy(alpha = 0.11f), RoundedCornerShape(13.dp)),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(icon, null, tint = VoltGreen, modifier = Modifier.size(20.dp))
+            }
+            Spacer(Modifier.width(10.dp))
+            Column {
+                Text(title, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                Spacer(Modifier.height(3.dp))
+                Text(subtitle, color = VoltTextMuted, fontSize = 10.sp, lineHeight = 13.sp)
+            }
+        }
+    }
+}
+
+@Composable
+private fun TextComposerDialog(
+    onDismiss: () -> Unit,
+    onCreate: (String) -> Unit,
+) {
+    var text by remember { mutableStateOf("") }
+    val clipboard = LocalClipboardManager.current
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = VoltSurfaceRaised,
+        title = {
+            Column {
+                Text("Create a text share", color = Color.White)
+                Spacer(Modifier.height(5.dp))
+                Text("Your note will be saved as a private .txt file.", color = VoltTextMuted, fontSize = 12.sp)
+            }
+        },
+        text = {
+            Column {
+                OutlinedTextField(
+                    value = text,
+                    onValueChange = { text = it },
+                    modifier = Modifier.fillMaxWidth().height(190.dp),
+                    placeholder = { Text("Type or paste anything…", color = VoltTextMuted) },
+                    textStyle = TextStyle(color = Color.White, fontSize = 14.sp),
+                    minLines = 7,
+                    maxLines = 9,
+                    colors = androidx.compose.material3.TextFieldDefaults.colors(
+                        focusedContainerColor = VoltSurface,
+                        unfocusedContainerColor = VoltSurface,
+                        focusedTextColor = Color.White,
+                        unfocusedTextColor = Color.White,
+                        focusedBorderColor = VoltGreen,
+                        unfocusedBorderColor = Color.White.copy(alpha = 0.14f),
+                        cursorColor = VoltGreen,
+                    ),
+                )
+                Spacer(Modifier.height(8.dp))
+                TextButton(
+                    onClick = { clipboard.getText()?.text?.let { text = it } },
+                    colors = ButtonDefaults.textButtonColors(contentColor = VoltGreen),
+                ) {
+                    Icon(Icons.Default.ContentPaste, null, modifier = Modifier.size(17.dp))
+                    Spacer(Modifier.width(7.dp))
+                    Text("Paste from clipboard")
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = { onCreate(text) },
+                enabled = text.isNotBlank(),
+                colors = ButtonDefaults.textButtonColors(contentColor = VoltGreen),
+            ) {
+                Icon(Icons.Default.Share, null, modifier = Modifier.size(17.dp))
+                Spacer(Modifier.width(6.dp))
+                Text("Prepare to send")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss, colors = ButtonDefaults.textButtonColors(contentColor = VoltTextMuted)) {
+                Text("Cancel")
+            }
+        },
+    )
+}
+
+@Composable
+private fun InstalledAppsDialog(
+    onDismiss: () -> Unit,
+    onSelected: (InstalledAppChoice) -> Unit,
+) {
+    val context = LocalContext.current
+    val apps = remember {
+        context.packageManager
+            .getInstalledApplications(PackageManager.GET_META_DATA)
+            .asSequence()
+            .filter { it.packageName != context.packageName }
+            .filter { it.flags and ApplicationInfo.FLAG_SYSTEM == 0 }
+            .mapNotNull { info ->
+                val paths = buildList {
+                    info.sourceDir?.let(::add)
+                    info.splitSourceDirs?.forEach(::add)
+                }.filter { File(it).isFile }
+                if (paths.isEmpty()) null else InstalledAppChoice(
+                    label = context.packageManager.getApplicationLabel(info).toString(),
+                    packageName = info.packageName,
+                    apkPaths = paths,
+                )
+            }
+            .sortedBy { it.label.lowercase() }
+            .toList()
+    }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = VoltSurfaceRaised,
+        title = {
+            Column {
+                Text("Installed Android apps", color = Color.White)
+                Spacer(Modifier.height(5.dp))
+                Text("Only user-installed apps are shown. Split apps become an APKS package.", color = VoltTextMuted, fontSize = 12.sp)
+            }
+        },
+        text = {
+            if (apps.isEmpty()) {
+                Text("No user-installed apps were found on this device.", color = VoltTextMuted)
+            } else {
+                Column(Modifier.height(330.dp).verticalScroll(rememberScrollState())) {
+                    apps.forEach { app ->
+                        Surface(
+                            modifier = Modifier.fillMaxWidth().clickable { onSelected(app) },
+                            color = Color.Transparent,
+                            shape = RoundedCornerShape(14.dp),
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(vertical = 10.dp, horizontal = 4.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Box(
+                                    modifier = Modifier.size(40.dp).background(VoltGreen.copy(alpha = 0.11f), CircleShape),
+                                    contentAlignment = Alignment.Center,
+                                ) {
+                                    Icon(Icons.Default.Smartphone, null, tint = VoltGreen, modifier = Modifier.size(20.dp))
+                                }
+                                Spacer(Modifier.width(12.dp))
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(app.label, color = Color.White, fontWeight = FontWeight.SemiBold, maxLines = 1)
+                                    Text(
+                                        "${app.packageName} • ${if (app.apkPaths.size > 1) "split APKS" else "APK"}",
+                                        color = VoltTextMuted,
+                                        fontSize = 10.sp,
+                                        maxLines = 1,
+                                    )
+                                }
+                                Icon(Icons.Default.ArrowUpward, null, tint = VoltGreen, modifier = Modifier.size(17.dp))
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss, colors = ButtonDefaults.textButtonColors(contentColor = VoltTextMuted)) {
+                Text("Cancel")
+            }
+        },
+    )
 }
 
 @Composable
@@ -1468,6 +1907,72 @@ private fun GlassCard(modifier: Modifier, accent: Color, padding: androidx.compo
         content = content,
     )
 }
+
+private fun createFolderArchive(context: MainActivity, treeUri: Uri): File? {
+    val root = DocumentFile.fromTreeUri(context, treeUri) ?: return null
+    val rootName = safeFileName(root.name ?: "shared-folder")
+    val output = File(context.cacheDir, "$rootName-${System.currentTimeMillis()}.zip")
+    return runCatching {
+        ZipOutputStream(BufferedOutputStream(FileOutputStream(output))).use { zip ->
+            root.listFiles().forEach { child ->
+                addDocumentToZip(context, child, "$rootName/${safeFileName(child.name ?: "item")}", zip)
+            }
+        }
+        output
+    }.getOrElse {
+        output.delete()
+        null
+    }
+}
+
+private fun addDocumentToZip(
+    context: MainActivity,
+    document: DocumentFile,
+    path: String,
+    zip: ZipOutputStream,
+) {
+    if (document.isDirectory) {
+        zip.putNextEntry(ZipEntry("$path/"))
+        zip.closeEntry()
+        document.listFiles().forEach { child ->
+            addDocumentToZip(context, child, "$path/${safeFileName(child.name ?: "item")}", zip)
+        }
+    } else {
+        zip.putNextEntry(ZipEntry(path))
+        context.contentResolver.openInputStream(document.uri)?.use { input ->
+            input.copyTo(zip, 1024 * 1024)
+        } ?: error("Could not read ${document.name}")
+        zip.closeEntry()
+    }
+}
+
+private fun createInstalledAppPackage(context: MainActivity, app: InstalledAppChoice): File? {
+    val extension = if (app.apkPaths.size > 1) "apks" else "apk"
+    val output = File(context.cacheDir, "${safeFileName(app.label)}-${System.currentTimeMillis()}.$extension")
+    return runCatching {
+        if (app.apkPaths.size == 1) {
+            File(app.apkPaths.first()).inputStream().use { input ->
+                output.outputStream().use { out -> input.copyTo(out, 1024 * 1024) }
+            }
+        } else {
+            ZipOutputStream(BufferedOutputStream(FileOutputStream(output))).use { zip ->
+                app.apkPaths.forEachIndexed { index, sourcePath ->
+                    val source = File(sourcePath)
+                    zip.putNextEntry(ZipEntry("${index.toString().padStart(2, '0')}-${source.name}"))
+                    source.inputStream().use { input -> input.copyTo(zip, 1024 * 1024) }
+                    zip.closeEntry()
+                }
+            }
+        }
+        output
+    }.getOrElse {
+        output.delete()
+        null
+    }
+}
+
+private fun safeFileName(value: String): String =
+    value.replace(Regex("[^A-Za-z0-9._ -]"), "_").trim().take(80).ifBlank { "shared-item" }
 
 private fun fileIcon(file: VaultFile): ImageVector = when {
     isImage(file) -> Icons.Default.Image

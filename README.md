@@ -9,6 +9,8 @@ VoltShare is a native Android vault and device-to-device sharing app. Files are 
 - AES-GCM encrypted vault files with Android Keystore-backed key material.
 - File-level lock gate using the vault lock.
 - Folder creation, nested folders, rename/delete, file move, private-file search, eight sort modes, and custom up/down ordering.
+- Share actions for any file, complete folders as ZIP archives, typed or pasted text as private `.txt` files, gallery photos, and user-installed Android apps as APK or split APKS packages.
+- Android Sharesheet receiving for single files, multiple files, and text from other apps; incoming items wait behind the VoltShare lock and are encrypted into the private vault.
 - Specialized viewer routing for images, video, text/code, PDFs, and APK/XAPK/APKS package installation.
 - Direct local transfer host/discovery/send/receive flow using Android NSD and buffered TCP sockets, with protocol versioning, exact-size validation, SHA-256 verification, and safe rejection of partial files.
 - Premium dark/volt-green UI with layered elevation, gradient glow edges, rounded controls, and spring/fade motion.
