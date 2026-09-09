@@ -1,0 +1,1 @@
+- [Share transfer state](share-transfer-state.md) — keep hosting, discovery, and batch-transfer activity separate so device controls stay usable during sends.

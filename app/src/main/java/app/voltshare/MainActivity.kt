@@ -1,15 +1,19 @@
 package app.voltshare
 
+import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.graphics.drawable.Drawable
 import android.graphics.pdf.PdfRenderer
 import android.content.Intent
 import android.content.pm.ApplicationInfo
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Bundle
+import android.os.ParcelFileDescriptor
 import android.text.format.Formatter
 import android.view.ViewGroup
 import android.widget.ImageView
+import android.media.MediaMetadataRetriever
 import androidx.activity.compose.setContent
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -23,12 +27,19 @@ import androidx.compose.animation.scaleIn
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -66,8 +77,10 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.ContentPaste
 import androidx.compose.material.icons.filled.Description
+import androidx.compose.material.icons.filled.DragHandle
 import androidx.compose.material.icons.filled.Fingerprint
 import androidx.compose.material.icons.filled.Folder
+import androidx.compose.material.icons.filled.FolderOpen
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.LockOpen
@@ -86,6 +99,7 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Divider
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
@@ -110,19 +124,24 @@ import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
@@ -132,6 +151,9 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
+import androidx.core.graphics.drawable.toBitmap
 import androidx.fragment.app.FragmentActivity
 import androidx.documentfile.provider.DocumentFile
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -163,6 +185,7 @@ data class InstalledAppChoice(
     val label: String,
     val packageName: String,
     val apkPaths: List<String>,
+    val icon: Drawable? = null,
 )
 
 class MainActivity : FragmentActivity() {
@@ -271,6 +294,7 @@ private fun VoltShareTheme(content: @Composable () -> Unit) {
 
 private enum class AppTab(val label: String, val icon: ImageVector) {
     VAULT("Vault", Icons.Default.Folder),
+    FILES("Files", Icons.Default.FolderOpen),
     SHARE("Share", Icons.Default.Share),
     SECURITY("Lock", Icons.Default.Security),
 }
@@ -296,13 +320,13 @@ private fun VoltShareApp(
     var showRenameFolder by remember { mutableStateOf(false) }
     var showSort by remember { mutableStateOf(false) }
     var importFolder by remember { mutableStateOf("/") }
-    var lastSharedFile by remember { mutableStateOf<VaultFile?>(null) }
+    var lastSharedFiles by remember { mutableStateOf<List<VaultFile>>(emptyList()) }
     val scope = rememberCoroutineScope()
     val incomingShare = activity.pendingIncomingShare
 
     LaunchedEffect(transfer) {
         transfer.status.collect { status ->
-            if (status.label.startsWith("Received and verified")) {
+            if (status.label.startsWith("Received and verified") || status.label.startsWith("Sent and verified")) {
                 files = vault.listFiles()
                 folders = vault.listFolders()
             }
@@ -345,34 +369,46 @@ private fun VoltShareApp(
         files = vault.listFiles()
     }
     val shareFilePicker = rememberLauncherForActivityResult(
-        ActivityResultContracts.OpenDocument(),
-    ) { uri ->
-        uri ?: return@rememberLauncherForActivityResult
+        ActivityResultContracts.OpenMultipleDocuments(),
+    ) { uris ->
+        if (uris.isEmpty()) return@rememberLauncherForActivityResult
         scope.launch {
             val imported = withContext(Dispatchers.IO) {
-                runCatching {
-                    activity.contentResolver.takePersistableUriPermission(
-                        uri,
-                        Intent.FLAG_GRANT_READ_URI_PERMISSION,
-                    )
+                uris.mapNotNull { uri ->
+                    runCatching {
+                        activity.contentResolver.takePersistableUriPermission(
+                            uri,
+                            Intent.FLAG_GRANT_READ_URI_PERMISSION,
+                        )
+                    }
+                    vault.importUri(uri)
                 }
-                vault.importUri(uri)
             }
-            imported?.let {
+            if (imported.isNotEmpty()) {
                 files = vault.listFiles()
-                lastSharedFile = it
+                lastSharedFiles = imported
             }
         }
     }
     val mediaPicker = rememberLauncherForActivityResult(
-        ActivityResultContracts.GetContent(),
-    ) { uri ->
-        uri ?: return@rememberLauncherForActivityResult
+        ActivityResultContracts.OpenMultipleDocuments(),
+    ) { uris ->
+        if (uris.isEmpty()) return@rememberLauncherForActivityResult
         scope.launch {
-            val imported = withContext(Dispatchers.IO) { vault.importUri(uri) }
-            imported?.let {
+            val imported = withContext(Dispatchers.IO) {
+                uris.mapNotNull { uri ->
+                    runCatching {
+                        activity.contentResolver.takePersistableUriPermission(
+                            uri,
+                            Intent.FLAG_GRANT_READ_URI_PERMISSION,
+                        )
+                    }
+                    vault.importUri(uri)
+                }
+            }
+            if (imported.isNotEmpty()) {
                 files = vault.listFiles()
-                lastSharedFile = it
+                lastSharedFiles = imported
             }
         }
     }
@@ -396,7 +432,7 @@ private fun VoltShareApp(
             }
             imported?.let {
                 files = vault.listFiles()
-                lastSharedFile = it
+                lastSharedFiles = listOf(it)
             }
         }
     }
@@ -529,6 +565,22 @@ private fun VoltShareApp(
             when (current) {
                 AppTab.VAULT -> VaultHome(
                     files = files,
+                    onImport = {
+                        importFolder = "/"
+                        picker.launch(arrayOf("*/*"))
+                    },
+                    onOpen = { file ->
+                        if (file.locked) fileToUnlock = file else viewerFile = file
+                    },
+                    onToggleLock = {
+                        vault.toggleLocked(it)
+                        files = vault.listFiles()
+                    },
+                    vault = vault,
+                )
+
+                AppTab.FILES -> FilesHome(
+                    files = files,
                     folders = folders,
                     currentFolder = currentFolder,
                     sortMode = sortMode,
@@ -558,14 +610,16 @@ private fun VoltShareApp(
                         vault.reorder(file, direction)
                         files = vault.listFiles()
                     },
+                    vault = vault,
                 )
 
                 AppTab.SHARE -> ShareHome(
                     files = files,
                     transfer = transfer,
-                    newlyPreparedFile = lastSharedFile,
+                    vault = vault,
+                    newlyPreparedFiles = lastSharedFiles,
                     onPickFile = { shareFilePicker.launch(arrayOf("*/*")) },
-                    onPickMedia = { mediaPicker.launch("image/*") },
+                    onPickMedia = { mediaPicker.launch(arrayOf("image/*", "video/*")) },
                     onPickFolder = { folderPicker.launch(null) },
                     onCreateText = { text ->
                         scope.launch {
@@ -574,29 +628,31 @@ private fun VoltShareApp(
                             }
                             created?.let {
                                 files = vault.listFiles()
-                                lastSharedFile = it
+                                lastSharedFiles = listOf(it)
                             }
                         }
                     },
-                    onPickInstalledApp = { app ->
+                    onPickInstalledApp = { apps ->
                         scope.launch {
                             val created = withContext(Dispatchers.IO) {
-                                createInstalledAppPackage(activity, app)?.let { packageFile ->
-                                    try {
-                                        val extension = if (app.apkPaths.size > 1) "apks" else "apk"
-                                        vault.importGeneratedFile(
-                                            source = packageFile,
-                                            displayName = "${safeFileName(app.label)}.$extension",
-                                            mimeType = "application/vnd.android.package-archive",
-                                        )
-                                    } finally {
-                                        packageFile.delete()
+                                apps.mapNotNull { app ->
+                                    createInstalledAppPackage(activity, app)?.let { packageFile ->
+                                        try {
+                                            val extension = if (app.apkPaths.size > 1) "apks" else "apk"
+                                            vault.importGeneratedFile(
+                                                source = packageFile,
+                                                displayName = "${safeFileName(app.label)}.$extension",
+                                                mimeType = "application/vnd.android.package-archive",
+                                            )
+                                        } finally {
+                                            packageFile.delete()
+                                        }
                                     }
                                 }
                             }
-                            created?.let {
+                            if (created.isNotEmpty()) {
                                 files = vault.listFiles()
-                                lastSharedFile = it
+                                lastSharedFiles = created
                             }
                         }
                     },
@@ -764,8 +820,9 @@ private fun LockScaffold(
         Column(
             modifier = Modifier
                 .fillMaxSize()
+                .verticalScroll(rememberScrollState())
                 .padding(horizontal = 24.dp, vertical = 48.dp),
-            verticalArrangement = Arrangement.Center,
+            verticalArrangement = Arrangement.Top,
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(Icons.Default.Bolt, null, tint = VoltGreen, modifier = Modifier.size(18.dp))
@@ -785,6 +842,90 @@ private fun LockScaffold(
 @Composable
 private fun VaultHome(
     files: List<VaultFile>,
+    onImport: () -> Unit,
+    onOpen: (VaultFile) -> Unit,
+    onToggleLock: (VaultFile) -> Unit,
+    vault: VaultRepository,
+) {
+    val recentFiles = files.sortedByDescending { it.createdAt }.take(5)
+    LazyColumn(
+        modifier = Modifier.fillMaxSize().background(VoltBlack),
+        contentPadding = PaddingValues(horizontal = 20.dp, vertical = 22.dp),
+        verticalArrangement = Arrangement.spacedBy(18.dp),
+    ) {
+        item {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Column {
+                    Text("V O L T S H A R E", color = VoltGreen, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 3.sp)
+                    Spacer(Modifier.height(8.dp))
+                    Text("Your private vault", style = MaterialTheme.typography.headlineMedium, color = Color.White)
+                    Text("A calm command center for protected files", color = VoltTextMuted, fontSize = 13.sp)
+                }
+                Box(
+                    modifier = Modifier.size(46.dp).background(VoltGreen.copy(alpha = 0.12f), CircleShape),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(Icons.Default.Bolt, null, tint = VoltGreen, modifier = Modifier.size(24.dp))
+                }
+            }
+        }
+        item { VaultMetricCard(files) }
+        item {
+            GlowButton(
+                text = "Import files",
+                icon = Icons.Default.Add,
+                onClick = onImport,
+                modifier = Modifier.fillMaxWidth(),
+            )
+        }
+        item {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Column {
+                    Text("Recent files", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                    Text("Open, lock, or preview what you added last", color = VoltTextMuted, fontSize = 12.sp)
+                }
+                Text("${files.size} total", color = VoltGreen, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+            }
+        }
+        if (recentFiles.isEmpty()) {
+            item { EmptyVaultCard(onImport) }
+        } else {
+            items(recentFiles, key = { it.id }) { file ->
+                FileRow(
+                    file = file,
+                    vault = vault,
+                    onOpen = onOpen,
+                    onToggleLock = onToggleLock,
+                    onMove = {},
+                    onMoveUp = {},
+                    onMoveDown = {},
+                    allowReorder = false,
+                    showFolderAction = false,
+                )
+            }
+        }
+        item {
+            Text(
+                "Files stay inside encrypted app-private storage",
+                color = VoltTextMuted,
+                fontSize = 12.sp,
+                modifier = Modifier.padding(top = 8.dp, bottom = 20.dp),
+            )
+        }
+    }
+}
+
+@Composable
+private fun FilesHome(
+    files: List<VaultFile>,
     folders: List<String>,
     currentFolder: String,
     sortMode: VaultSort,
@@ -798,13 +939,20 @@ private fun VaultHome(
     onToggleLock: (VaultFile) -> Unit,
     onMove: (VaultFile) -> Unit,
     onReorder: (VaultFile, Int) -> Unit,
+    vault: VaultRepository,
 ) {
-    var searchOpen by remember { mutableStateOf(false) }
     var searchQuery by remember { mutableStateOf("") }
+    var activeFilter by remember { mutableStateOf("All") }
+    val filterOptions = listOf("All", "Sent", "Received")
     val visibleFiles = sortVaultFiles(
         files.filter {
             it.folderPath == currentFolder &&
-                (searchQuery.isBlank() || it.name.contains(searchQuery.trim(), ignoreCase = true))
+                (searchQuery.isBlank() || it.name.contains(searchQuery.trim(), ignoreCase = true)) &&
+                when (activeFilter) {
+                    "Sent" -> it.transferDirection == TransferDirection.SENT
+                    "Received" -> it.transferDirection == TransferDirection.RECEIVED
+                    else -> true
+                }
         },
         sortMode,
     )
@@ -829,30 +977,62 @@ private fun VaultHome(
                 }
             }
         }
-        if (searchOpen) {
-            item {
-                OutlinedTextField(
-                    value = searchQuery,
-                    onValueChange = { searchQuery = it },
-                    label = { Text("Search private files") },
-                    leadingIcon = { Icon(Icons.Default.Search, null, tint = VoltGreen) },
-                    trailingIcon = {
-                        IconButton(onClick = { searchQuery = ""; searchOpen = false }) {
-                            Icon(Icons.Default.Close, "Close search", tint = VoltTextMuted)
+        item {
+            OutlinedTextField(
+                value = searchQuery,
+                onValueChange = { searchQuery = it },
+                label = { Text("Search files and folders") },
+                leadingIcon = { Icon(Icons.Default.Search, null, tint = VoltGreen) },
+                trailingIcon = {
+                    if (searchQuery.isNotEmpty()) {
+                        IconButton(onClick = { searchQuery = "" }) {
+                            Icon(Icons.Default.Close, "Clear search", tint = VoltTextMuted)
                         }
-                    },
-                    modifier = Modifier.fillMaxWidth(),
-                    singleLine = true,
-                    shape = RoundedCornerShape(18.dp),
-                    colors = androidx.compose.material3.OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = VoltGreen,
-                        focusedLabelColor = VoltGreen,
-                        cursorColor = VoltGreen,
-                        unfocusedBorderColor = Color.White.copy(alpha = 0.16f),
-                        focusedTextColor = Color.White,
-                        unfocusedTextColor = Color.White,
-                    ),
-                )
+                    }
+                },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+                shape = RoundedCornerShape(18.dp),
+                colors = androidx.compose.material3.OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = VoltGreen,
+                    focusedLabelColor = VoltGreen,
+                    cursorColor = VoltGreen,
+                    unfocusedBorderColor = Color.White.copy(alpha = 0.16f),
+                    focusedTextColor = Color.White,
+                    unfocusedTextColor = Color.White,
+                ),
+            )
+        }
+        item {
+            Row(
+                modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                filterOptions.forEach { option ->
+                    FilterChip(
+                        selected = activeFilter == option,
+                        onClick = { activeFilter = option },
+                        label = { Text(option) },
+                        leadingIcon = if (activeFilter == option) {
+                            { Icon(Icons.Default.Check, null, modifier = Modifier.size(16.dp)) }
+                        } else {
+                            null
+                        },
+                        colors = androidx.compose.material3.FilterChipDefaults.filterChipColors(
+                            selectedContainerColor = VoltGreen,
+                            selectedLabelColor = Color.Black,
+                            selectedLeadingIconColor = Color.Black,
+                            containerColor = VoltSurface,
+                            labelColor = VoltTextMuted,
+                        ),
+                        border = androidx.compose.material3.FilterChipDefaults.filterChipBorder(
+                            enabled = true,
+                            selected = activeFilter == option,
+                            borderColor = Color.White.copy(alpha = 0.12f),
+                            selectedBorderColor = VoltGreen,
+                        ),
+                    )
+                }
             }
         }
         item {
@@ -914,7 +1094,7 @@ private fun VaultHome(
                     modifier = Modifier.weight(1f),
                 )
                 OutlinedButton(
-                    onClick = { searchOpen = true },
+                    onClick = { searchQuery = "" },
                     modifier = Modifier.weight(0.65f).height(54.dp).shadow(10.dp, RoundedCornerShape(20.dp), spotColor = VoltGreen.copy(alpha = 0.16f)),
                     shape = RoundedCornerShape(20.dp),
                     border = BorderStroke(1.dp, VoltGreen.copy(alpha = 0.3f)),
@@ -943,6 +1123,7 @@ private fun VaultHome(
             items(visibleFiles, key = { it.id }) { file ->
                 FileRow(
                     file = file,
+                    vault = vault,
                     onOpen = onOpen,
                     onToggleLock = onToggleLock,
                     onMove = onMove,
@@ -1027,44 +1208,94 @@ private fun EmptyVaultCard(onImport: () -> Unit) {
 @Composable
 private fun FileRow(
     file: VaultFile,
+    vault: VaultRepository? = null,
     onOpen: (VaultFile) -> Unit,
     onToggleLock: (VaultFile) -> Unit,
     onMove: (VaultFile) -> Unit,
     onMoveUp: () -> Unit,
     onMoveDown: () -> Unit,
     allowReorder: Boolean,
+    showFolderAction: Boolean = true,
+    onDrag: (Float) -> Unit = {},
 ) {
     val icon = fileIcon(file)
+    var dragDistance by remember(file.id) { mutableStateOf(0f) }
+    var isDragging by remember(file.id) { mutableStateOf(false) }
     GlassCard(
-        modifier = Modifier.fillMaxWidth().clickable { onOpen(file) },
+        modifier = Modifier
+            .fillMaxWidth()
+            .graphicsLayer {
+                scaleX = if (isDragging) 1.025f else 1f
+                scaleY = if (isDragging) 1.025f else 1f
+                alpha = if (isDragging) 0.86f else 1f
+            }
+            .clickable { onOpen(file) },
         accent = if (file.locked) Color(0xFF7C4DFF) else VoltGreen,
         padding = 16.dp,
     ) {
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-            Box(
-                modifier = Modifier.size(48.dp).background(VoltGreen.copy(alpha = 0.09f), RoundedCornerShape(16.dp)),
-                contentAlignment = Alignment.Center,
-            ) {
-                Icon(icon, null, tint = VoltGreen, modifier = Modifier.size(24.dp))
+            if (vault != null) {
+                FileThumbnail(vault, file)
+            } else {
+                Box(
+                    modifier = Modifier.size(52.dp).background(VoltGreen.copy(alpha = 0.09f), RoundedCornerShape(16.dp)),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(icon, null, tint = VoltGreen, modifier = Modifier.size(24.dp))
+                }
             }
             Spacer(Modifier.width(14.dp))
             Column(modifier = Modifier.weight(1f)) {
                 Text(file.name, color = Color.White, fontWeight = FontWeight.SemiBold, maxLines = 1)
                 Spacer(Modifier.height(4.dp))
-                Text("${file.mimeType.substringBefore('/')} • ${formatSize(file.sizeBytes)}", color = VoltTextMuted, fontSize = 12.sp)
+                Text(
+                    "${file.transferDirection.label} • ${formatSize(file.sizeBytes)}",
+                    color = VoltTextMuted,
+                    fontSize = 12.sp,
+                )
             }
             if (allowReorder) {
-                Column {
-                    IconButton(onClick = onMoveUp, modifier = Modifier.size(28.dp)) {
-                        Icon(Icons.Default.ArrowUpward, "Move up", tint = VoltTextMuted, modifier = Modifier.size(15.dp))
-                    }
-                    IconButton(onClick = onMoveDown, modifier = Modifier.size(28.dp)) {
-                        Icon(Icons.Default.ArrowDownward, "Move down", tint = VoltTextMuted, modifier = Modifier.size(15.dp))
-                    }
-                }
+                Icon(
+                    Icons.Default.DragHandle,
+                    "Hold and drag to reorder",
+                    tint = if (isDragging) VoltGreen else VoltTextMuted,
+                    modifier = Modifier
+                        .size(30.dp)
+                        .pointerInput(file.id) {
+                            detectDragGesturesAfterLongPress(
+                                onDragStart = {
+                                    isDragging = true
+                                    dragDistance = 0f
+                                },
+                                onDragCancel = {
+                                    isDragging = false
+                                    dragDistance = 0f
+                                },
+                                onDragEnd = {
+                                    isDragging = false
+                                    dragDistance = 0f
+                                },
+                                onDrag = { change, dragAmount ->
+                                    change.consume()
+                                    dragDistance += dragAmount.y
+                                    if (dragDistance <= -64f) {
+                                        onMoveUp()
+                                        onDrag(dragDistance)
+                                        dragDistance = 0f
+                                    } else if (dragDistance >= 64f) {
+                                        onMoveDown()
+                                        onDrag(dragDistance)
+                                        dragDistance = 0f
+                                    }
+                                },
+                            )
+                        },
+                )
             }
-            IconButton(onClick = { onMove(file) }) {
-                Icon(Icons.Default.Folder, "Move to folder", tint = VoltTextMuted, modifier = Modifier.size(18.dp))
+            if (showFolderAction) {
+                IconButton(onClick = { onMove(file) }) {
+                    Icon(Icons.Default.Folder, "Move to folder", tint = VoltTextMuted, modifier = Modifier.size(18.dp))
+                }
             }
             IconButton(onClick = { onToggleLock(file) }) {
                 Icon(if (file.locked) Icons.Default.Lock else Icons.Default.LockOpen, null, tint = if (file.locked) VoltGreen else VoltTextMuted)
@@ -1074,24 +1305,126 @@ private fun FileRow(
 }
 
 @Composable
+private fun FileThumbnail(vault: VaultRepository, file: VaultFile) {
+    val context = LocalContext.current
+    var bitmap by remember(file.id) { mutableStateOf<Bitmap?>(null) }
+    LaunchedEffect(file.id) {
+        bitmap = withContext(Dispatchers.IO) { createFileThumbnail(context, vault, file) }
+    }
+    Box(
+        modifier = Modifier
+            .size(52.dp)
+            .clip(RoundedCornerShape(16.dp))
+            .background(VoltGreen.copy(alpha = 0.09f)),
+        contentAlignment = Alignment.Center,
+    ) {
+        if (bitmap != null) {
+            Image(
+                bitmap = bitmap!!.asImageBitmap(),
+                contentDescription = "${file.name} thumbnail",
+                modifier = Modifier.fillMaxSize(),
+                contentScale = ContentScale.Crop,
+            )
+        } else {
+            Icon(fileIcon(file), null, tint = VoltGreen, modifier = Modifier.size(24.dp))
+        }
+    }
+}
+
+private fun createFileThumbnail(context: android.content.Context, vault: VaultRepository, file: VaultFile): Bitmap? {
+    val prepared = vault.prepareViewing(file) ?: return null
+    return try {
+        when {
+            isImage(file) -> {
+                val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+                BitmapFactory.decodeFile(prepared.absolutePath, bounds)
+                val sample = calculateSampleSize(bounds.outWidth, bounds.outHeight, 256, 256)
+                BitmapFactory.decodeFile(
+                    prepared.absolutePath,
+                    BitmapFactory.Options().apply { inSampleSize = sample },
+                )
+            }
+            isVideo(file) -> {
+                val retriever = MediaMetadataRetriever()
+                runCatching {
+                    retriever.setDataSource(prepared.absolutePath)
+                    retriever.getFrameAtTime(0, MediaMetadataRetriever.OPTION_CLOSEST_SYNC)
+                }.getOrNull().also { runCatching { retriever.release() } }
+            }
+            isPdf(file) -> {
+                ParcelFileDescriptor.open(prepared, ParcelFileDescriptor.MODE_READ_ONLY).use { descriptor ->
+                    PdfRenderer(descriptor).use { renderer ->
+                        if (renderer.pageCount == 0) {
+                            null
+                        } else {
+                            renderer.openPage(0).use { page ->
+                                val scale = 256f / page.width.coerceAtLeast(1)
+                                Bitmap.createBitmap(
+                                    (page.width * scale).toInt().coerceAtLeast(1),
+                                    (page.height * scale).toInt().coerceAtLeast(1),
+                                    Bitmap.Config.ARGB_8888,
+                                ).also { preview ->
+                                    preview.eraseColor(Color.White.toArgb())
+                                    page.render(preview, null, null, PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            isInstallable(file) -> {
+                val packageInfo = context.packageManager.getPackageArchiveInfo(prepared.absolutePath, PackageManager.GET_META_DATA)
+                packageInfo?.applicationInfo?.let { info ->
+                    info.sourceDir = prepared.absolutePath
+                    info.publicSourceDir = prepared.absolutePath
+                    context.packageManager.getApplicationIcon(info).toBitmap(256, 256)
+                }
+            }
+            else -> null
+        }
+    } finally {
+        prepared.delete()
+    }
+}
+
+private fun calculateSampleSize(width: Int, height: Int, targetWidth: Int, targetHeight: Int): Int {
+    var sample = 1
+    while (width / sample > targetWidth * 2 || height / sample > targetHeight * 2) sample *= 2
+    return sample
+}
+
+@Composable
 private fun ShareHome(
     files: List<VaultFile>,
+    vault: VaultRepository,
     transfer: PeerTransferManager,
-    newlyPreparedFile: VaultFile?,
+    newlyPreparedFiles: List<VaultFile>,
     onPickFile: () -> Unit,
     onPickMedia: () -> Unit,
     onPickFolder: () -> Unit,
     onCreateText: (String) -> Unit,
-    onPickInstalledApp: (InstalledAppChoice) -> Unit,
+    onPickInstalledApp: (List<InstalledAppChoice>) -> Unit,
 ) {
     val peers by transfer.peers.collectAsStateWithLifecycle()
     val status by transfer.status.collectAsStateWithLifecycle()
-    var selectedFile by remember(files) { mutableStateOf(files.firstOrNull()) }
+    val deviceIsActive = status.active || status.hosting
+    var selectedIds by remember(files, newlyPreparedFiles) {
+        mutableStateOf((newlyPreparedFiles.ifEmpty { files.take(1) }).map { it.id }.toSet())
+    }
+    var fileQuery by remember { mutableStateOf("") }
     var showTextEditor by remember { mutableStateOf(false) }
     var showInstalledApps by remember { mutableStateOf(false) }
+    var showErrorLog by remember { mutableStateOf(false) }
 
-    LaunchedEffect(newlyPreparedFile?.id) {
-        newlyPreparedFile?.let { selectedFile = it }
+    LaunchedEffect(newlyPreparedFiles.map { it.id }.joinToString(",")) {
+        if (newlyPreparedFiles.isNotEmpty()) selectedIds = newlyPreparedFiles.map { it.id }.toSet()
+    }
+
+    val selectedFiles = files.filter { it.id in selectedIds }
+    val visibleShareFiles = files.filter {
+        fileQuery.isBlank() ||
+            it.name.contains(fileQuery.trim(), ignoreCase = true) ||
+            it.transferDirection.label.contains(fileQuery.trim(), ignoreCase = true)
     }
 
     if (showTextEditor) {
@@ -1110,6 +1443,12 @@ private fun ShareHome(
                 showInstalledApps = false
                 onPickInstalledApp(it)
             },
+        )
+    }
+    if (showErrorLog && status.errorLog != null) {
+        TransferErrorDialog(
+            errorLog = status.errorLog!!,
+            onDismiss = { showErrorLog = false },
         )
     }
 
@@ -1173,16 +1512,22 @@ private fun ShareHome(
         item {
             GlassCard(modifier = Modifier.fillMaxWidth(), accent = VoltGreen) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Box(modifier = Modifier.size(48.dp).background(VoltGreen.copy(alpha = 0.12f), CircleShape), contentAlignment = Alignment.Center) {
-                        Icon(Icons.Default.Smartphone, null, tint = VoltGreen)
-                    }
+                    DeviceRadar(active = deviceIsActive)
                     Spacer(Modifier.width(14.dp))
                     Column(modifier = Modifier.weight(1f)) {
                         Text("This device", color = Color.White, fontWeight = FontWeight.Bold)
-                        Text(if (status.active) "Visible to nearby devices" else "Private and ready", color = VoltTextMuted, fontSize = 12.sp)
+                        Text(
+                            when {
+                                status.label.startsWith("Looking") -> "Scanning the local network"
+                                status.hosting -> "Visible to nearby devices"
+                                else -> "Private and ready"
+                            },
+                            color = VoltTextMuted,
+                            fontSize = 12.sp,
+                        )
                     }
                     PremiumSwitch(
-                        checked = status.active,
+                        checked = status.hosting,
                         onCheckedChange = { if (it) transfer.startHosting() else transfer.close() },
                     )
                 }
@@ -1205,24 +1550,93 @@ private fun ShareHome(
             }
         }
         item {
-            Text("1. Choose a file", color = Color.White, fontSize = 17.sp, fontWeight = FontWeight.Bold)
+            Text("1. Choose files to send", color = Color.White, fontSize = 17.sp, fontWeight = FontWeight.Bold)
             Spacer(Modifier.height(10.dp))
-            Row(modifier = Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                files.take(12).forEach { file ->
-                    val selected = file.id == selectedFile?.id
+            OutlinedTextField(
+                value = fileQuery,
+                onValueChange = { fileQuery = it },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+                label = { Text("Search files to send") },
+                leadingIcon = { Icon(Icons.Default.Search, null, tint = VoltGreen) },
+                trailingIcon = {
+                    if (fileQuery.isNotEmpty()) {
+                        IconButton(onClick = { fileQuery = "" }) {
+                            Icon(Icons.Default.Close, "Clear search", tint = VoltTextMuted)
+                        }
+                    }
+                },
+                shape = RoundedCornerShape(18.dp),
+                colors = androidx.compose.material3.OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = VoltGreen,
+                    focusedLabelColor = VoltGreen,
+                    cursorColor = VoltGreen,
+                    unfocusedBorderColor = Color.White.copy(alpha = 0.16f),
+                    focusedTextColor = Color.White,
+                    unfocusedTextColor = Color.White,
+                ),
+            )
+            Spacer(Modifier.height(10.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
+            ) {
+                Text("${selectedFiles.size} selected", color = VoltGreen, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                TextButton(
+                    onClick = {
+                        selectedIds = if (selectedIds.size == visibleShareFiles.size) {
+                            emptySet()
+                        } else {
+                            visibleShareFiles.map { it.id }.toSet()
+                        }
+                    },
+                    colors = ButtonDefaults.textButtonColors(contentColor = VoltGreen),
+                ) {
+                    Text(if (selectedIds.size == visibleShareFiles.size) "Clear all" else "Select all")
+                }
+            }
+            Column(verticalArrangement = Arrangement.spacedBy(9.dp)) {
+                visibleShareFiles.forEach { file ->
+                    val selected = file.id in selectedIds
                     Surface(
-                        modifier = Modifier.width(140.dp).clickable { selectedFile = file },
+                        modifier = Modifier.fillMaxWidth().clickable {
+                            selectedIds = if (selected) selectedIds - file.id else selectedIds + file.id
+                        },
                         shape = RoundedCornerShape(18.dp),
-                        color = if (selected) VoltGreen.copy(alpha = 0.16f) else VoltSurface,
+                        color = if (selected) VoltGreen.copy(alpha = 0.13f) else VoltSurface,
                         border = BorderStroke(1.dp, if (selected) VoltGreen else Color.White.copy(alpha = 0.08f)),
                     ) {
-                        Column(Modifier.padding(14.dp)) {
-                            Icon(fileIcon(file), null, tint = if (selected) VoltGreen else VoltTextMuted, modifier = Modifier.size(20.dp))
-                            Spacer(Modifier.height(12.dp))
-                            Text(file.name, color = Color.White, maxLines = 1, fontSize = 12.sp)
+                        Row(
+                            modifier = Modifier.padding(10.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            FileThumbnail(vault, file)
+                            Spacer(Modifier.width(12.dp))
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(file.name, color = Color.White, maxLines = 1, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                                Text(
+                                    "${file.transferDirection.label} • ${formatSize(file.sizeBytes)}",
+                                    color = VoltTextMuted,
+                                    fontSize = 11.sp,
+                                )
+                            }
+                            Box(
+                                modifier = Modifier
+                                    .size(28.dp)
+                                    .background(if (selected) VoltGreen else Color.Transparent, CircleShape)
+                                    .border(1.dp, if (selected) VoltGreen else VoltTextMuted, CircleShape),
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                if (selected) Icon(Icons.Default.Check, null, tint = Color.Black, modifier = Modifier.size(18.dp))
+                            }
                         }
                     }
                 }
+            }
+            if (visibleShareFiles.isEmpty()) {
+                Spacer(Modifier.height(6.dp))
+                Text("No protected files match your search.", color = VoltTextMuted, fontSize = 12.sp)
             }
         }
         item {
@@ -1231,9 +1645,27 @@ private fun ShareHome(
         if (peers.isEmpty()) {
             item {
                 GlassCard(modifier = Modifier.fillMaxWidth(), accent = VoltTeal, padding = 18.dp) {
-                    Text("No devices yet", color = Color.White, fontWeight = FontWeight.Bold)
-                    Spacer(Modifier.height(5.dp))
-                    Text("Open VoltShare on the other phone, tap Host, then tap Find nearby here.", color = VoltTextMuted, fontSize = 13.sp)
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        DeviceRadar(active = status.label.startsWith("Looking"))
+                        Spacer(Modifier.width(12.dp))
+                        Column {
+                            Text(
+                                if (status.label.startsWith("Looking")) "Scanning nearby devices…" else "No devices yet",
+                                color = Color.White,
+                                fontWeight = FontWeight.Bold,
+                            )
+                            Spacer(Modifier.height(5.dp))
+                            Text(
+                                if (status.label.startsWith("Looking")) {
+                                    "Searching the local network for VoltShare devices."
+                                } else {
+                                    "Open VoltShare on the other phone, tap Host, then tap Find nearby here."
+                                },
+                                color = VoltTextMuted,
+                                fontSize = 13.sp,
+                            )
+                        }
+                    }
                 }
             }
         } else {
@@ -1247,22 +1679,34 @@ private fun ShareHome(
                             Text("Direct local connection", color = VoltTextMuted, fontSize = 12.sp)
                         }
                         TextButton(
-                            onClick = { selectedFile?.let { transfer.send(peer, it) } },
-                            enabled = selectedFile != null,
+                            onClick = { transfer.send(peer, selectedFiles) },
+                            enabled = selectedFiles.isNotEmpty() && !status.transferring,
                             colors = ButtonDefaults.textButtonColors(contentColor = VoltGreen),
                         ) {
                             Icon(Icons.Default.ArrowUpward, null, modifier = Modifier.size(16.dp))
                             Spacer(Modifier.width(5.dp))
-                            Text("Send")
+                            Text("Send ${selectedFiles.size}")
                         }
                     }
                 }
             }
         }
         item {
-            AnimatedVisibility(status.active || status.progress > 0f, enter = fadeIn() + scaleIn(), exit = fadeOut()) {
+            AnimatedVisibility(
+                status.active || status.progress > 0f || status.errorLog != null,
+                enter = fadeIn() + scaleIn(),
+                exit = fadeOut(),
+            ) {
                 GlassCard(modifier = Modifier.fillMaxWidth(), accent = VoltGreen, padding = 18.dp) {
                     Text(status.label, color = Color.White, fontWeight = FontWeight.SemiBold)
+                    if (status.totalFiles > 0) {
+                        Spacer(Modifier.height(6.dp))
+                        Text(
+                            "${status.completedFiles}/${status.totalFiles} files • ${formatSize(status.bytesTransferred)} / ${formatSize(status.totalBytes)}",
+                            color = VoltTextMuted,
+                            fontSize = 12.sp,
+                        )
+                    }
                     Spacer(Modifier.height(12.dp))
                     LinearProgressIndicator(
                         progress = { status.progress },
@@ -1270,6 +1714,145 @@ private fun ShareHome(
                         color = VoltGreen,
                         trackColor = Color.White.copy(alpha = 0.1f),
                     )
+                    if (status.errorLog != null) {
+                        Spacer(Modifier.height(12.dp))
+                        OutlinedButton(
+                            onClick = { showErrorLog = true },
+                            modifier = Modifier.fillMaxWidth().height(48.dp),
+                            shape = RoundedCornerShape(16.dp),
+                            border = BorderStroke(1.dp, Color(0xFFFF6B6B).copy(alpha = 0.65f)),
+                            colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFFFF8A80)),
+                        ) {
+                            Icon(Icons.Default.Description, null, modifier = Modifier.size(17.dp))
+                            Spacer(Modifier.width(8.dp))
+                            Text("View detailed error report")
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun DeviceRadar(active: Boolean) {
+    val transition = rememberInfiniteTransition(label = "device-radar")
+    val pulse by transition.animateFloat(
+        initialValue = 0f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(tween(1800), RepeatMode.Restart),
+        label = "device-pulse",
+    )
+    Box(
+        modifier = Modifier.size(62.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        if (active) {
+            Box(
+                modifier = Modifier
+                    .size(42.dp + (26.dp * pulse))
+                    .border(
+                        width = 1.dp,
+                        color = VoltGreen.copy(alpha = (0.42f * (1f - pulse)).coerceAtLeast(0.05f)),
+                        shape = CircleShape,
+                    ),
+            )
+            Box(
+                modifier = Modifier
+                    .size(48.dp + (18.dp * pulse))
+                    .background(VoltGreen.copy(alpha = 0.06f * (1f - pulse)), CircleShape),
+            )
+        }
+        Box(
+            modifier = Modifier
+                .size(48.dp)
+                .background(VoltGreen.copy(alpha = if (active) 0.18f else 0.1f), CircleShape)
+                .border(1.dp, VoltGreen.copy(alpha = 0.35f), CircleShape),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(Icons.Default.Smartphone, null, tint = VoltGreen, modifier = Modifier.size(22.dp))
+        }
+    }
+}
+
+@Composable
+private fun TransferErrorDialog(
+    errorLog: String,
+    onDismiss: () -> Unit,
+) {
+    val clipboard = LocalClipboardManager.current
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false),
+    ) {
+        Surface(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 18.dp),
+            shape = RoundedCornerShape(30.dp),
+            color = VoltSurfaceRaised,
+            border = BorderStroke(1.dp, Color(0xFFFF6B6B).copy(alpha = 0.38f)),
+            shadowElevation = 24.dp,
+        ) {
+            Column(Modifier.padding(22.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(
+                        modifier = Modifier.size(48.dp).background(Color(0xFFFF6B6B).copy(alpha = 0.12f), CircleShape),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(Icons.Default.Close, null, tint = Color(0xFFFF8A80), modifier = Modifier.size(25.dp))
+                    }
+                    Spacer(Modifier.width(14.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("Transfer diagnostics", color = Color.White, fontSize = 21.sp, fontWeight = FontWeight.Black)
+                        Text("Some files could not be sent", color = Color(0xFFFF8A80), fontSize = 12.sp)
+                    }
+                    IconButton(onClick = onDismiss) {
+                        Icon(Icons.Default.Close, "Close error report", tint = VoltTextMuted)
+                    }
+                }
+                Spacer(Modifier.height(16.dp))
+                Text(
+                    "The report below contains the file, transfer stage, and technical cause. Copy it when you need to troubleshoot the two devices.",
+                    color = VoltTextMuted,
+                    lineHeight = 19.sp,
+                    fontSize = 13.sp,
+                )
+                Spacer(Modifier.height(14.dp))
+                Surface(
+                    modifier = Modifier.fillMaxWidth().height(330.dp),
+                    color = Color.Black.copy(alpha = 0.42f),
+                    shape = RoundedCornerShape(18.dp),
+                    border = BorderStroke(1.dp, Color.White.copy(alpha = 0.08f)),
+                ) {
+                    Text(
+                        errorLog,
+                        modifier = Modifier.padding(14.dp).verticalScroll(rememberScrollState()),
+                        color = Color.White.copy(alpha = 0.86f),
+                        fontFamily = FontFamily.Monospace,
+                        fontSize = 11.sp,
+                        lineHeight = 16.sp,
+                    )
+                }
+                Spacer(Modifier.height(14.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
+                    OutlinedButton(
+                        onClick = { clipboard.setText(AnnotatedString(errorLog)) },
+                        modifier = Modifier.weight(1f).height(50.dp),
+                        shape = RoundedCornerShape(16.dp),
+                        border = BorderStroke(1.dp, VoltGreen.copy(alpha = 0.5f)),
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = VoltGreen),
+                    ) {
+                        Icon(Icons.Default.ContentCopy, null, modifier = Modifier.size(17.dp))
+                        Spacer(Modifier.width(7.dp))
+                        Text("Copy report")
+                    }
+                    Button(
+                        onClick = onDismiss,
+                        modifier = Modifier.weight(0.72f).height(50.dp),
+                        shape = RoundedCornerShape(16.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = VoltGreen, contentColor = Color.Black),
+                    ) {
+                        Text("Done")
+                    }
                 }
             }
         }
@@ -1376,9 +1959,11 @@ private fun TextComposerDialog(
 @Composable
 private fun InstalledAppsDialog(
     onDismiss: () -> Unit,
-    onSelected: (InstalledAppChoice) -> Unit,
+    onSelected: (List<InstalledAppChoice>) -> Unit,
 ) {
     val context = LocalContext.current
+    var query by remember { mutableStateOf("") }
+    var selectedPackages by remember { mutableStateOf<Set<String>>(emptySet()) }
     val apps = remember {
         context.packageManager
             .getInstalledApplications(PackageManager.GET_META_DATA)
@@ -1394,65 +1979,180 @@ private fun InstalledAppsDialog(
                     label = context.packageManager.getApplicationLabel(info).toString(),
                     packageName = info.packageName,
                     apkPaths = paths,
+                    icon = runCatching { context.packageManager.getApplicationIcon(info) }.getOrNull(),
                 )
             }
             .sortedBy { it.label.lowercase() }
             .toList()
     }
-    AlertDialog(
+    val filteredApps = apps.filter {
+        query.isBlank() ||
+            it.label.contains(query.trim(), ignoreCase = true) ||
+            it.packageName.contains(query.trim(), ignoreCase = true)
+    }
+    val selectedApps = apps.filter { it.packageName in selectedPackages }
+    Dialog(
         onDismissRequest = onDismiss,
-        containerColor = VoltSurfaceRaised,
-        title = {
-            Column {
-                Text("Installed Android apps", color = Color.White)
-                Spacer(Modifier.height(5.dp))
-                Text("Only user-installed apps are shown. Split apps become an APKS package.", color = VoltTextMuted, fontSize = 12.sp)
-            }
-        },
-        text = {
-            if (apps.isEmpty()) {
-                Text("No user-installed apps were found on this device.", color = VoltTextMuted)
-            } else {
-                Column(Modifier.height(330.dp).verticalScroll(rememberScrollState())) {
-                    apps.forEach { app ->
-                        Surface(
-                            modifier = Modifier.fillMaxWidth().clickable { onSelected(app) },
-                            color = Color.Transparent,
-                            shape = RoundedCornerShape(14.dp),
-                        ) {
-                            Row(
-                                modifier = Modifier.padding(vertical = 10.dp, horizontal = 4.dp),
-                                verticalAlignment = Alignment.CenterVertically,
+        properties = DialogProperties(usePlatformDefaultWidth = false),
+    ) {
+        Surface(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 18.dp),
+            shape = RoundedCornerShape(30.dp),
+            color = VoltSurfaceRaised,
+            border = BorderStroke(1.dp, VoltGreen.copy(alpha = 0.26f)),
+            shadowElevation = 24.dp,
+        ) {
+            Column(Modifier.padding(22.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(
+                        modifier = Modifier.size(48.dp).background(VoltGreen.copy(alpha = 0.12f), CircleShape),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(Icons.Default.Smartphone, null, tint = VoltGreen, modifier = Modifier.size(24.dp))
+                    }
+                    Spacer(Modifier.width(14.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("Choose an app", color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.Black)
+                        Text("Ready to package and share", color = VoltTextMuted, fontSize = 12.sp)
+                    }
+                    IconButton(onClick = onDismiss) {
+                        Icon(Icons.Default.Close, "Close", tint = VoltTextMuted)
+                    }
+                }
+                Spacer(Modifier.height(18.dp))
+                Text(
+                    "Select a user-installed app. Its original icon and name are shown so you can confirm exactly what will be shared.",
+                    color = VoltTextMuted,
+                    lineHeight = 19.sp,
+                    fontSize = 13.sp,
+                )
+                Spacer(Modifier.height(14.dp))
+                OutlinedTextField(
+                    value = query,
+                    onValueChange = { query = it },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    label = { Text("Search installed apps") },
+                    leadingIcon = { Icon(Icons.Default.Search, null, tint = VoltGreen) },
+                    colors = androidx.compose.material3.OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = VoltGreen,
+                        focusedLabelColor = VoltGreen,
+                        cursorColor = VoltGreen,
+                        unfocusedBorderColor = Color.White.copy(alpha = 0.16f),
+                        focusedTextColor = Color.White,
+                        unfocusedTextColor = Color.White,
+                    ),
+                    shape = RoundedCornerShape(18.dp),
+                )
+                Spacer(Modifier.height(14.dp))
+                if (filteredApps.isEmpty()) {
+                    Box(Modifier.fillMaxWidth().height(220.dp), contentAlignment = Alignment.Center) {
+                        Text(
+                            if (apps.isEmpty()) "No user-installed apps were found." else "No apps match your search.",
+                            color = VoltTextMuted,
+                        )
+                    }
+                } else {
+                    LazyColumn(
+                        modifier = Modifier.height(390.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp),
+                    ) {
+                        items(filteredApps, key = { it.packageName }) { app ->
+                            val selected = app.packageName in selectedPackages
+                            Surface(
+                                modifier = Modifier.fillMaxWidth().clickable {
+                                    selectedPackages = if (selected) {
+                                        selectedPackages - app.packageName
+                                    } else {
+                                        selectedPackages + app.packageName
+                                    }
+                                },
+                                color = if (selected) VoltGreen.copy(alpha = 0.12f) else VoltSurface,
+                                shape = RoundedCornerShape(20.dp),
+                                border = BorderStroke(1.dp, if (selected) VoltGreen else Color.White.copy(alpha = 0.08f)),
                             ) {
-                                Box(
-                                    modifier = Modifier.size(40.dp).background(VoltGreen.copy(alpha = 0.11f), CircleShape),
-                                    contentAlignment = Alignment.Center,
+                                Row(
+                                    modifier = Modifier.padding(12.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
                                 ) {
-                                    Icon(Icons.Default.Smartphone, null, tint = VoltGreen, modifier = Modifier.size(20.dp))
+                                    Box(
+                                        modifier = Modifier.size(58.dp).clip(RoundedCornerShape(17.dp)).background(Color.Black),
+                                        contentAlignment = Alignment.Center,
+                                    ) {
+                                        if (app.icon != null) {
+                                            AndroidView(
+                                                factory = { ImageView(it).apply { scaleType = ImageView.ScaleType.CENTER_INSIDE } },
+                                                update = { view -> view.setImageDrawable(app.icon) },
+                                                modifier = Modifier.fillMaxSize().padding(8.dp),
+                                            )
+                                        } else {
+                                            Icon(Icons.Default.Smartphone, null, tint = VoltGreen, modifier = Modifier.size(25.dp))
+                                        }
+                                    }
+                                    Spacer(Modifier.width(14.dp))
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(app.label, color = Color.White, fontWeight = FontWeight.Bold, maxLines = 1)
+                                        Spacer(Modifier.height(3.dp))
+                                        Text(app.packageName, color = VoltTextMuted, fontSize = 10.sp, maxLines = 1)
+                                        Text(
+                                            if (app.apkPaths.size > 1) "Split package • APKS" else "Install package • APK",
+                                            color = VoltGreen,
+                                            fontSize = 11.sp,
+                                            fontWeight = FontWeight.Bold,
+                                        )
+                                    }
+                                    Box(
+                                        modifier = Modifier
+                                            .size(36.dp)
+                                            .background(if (selected) VoltGreen else VoltGreen.copy(alpha = 0.12f), CircleShape),
+                                        contentAlignment = Alignment.Center,
+                                    ) {
+                                        Icon(
+                                            if (selected) Icons.Default.Check else Icons.Default.ArrowUpward,
+                                            if (selected) "Selected" else "Select app",
+                                            tint = if (selected) Color.Black else VoltGreen,
+                                            modifier = Modifier.size(18.dp),
+                                        )
+                                    }
                                 }
-                                Spacer(Modifier.width(12.dp))
-                                Column(modifier = Modifier.weight(1f)) {
-                                    Text(app.label, color = Color.White, fontWeight = FontWeight.SemiBold, maxLines = 1)
-                                    Text(
-                                        "${app.packageName} • ${if (app.apkPaths.size > 1) "split APKS" else "APK"}",
-                                        color = VoltTextMuted,
-                                        fontSize = 10.sp,
-                                        maxLines = 1,
-                                    )
-                                }
-                                Icon(Icons.Default.ArrowUpward, null, tint = VoltGreen, modifier = Modifier.size(17.dp))
                             }
                         }
                     }
                 }
+                Spacer(Modifier.height(12.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                ) {
+                    Text("${selectedApps.size} selected", color = VoltGreen, fontSize = 12.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+                    TextButton(
+                        onClick = {
+                            selectedPackages = if (selectedPackages.size == filteredApps.size) {
+                                emptySet()
+                            } else {
+                                filteredApps.map { it.packageName }.toSet()
+                            }
+                        },
+                        colors = ButtonDefaults.textButtonColors(contentColor = VoltGreen),
+                    ) {
+                        Text(if (selectedPackages.size == filteredApps.size) "Clear" else "Select all")
+                    }
+                    OutlinedButton(
+                        onClick = { onSelected(selectedApps) },
+                        enabled = selectedApps.isNotEmpty(),
+                        shape = RoundedCornerShape(15.dp),
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = VoltGreen),
+                        border = BorderStroke(1.dp, VoltGreen.copy(alpha = 0.55f)),
+                    ) {
+                        Icon(Icons.Default.Share, null, modifier = Modifier.size(16.dp))
+                        Spacer(Modifier.width(6.dp))
+                        Text("Prepare")
+                    }
+                }
             }
-        },
-        confirmButton = {
-            TextButton(onClick = onDismiss, colors = ButtonDefaults.textButtonColors(contentColor = VoltTextMuted)) {
-                Text("Cancel")
-            }
-        },
-    )
+        }
+    }
 }
 
 @Composable
@@ -1816,31 +2516,142 @@ private fun SecretDialog(title: String, type: LockType, onDismiss: () -> Unit, o
 
 @Composable
 private fun PatternPad(pattern: List<Int>, onChange: (List<Int>) -> Unit) {
-    Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
-        repeat(3) { row ->
-            Row(horizontalArrangement = Arrangement.spacedBy(26.dp), modifier = Modifier.padding(vertical = 9.dp)) {
-                repeat(3) { column ->
-                    val point = row * 3 + column
-                    val selected = point in pattern
-                    Box(
-                        modifier = Modifier
-                            .size(48.dp)
-                            .shadow(if (selected) 14.dp else 0.dp, CircleShape, spotColor = VoltGreen.copy(alpha = 0.65f))
-                            .background(if (selected) VoltGreen else Color.White.copy(alpha = 0.1f), CircleShape)
-                            .border(1.dp, if (selected) VoltGreen else Color.White.copy(alpha = 0.2f), CircleShape)
-                            .clickable {
-                                onChange(if (selected) pattern - point else pattern + point)
-                            },
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        if (selected) {
-                            Box(Modifier.size(12.dp).background(Color.Black, CircleShape))
-                        }
-                    }
+    val density = LocalDensity.current
+    val nodeRadius = with(density) { 25.dp.toPx() }
+    val hitRadius = with(density) { 38.dp.toPx() }
+    val currentPattern by rememberUpdatedState(pattern)
+    val currentOnChange by rememberUpdatedState(onChange)
+    var activeLineEnd by remember { mutableStateOf<Offset?>(null) }
+    var isDrawing by remember { mutableStateOf(false) }
+
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .aspectRatio(1f)
+            .padding(horizontal = 12.dp),
+    ) {
+        Canvas(
+            modifier = Modifier
+                .fillMaxSize()
+                .pointerInput(Unit) {
+                    detectDragGestures(
+                        onDragStart = { position ->
+                            val point = patternPointAt(
+                                position,
+                                androidx.compose.ui.geometry.Size(size.width.toFloat(), size.height.toFloat()),
+                                hitRadius,
+                            )
+                            if (point != null) {
+                                isDrawing = true
+                                activeLineEnd = position
+                                currentOnChange(listOf(point))
+                            }
+                        },
+                        onDragCancel = {
+                            isDrawing = false
+                            activeLineEnd = null
+                        },
+                        onDragEnd = {
+                            isDrawing = false
+                            activeLineEnd = null
+                        },
+                        onDrag = { change, _ ->
+                            change.consume()
+                            if (!isDrawing) return@detectDragGestures
+                            activeLineEnd = change.position
+                            val point = patternPointAt(
+                                change.position,
+                                androidx.compose.ui.geometry.Size(size.width.toFloat(), size.height.toFloat()),
+                                hitRadius,
+                            ) ?: return@detectDragGestures
+                            val next = appendPatternPoint(currentPattern, point)
+                            if (next != currentPattern) currentOnChange(next)
+                        },
+                    )
+                },
+        ) {
+            val centers = patternCenters(size.width, size.height)
+            val selectedCenters = currentPattern.mapNotNull { centers.getOrNull(it) }
+            selectedCenters.zipWithNext().forEach { (start, end) ->
+                drawLine(
+                    color = VoltGreen,
+                    start = start,
+                    end = end,
+                    strokeWidth = with(density) { 7.dp.toPx() },
+                )
+            }
+            if (isDrawing && selectedCenters.isNotEmpty() && activeLineEnd != null) {
+                drawLine(
+                    color = VoltGreen.copy(alpha = 0.6f),
+                    start = selectedCenters.last(),
+                    end = activeLineEnd!!,
+                    strokeWidth = with(density) { 5.dp.toPx() },
+                )
+            }
+            centers.forEachIndexed { index, center ->
+                val selected = index in currentPattern
+                if (selected) {
+                    drawCircle(
+                        color = VoltGreen.copy(alpha = 0.18f),
+                        radius = with(density) { 34.dp.toPx() },
+                        center = center,
+                    )
+                    drawCircle(color = VoltGreen, radius = nodeRadius, center = center)
+                    drawCircle(color = Color.Black, radius = with(density) { 8.dp.toPx() }, center = center)
+                } else {
+                    drawCircle(
+                        color = Color.White.copy(alpha = 0.08f),
+                        radius = nodeRadius,
+                        center = center,
+                    )
+                    drawCircle(
+                        color = Color.White.copy(alpha = 0.24f),
+                        radius = nodeRadius,
+                        center = center,
+                        style = androidx.compose.ui.graphics.drawscope.Stroke(with(density) { 1.dp.toPx() }),
+                    )
                 }
             }
         }
     }
+}
+
+private fun patternCenters(width: Float, height: Float): List<Offset> {
+    val side = minOf(width, height)
+    val inset = side * 0.19f
+    val gap = (side - inset * 2f) / 2f
+    val startX = (width - side) / 2f + inset
+    val startY = (height - side) / 2f + inset
+    return buildList {
+        repeat(3) { row ->
+            repeat(3) { column ->
+                add(Offset(startX + gap * column, startY + gap * row))
+            }
+        }
+    }
+}
+
+private fun patternPointAt(position: Offset, size: androidx.compose.ui.geometry.Size, hitRadius: Float): Int? {
+    return patternCenters(size.width, size.height)
+        .mapIndexed { index, center -> index to (center - position).getDistance() }
+        .minByOrNull { it.second }
+        ?.takeIf { it.second <= hitRadius }
+        ?.first
+}
+
+private fun appendPatternPoint(pattern: List<Int>, point: Int): List<Int> {
+    if (point in pattern) return pattern
+    val last = pattern.lastOrNull() ?: return listOf(point)
+    val middle = when (setOf(last, point)) {
+        setOf(0, 2) -> 1
+        setOf(0, 6) -> 3
+        setOf(2, 8) -> 5
+        setOf(6, 8) -> 7
+        setOf(0, 8) -> 4
+        setOf(2, 6) -> 4
+        else -> null
+    }
+    return if (middle != null && middle !in pattern) pattern + middle + point else pattern + point
 }
 
 @Composable

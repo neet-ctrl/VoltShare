@@ -21,6 +21,12 @@ import javax.crypto.KeyGenerator
 import javax.crypto.SecretKey
 import javax.crypto.spec.GCMParameterSpec
 
+enum class TransferDirection(val label: String) {
+    LOCAL("Local"),
+    SENT("Sent"),
+    RECEIVED("Received"),
+}
+
 data class VaultFile(
     val id: String,
     val name: String,
@@ -30,6 +36,7 @@ data class VaultFile(
     val folderPath: String = "/",
     val createdAt: Long = System.currentTimeMillis(),
     val order: Long = createdAt,
+    val transferDirection: TransferDirection = TransferDirection.LOCAL,
 )
 
 enum class VaultSort(val label: String) {
@@ -65,6 +72,9 @@ class VaultRepository(private val context: Context) {
                             folderPath = item.optString("folderPath", "/").ifBlank { "/" },
                             createdAt = item.optLong("createdAt", 0L).takeIf { it > 0 } ?: System.currentTimeMillis(),
                             order = item.optLong("order", index.toLong()),
+                            transferDirection = runCatching {
+                                TransferDirection.valueOf(item.optString("transferDirection", TransferDirection.LOCAL.name))
+                            }.getOrDefault(TransferDirection.LOCAL),
                         ),
                     )
                 }
@@ -87,7 +97,17 @@ class VaultRepository(private val context: Context) {
             val now = System.currentTimeMillis()
             val targetFolder = normalizeFolderPath(folderPath)
             ensureFolderPath(targetFolder)
-            val record = VaultFile(id, displayName, mimeType, size, locked = false, folderPath = targetFolder, createdAt = now, order = now)
+            val record = VaultFile(
+                id = id,
+                name = displayName,
+                mimeType = mimeType,
+                sizeBytes = size,
+                locked = false,
+                folderPath = targetFolder,
+                createdAt = now,
+                order = now,
+                transferDirection = TransferDirection.LOCAL,
+            )
             writeFiles(listFiles() + record)
             record
         }.getOrNull()
@@ -136,7 +156,17 @@ class VaultRepository(private val context: Context) {
             val now = System.currentTimeMillis()
             val targetFolder = normalizeFolderPath(folderPath)
             ensureFolderPath(targetFolder)
-            val record = VaultFile(id, name.sanitizeName(), mimeType, size, locked = false, folderPath = targetFolder, createdAt = now, order = now)
+            val record = VaultFile(
+                id = id,
+                name = name.sanitizeName(),
+                mimeType = mimeType,
+                sizeBytes = size,
+                locked = false,
+                folderPath = targetFolder,
+                createdAt = now,
+                order = now,
+                transferDirection = TransferDirection.RECEIVED,
+            )
             writeFiles(listFiles() + record)
             record
         }.onFailure { encryptedFile.delete() }.getOrNull()
@@ -144,6 +174,12 @@ class VaultRepository(private val context: Context) {
 
     fun toggleLocked(file: VaultFile): VaultFile {
         val updated = file.copy(locked = !file.locked)
+        writeFiles(listFiles().map { if (it.id == file.id) updated else it })
+        return updated
+    }
+
+    fun markSent(file: VaultFile): VaultFile {
+        val updated = file.copy(transferDirection = TransferDirection.SENT)
         writeFiles(listFiles().map { if (it.id == file.id) updated else it })
         return updated
     }
@@ -331,7 +367,8 @@ class VaultRepository(private val context: Context) {
                     .put("locked", file.locked)
                     .put("folderPath", file.folderPath)
                     .put("createdAt", file.createdAt)
-                    .put("order", file.order),
+                     .put("order", file.order)
+                     .put("transferDirection", file.transferDirection.name),
             )
         }
         metadataFile.writeText(array.toString())
