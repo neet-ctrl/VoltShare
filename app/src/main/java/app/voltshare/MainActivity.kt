@@ -10,6 +10,7 @@ import android.os.Bundle
 import android.text.format.Formatter
 import android.view.ViewGroup
 import android.widget.ImageView
+import androidx.activity.compose.setContent
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.biometric.BiometricManager
@@ -95,7 +96,7 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SmallTopAppBar
+import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.Surface
 import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Text
@@ -1331,7 +1332,7 @@ private fun TextComposerDialog(
                     textStyle = TextStyle(color = Color.White, fontSize = 14.sp),
                     minLines = 7,
                     maxLines = 9,
-                    colors = androidx.compose.material3.TextFieldDefaults.colors(
+                    colors = androidx.compose.material3.OutlinedTextFieldDefaults.colors(
                         focusedContainerColor = VoltSurface,
                         unfocusedContainerColor = VoltSurface,
                         focusedTextColor = Color.White,
@@ -1506,16 +1507,17 @@ private fun SecurityHome(lockType: LockType, onLockNow: () -> Unit) {
 }
 
 @Composable
+@OptIn(ExperimentalMaterial3Api::class)
 private fun FileViewerScreen(activity: MainActivity, vault: VaultRepository, file: VaultFile, onBack: () -> Unit) {
     var prepared by remember(file.id) { mutableStateOf<File?>(null) }
     LaunchedEffect(file.id) {
         prepared = withContext(Dispatchers.IO) { vault.prepareViewing(file) }
     }
     Column(Modifier.fillMaxSize().background(VoltBlack)) {
-        SmallTopAppBar(
+        TopAppBar(
             title = { Text(file.name, maxLines = 1, color = Color.White) },
             navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.Default.ArrowBack, "Back", tint = Color.White) } },
-            colors = TopAppBarDefaults.smallTopAppBarColors(containerColor = VoltBlack),
+            colors = TopAppBarDefaults.topAppBarColors(containerColor = VoltBlack),
         )
         if (prepared == null) {
             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {

@@ -188,7 +188,8 @@ class VaultRepository(private val context: Context) {
                 folder == path -> newPath
                 folder.startsWith(prefix) -> newPath + folder.removePrefix(path)
                 else -> folder
-            })
+            }
+        })
         return newPath
     }
 

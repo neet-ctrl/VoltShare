@@ -1,0 +1,270 @@
+Build and publish release APK
+Started 2m 23s ago
+3s
+1s
+0s
+10s
+0s
+Run test -n "$ANDROID_KEYSTORE_BASE64"
+  
+1m 56s
+Run gradle --no-daemon clean assembleRelease
+  
+Welcome to Gradle 8.9!
+Here are the highlights of this release:
+ - Enhanced Error and Warning Messages
+ - IDE Integration Improvements
+ - Daemon JVM Information
+For more details see https://docs.gradle.org/8.9/release-notes.html
+To honour the JVM settings for this build a single-use Daemon process will be forked. For more on this, please refer to https://docs.gradle.org/8.9/userguide/gradle_daemon.html#sec:disabling_the_daemon in the Gradle documentation.
+Daemon will be stopped at the end of the build 
+> Task :app:clean UP-TO-DATE
+> Task :app:buildKotlinToolingMetadata
+> Task :app:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :app:preBuild UP-TO-DATE
+> Task :app:preReleaseBuild UP-TO-DATE
+> Task :app:generateReleaseBuildConfig
+> Task :app:generateReleaseResValues
+> Task :app:checkReleaseAarMetadata
+> Task :app:mapReleaseSourceSetPaths
+> Task :app:generateReleaseResources
+> Task :app:packageReleaseResources
+> Task :app:mergeReleaseResources
+> Task :app:createReleaseCompatibleScreenManifests
+> Task :app:extractDeepLinksRelease
+> Task :app:parseReleaseLocalResources
+> Task :app:processReleaseMainManifest
+> Task :app:processReleaseManifest
+> Task :app:processReleaseManifestForPackage
+> Task :app:javaPreCompileRelease
+> Task :app:extractProguardFiles
+> Task :app:mergeReleaseJniLibFolders
+> Task :app:mergeReleaseNativeLibs
+> Task :app:processReleaseResources
+> Task :app:checkReleaseDuplicateClasses
+> Task :app:stripReleaseDebugSymbols
+Unable to strip the following libraries, packaging them as they are: libandroidx.graphics.path.so.
+> Task :app:mergeReleaseArtProfile
+> Task :app:mergeReleaseStartupProfile
+> Task :app:extractReleaseNativeSymbolTables
+> Task :app:mergeReleaseShaders
+> Task :app:mergeReleaseNativeDebugMetadata NO-SOURCE
+> Task :app:compileReleaseShaders NO-SOURCE
+> Task :app:generateReleaseAssets UP-TO-DATE
+> Task :app:mergeReleaseAssets
+> Task :app:compressReleaseAssets
+> Task :app:extractReleaseVersionControlInfo
+> Task :app:collectReleaseDependencies
+> Task :app:sdkReleaseDependencyData
+> Task :app:convertLinkedResourcesToProtoRelease
+> Task :app:validateSigningRelease
+> Task :app:writeReleaseAppMetadata
+> Task :app:writeReleaseSigningConfigVersions
+e: The daemon has terminated unexpectedly on startup attempt #1 with error code: 0. The daemon process output:
+> Task :app:compileReleaseKotlin
+    1. Kotlin compile daemon is ready
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:98:35 Unresolved reference 'SmallTopAppBar'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:182:9 Unresolved reference 'setContent'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:183:13 @Composable invocations can only happen from the context of a @Composable function
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:223:15 Unresolved reference 'clearViewCache'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:289:20 Cannot infer type for this parameter. Please specify it explicitly.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:289:20 Not enough information to infer type argument for 'T'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:289:20 Cannot infer type for this parameter. Please specify it explicitly.
+> Task :app:compileReleaseKotlin FAILED
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:289:20 Not enough information to infer type argument for 'T'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:289:29 Cannot infer type for this parameter. Please specify it explicitly.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:289:31 Cannot infer type for this parameter. Please specify it explicitly.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:289:31 Not enough information to infer type argument for 'T'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:289:52 Unresolved reference 'listFolders'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:306:33 Unresolved reference 'listFolders'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:328:25 Unresolved reference 'listFolders'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:451:33 Unresolved reference 'listFolders'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:466:33 Unresolved reference 'listFolders'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:542:31 Unresolved reference 'deleteFolder'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:543:41 Unresolved reference 'listFolders'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:557:31 Unresolved reference 'reorder'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:621:55 @Composable invocations can only happen from the context of a @Composable function
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:1334:75 None of the following candidates is applicable:
+fun colors(): TextFieldColors
+fun colors(focusedTextColor: Color = ..., unfocusedTextColor: Color = ..., disabledTextColor: Color = ..., errorTextColor: Color = ..., focusedContainerColor: Color = ..., unfocusedContainerColor: Color = ..., disabledContainerColor: Color = ..., errorContainerColor: Color = ..., cursorColor: Color = ..., errorCursorColor: Color = ..., selectionColors: TextSelectionColors? = ..., focusedIndicatorColor: Color = ..., unfocusedIndicatorColor: Color = ..., disabledIndicatorColor: Color = ..., errorIndicatorColor: Color = ..., focusedLeadingIconColor: Color = ..., unfocusedLeadingIconColor: Color = ..., disabledLeadingIconColor: Color = ..., errorLeadingIconColor: Color = ..., focusedTrailingIconColor: Color = ..., unfocusedTrailingIconColor: Color = ..., disabledTrailingIconColor: Color = ..., errorTrailingIconColor: Color = ..., focusedLabelColor: Color = ..., unfocusedLabelColor: Color = ..., disabledLabelColor: Color = ..., errorLabelColor: Color = ..., focusedPlaceholderColor: Color = ..., unfocusedPlaceholde
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:1512:56 Unresolved reference 'prepareViewing'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:1515:9 Unresolved reference 'SmallTopAppBar'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:1516:23 @Composable invocations can only happen from the context of a @Composable function
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:1517:32 @Composable invocations can only happen from the context of a @Composable function
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:1518:22 This material API is experimental and is likely to change or to be removed in the future.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:1518:40 Unresolved reference 'smallTopAppBarColors'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/PeerTransferManager.kt:110:38 Unresolved reference 'sha256'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/PeerTransferManager.kt:111:46 Cannot infer type for this parameter. Please specify it explicitly.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/PeerTransferManager.kt:111:46 Not enough information to infer type argument for 'R'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/PeerTransferManager.kt:111:50 Cannot infer type for this parameter. Please specify it explicitly.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/PeerTransferManager.kt:115:99 Cannot infer type for this parameter. Please specify it explicitly.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/PeerTransferManager.kt:115:99 Not enough information to infer type argument for 'R'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/PeerTransferManager.kt:115:103 Cannot infer type for this parameter. Please specify it explicitly.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/PeerTransferManager.kt:123:25 Argument type mismatch: actual type is 'R?', but 'K?' was expected.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/PeerTransferManager.kt:123:25 Not enough information to infer type argument for 'K'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/PeerTransferManager.kt:123:31 Unresolved reference 'openDecrypted'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/PeerTransferManager.kt:123:52 Cannot infer type for this parameter. Please specify it explicitly.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/PeerTransferManager.kt:123:52 Not enough information to infer type argument for 'R'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/PeerTransferManager.kt:123:58 Cannot infer type for this parameter. Please specify it explicitly.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/PeerTransferManager.kt:128:50 Unresolved reference 'read'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/PeerTransferManager.kt:135:45 Suspension functions can only be called within coroutine body.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/PeerTransferManager.kt:144:30 Argument type mismatch: actual type is 'kotlin.Nothing', but 'K' was expected.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/VaultRepository.kt:77:27 Unresolved reference 'queryDisplayName'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/VaultRepository.kt:78:49 Unresolved reference 'mimeFromName'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/VaultRepository.kt:84:24 Unresolved reference 'encrypt'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/VaultRepository.kt:88:32 Unresolved reference 'normalizeFolderPath'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/VaultRepository.kt:89:13 Unresolved reference 'ensureFolderPath'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/VaultRepository.kt:91:13 Unresolved reference 'writeFiles'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/VaultRepository.kt:102:16 Cannot infer type for this parameter. Please specify it explicitly.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/VaultRepository.kt:102:16 Not enough information to infer type argument for 'R'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/VaultRepository.kt:102:28 Cannot infer type for this parameter. Please specify it explicitly.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/VaultRepository.kt:103:34 Cannot infer type for this parameter. Please specify it explicitly.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/VaultRepository.kt:103:34 Not enough information to infer type argument for 'R'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/VaultRepository.kt:103:38 Cannot infer type for this parameter. Please specify it explicitly.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/VaultRepository.kt:104:17 Unresolved reference 'importStream'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/VaultRepository.kt:114:16 Cannot infer type for this parameter. Please specify it explicitly.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/VaultRepository.kt:114:16 Not enough information to infer type argument for 'R'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/VaultRepository.kt:114:28 Cannot infer type for this parameter. Please specify it explicitly.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/VaultRepository.kt:115:68 Cannot infer type for this parameter. Please specify it explicitly.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/VaultRepository.kt:115:68 Not enough information to infer type argument for 'R'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/VaultRepository.kt:115:72 Cannot infer type for this parameter. Please specify it explicitly.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/VaultRepository.kt:116:17 Unresolved reference 'importStream'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/VaultRepository.kt:132:26 Unresolved reference 'encryptExact'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/VaultRepository.kt:137:32 Unresolved reference 'normalizeFolderPath'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/VaultRepository.kt:138:13 Unresolved reference 'ensureFolderPath'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/VaultRepository.kt:139:45 Unresolved reference 'sanitizeName'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/VaultRepository.kt:140:13 Unresolved reference 'writeFiles'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/VaultRepository.kt:147:9 Unresolved reference 'writeFiles'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/VaultRepository.kt:152:28 Unresolved reference 'normalizeFolderPath'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/VaultRepository.kt:153:9 Unresolved reference 'ensureFolderPath'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/VaultRepository.kt:155:9 Unresolved reference 'writeFiles'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/VaultRepository.kt:160:30 Unresolved reference 'cleanFolderName'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/VaultRepository.kt:163:23 Unresolved reference 'listFolders'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/VaultRepository.kt:164:22 Unresolved reference 'add'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/VaultRepository.kt:165:9 Unresolved reference 'writeFolders'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/VaultRepository.kt:165:30 Overload resolution ambiguity between candidates:
+fun <T> Pair<T, T>.toList(): List<T>
+fun <T> Triple<T, T, T>.toList(): List<T>
+fun <T> Array<out T>.toList(): List<T>
+fun BooleanArray.toList(): List<Boolean>
+fun ByteArray.toList(): List<Byte>
+fun CharArray.toList(): List<Char>
+fun DoubleArray.toList(): List<Double>
+fun FloatArray.toList(): List<Float>
+fun IntArray.toList(): List<Int>
+fun LongArray.toList(): List<Long>
+fun ShortArray.toList(): List<Short>
+fun <T> Enumeration<T>.toList(): List<T>
+fun <T> Iterable<T>.toList(): List<T>
+fun <K, V> Map<out K, V>.toList(): List<Pair<K, V>>
+fun <T> Sequence<T>.toList(): List<T>
+fun CharSequence.toList(): List<Char>
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/VaultRepository.kt:170:37 Unresolved reference 'listFolders'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/VaultRepository.kt:171:30 Unresolved reference 'cleanFolderName'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/VaultRepository.kt:175:24 Unresolved reference 'listFolders'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/VaultRepository.kt:177:9 Unresolved reference 'writeFiles'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/VaultRepository.kt:186:22 Unresolved reference 'listFolders'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/VaultRepository.kt:186:42 Cannot infer type for this parameter. Please specify it explicitly.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/VaultRepository.kt:189:24 Overload resolution ambiguity between candidates:
+fun String.startsWith(prefix: String, ignoreCase: Boolean = ...): Boolean
+fun CharSequence.startsWith(prefix: CharSequence, ignoreCase: Boolean = ...): Boolean
+fun File.startsWith(other: String): Boolean
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/VaultRepository.kt:191:14 Syntax error: Unexpected tokens (use ';' to separate expressions on the same line).
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/VaultRepository.kt:192:9 'return' is prohibited here.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/VaultRepository.kt:193:6 Syntax error: Expecting ','.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/VaultRepository.kt:195:5 Anonymous functions with names are prohibited.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/VaultRepository.kt:195:5 Too many arguments for 'fun writeFolders(folders: List<String>): Unit'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/VaultRepository.kt:196:37 Unresolved reference 'listFolders'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/VaultRepository.kt:201:9 Unresolved reference 'writeFiles'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/VaultRepository.kt:202:9 Unresolved reference 'writeFolders'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/VaultRepository.kt:202:22 Unresolved reference 'listFolders'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/VaultRepository.kt:202:48 Unresolved reference 'it'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/VaultRepository.kt:202:62 Unresolved reference 'it'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/VaultRepository.kt:204:6 Syntax error: Expecting ','.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/VaultRepository.kt:206:5 Anonymous functions with names are prohibited.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/VaultRepository.kt:206:5 Too many arguments for 'fun writeFolders(folders: List<String>): Unit'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/VaultRepository.kt:207:14 Unresolved reference 'foldersFile'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/VaultRepository.kt:209:35 Unresolved reference 'foldersFile'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/VaultRepository.kt:212:45 Unresolved reference 'length'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/VaultRepository.kt:213:38 Unresolved reference 'optString'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/VaultRepository.kt:218:6 Syntax error: Expecting ','.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/VaultRepository.kt:220:5 Anonymous functions with names are prohibited.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/VaultRepository.kt:220:5 Too many arguments for 'fun writeFolders(folders: List<String>): Unit'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/VaultRepository.kt:230:9 Unresolved reference 'writeFiles'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/VaultRepository.kt:232:6 Syntax error: Expecting ','.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/VaultRepository.kt:234:5 Anonymous functions with names are prohibited.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/VaultRepository.kt:234:5 Too many arguments for 'fun writeFolders(folders: List<String>): Unit'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/VaultRepository.kt:243:6 Syntax error: Expecting ','.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/VaultRepository.kt:245:5 Anonymous functions with names are prohibited.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/VaultRepository.kt:245:5 Too many arguments for 'fun writeFolders(folders: List<String>): Unit'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/VaultRepository.kt:252:45 Unresolved reference 'TRANSFORMATION'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/VaultRepository.kt:253:46 Unresolved reference 'key'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/VaultRepository.kt:256:6 Syntax error: Expecting ','.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/VaultRepository.kt:258:5 Anonymous functions with names are prohibited.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/VaultRepository.kt:258:5 Too many arguments for 'fun writeFolders(folders: List<String>): Unit'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/VaultRepository.kt:271:6 Syntax error: Expecting ','.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/VaultRepository.kt:273:5 Anonymous functions with names are prohibited.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/VaultRepository.kt:273:5 Too many arguments for 'fun writeFolders(folders: List<String>): Unit'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/VaultRepository.kt:276:34 Unresolved reference 'sanitizeName'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/VaultRepository.kt:279:13 Unresolved reference 'decrypt'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/VaultRepository.kt:282:6 Syntax error: Expecting ','.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/VaultRepository.kt:284:5 Anonymous functions with names are prohibited.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/VaultRepository.kt:284:5 Too many arguments for 'fun writeFolders(folders: List<String>): Unit'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/VaultRepository.kt:284:82 Syntax error: Expecting ','.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/VaultRepository.kt:286:5 Anonymous functions with names are prohibited.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/VaultRepository.kt:286:5 Too many arguments for 'fun writeFolders(folders: List<String>): Unit'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/VaultRepository.kt:290:5 Unresolved reference 'private'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/VaultRepository.kt:290:13 Anonymous functions with names are prohibited.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/VaultRepository.kt:299:24 Unresolved reference 'encrypt'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/VaultRepository.kt:301:32 Unresolved reference 'normalizeFolderPath'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/VaultRepository.kt:302:13 Unresolved reference 'ensureFolderPath'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/VaultRepository.kt:305:36 Unresolved reference 'sanitizeName'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/VaultRepository.kt:313:13 Unresolved reference 'writeFiles'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/VaultRepository.kt:321:13 Anonymous functions with names are prohibited.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/VaultRepository.kt:339:13 Anonymous functions with names are prohibited.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/VaultRepository.kt:342:9 Unresolved reference 'foldersFile'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/VaultRepository.kt:345:13 Anonymous functions with names are prohibited.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/VaultRepository.kt:353:13 Anonymous functions with names are prohibited.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/VaultRepository.kt:354:41 Unresolved reference 'TRANSFORMATION'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/VaultRepository.kt:355:42 Unresolved reference 'key'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/VaultRepository.kt:372:13 Anonymous functions with names are prohibited.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/VaultRepository.kt:373:41 Unresolved reference 'TRANSFORMATION'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/VaultRepository.kt:374:42 Unresolved reference 'key'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/VaultRepository.kt:394:13 Anonymous functions with names are prohibited.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/VaultRepository.kt:398:45 Unresolved reference 'TRANSFORMATION'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/VaultRepository.kt:399:46 Unresolved reference 'key'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/VaultRepository.kt:406:13 Anonymous functions with names are prohibited.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/VaultRepository.kt:408:37 Unresolved reference 'KEY_ALIAS'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/VaultRepository.kt:413:17 Unresolved reference 'KEY_ALIAS'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/VaultRepository.kt:425:13 Anonymous functions with names are prohibited.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/VaultRepository.kt:435:5 Unresolved reference 'private'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/VaultRepository.kt:435:13 Anonymous functions with names are prohibited.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/VaultRepository.kt:438:5 Unresolved reference 'private'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/VaultRepository.kt:438:13 Anonymous functions with names are prohibited.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/VaultRepository.kt:439:9 Variable expected.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/VaultRepository.kt:439:9 Only expressions are allowed in this context.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/VaultRepository.kt:441:5 Unresolved reference 'private'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/VaultRepository.kt:441:13 Anonymous functions with names are prohibited.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/VaultRepository.kt:446:13 Anonymous functions with names are prohibited.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/VaultRepository.kt:458:17 Const 'val' is only allowed on top level, in named objects, or in companion objects.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/VaultRepository.kt:459:17 Const 'val' is only allowed on top level, in named objects, or in companion objects.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/VaultRepository.kt:463:13 Syntax error: Expecting an expression.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/VaultRepository.kt:463:17 Assignment type mismatch: actual type is 'java.io.File', but 'kotlin.text.MatchGroup?' was expected.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/VaultRepository.kt:463:47 Syntax error: Expecting ')'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/VaultRepository.kt:464:1 Missing return statement.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/VaultRepository.kt:464:2 Syntax error: Missing '}.
+gradle/actions: Writing build results to /home/runner/work/_temp/.gradle-actions/build-results/__run_2-1788970900361.json
+FAILURE: Build failed with an exception.
+* What went wrong:
+Execution failed for task ':app:compileReleaseKotlin'.
+> A failure occurred while executing org.jetbrains.kotlin.compilerRunner.GradleCompilerRunnerWithWorkers$GradleKotlinCompilerWorkAction
+   > Compilation error. See log for more details
+36 actionable tasks: 35 executed, 1 up-to-date
+* Try:
+> Run with --stacktrace option to get the stack trace.
+> Run with --info or --debug option to get more log output.
+> Run with --scan to get full insights.
+> Get more help at https://help.gradle.org.
+BUILD FAILED in 1m 55s
+Error: Process completed with exit code 1.
+0s
