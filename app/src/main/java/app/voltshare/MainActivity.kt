@@ -43,6 +43,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -96,8 +97,7 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SmallTopAppBar
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Switch
-import androidx.compose.material3.SwitchDefaults
+import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBarDefaults
@@ -257,10 +257,12 @@ private fun VoltShareTheme(content: @Composable () -> Unit) {
             onSurface = Color.White,
         ),
         typography = androidx.compose.material3.Typography(
-            headlineLarge = TextStyle(fontWeight = FontWeight.Black, letterSpacing = (-1.2).sp),
-            headlineMedium = TextStyle(fontWeight = FontWeight.Black, letterSpacing = (-0.8).sp),
-            titleLarge = TextStyle(fontWeight = FontWeight.Bold),
-            bodyMedium = TextStyle(fontSize = 14.sp),
+            headlineLarge = TextStyle(fontFamily = FontFamily.SansSerif, fontWeight = FontWeight.Black, letterSpacing = (-1.2).sp),
+            headlineMedium = TextStyle(fontFamily = FontFamily.SansSerif, fontWeight = FontWeight.Black, letterSpacing = (-0.8).sp),
+            titleLarge = TextStyle(fontFamily = FontFamily.SansSerif, fontWeight = FontWeight.Bold),
+            bodyLarge = TextStyle(fontFamily = FontFamily.SansSerif, fontSize = 15.sp, lineHeight = 22.sp),
+            bodyMedium = TextStyle(fontFamily = FontFamily.SansSerif, fontSize = 14.sp, lineHeight = 20.sp),
+            labelLarge = TextStyle(fontFamily = FontFamily.SansSerif, fontWeight = FontWeight.Bold),
         ),
         content = content,
     )
@@ -506,6 +508,13 @@ private fun VoltShareApp(
                         onClick = { tab = item },
                         icon = { Icon(item.icon, item.label) },
                         label = { Text(item.label) },
+                        colors = NavigationBarItemDefaults.colors(
+                            selectedIconColor = Color.Black,
+                            selectedTextColor = VoltGreen,
+                            indicatorColor = VoltGreen,
+                            unselectedIconColor = VoltTextMuted,
+                            unselectedTextColor = VoltTextMuted,
+                        ),
                     )
                 }
             }
@@ -730,8 +739,8 @@ private fun UnlockScreen(
         Spacer(Modifier.height(12.dp))
         OutlinedButton(
             onClick = onBiometric,
-            modifier = Modifier.fillMaxWidth().height(54.dp),
-            shape = RoundedCornerShape(18.dp),
+            modifier = Modifier.fillMaxWidth().height(54.dp).shadow(10.dp, RoundedCornerShape(20.dp), spotColor = VoltGreen.copy(alpha = 0.16f)),
+            shape = RoundedCornerShape(20.dp),
             border = BorderStroke(1.dp, Color.White.copy(alpha = 0.16f)),
             colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White),
         ) {
@@ -904,8 +913,8 @@ private fun VaultHome(
                 )
                 OutlinedButton(
                     onClick = { searchOpen = true },
-                    modifier = Modifier.weight(0.65f).height(54.dp),
-                    shape = RoundedCornerShape(18.dp),
+                    modifier = Modifier.weight(0.65f).height(54.dp).shadow(10.dp, RoundedCornerShape(20.dp), spotColor = VoltGreen.copy(alpha = 0.16f)),
+                    shape = RoundedCornerShape(20.dp),
                     border = BorderStroke(1.dp, VoltGreen.copy(alpha = 0.3f)),
                     colors = ButtonDefaults.outlinedButtonColors(contentColor = VoltGreen),
                 ) {
@@ -1170,10 +1179,9 @@ private fun ShareHome(
                         Text("This device", color = Color.White, fontWeight = FontWeight.Bold)
                         Text(if (status.active) "Visible to nearby devices" else "Private and ready", color = VoltTextMuted, fontSize = 12.sp)
                     }
-                    Switch(
+                    PremiumSwitch(
                         checked = status.active,
                         onCheckedChange = { if (it) transfer.startHosting() else transfer.close() },
-                        colors = SwitchDefaults.colors(checkedThumbColor = Color.Black, checkedTrackColor = VoltGreen, uncheckedThumbColor = Color.White.copy(alpha = 0.7f), uncheckedTrackColor = Color.White.copy(alpha = 0.12f)),
                     )
                 }
             }
@@ -1183,8 +1191,8 @@ private fun ShareHome(
                 GlowButton("Find nearby", Icons.Default.Search, { transfer.discoverPeers() }, Modifier.weight(1f))
                 OutlinedButton(
                     onClick = { transfer.startHosting() },
-                    modifier = Modifier.weight(1f).height(54.dp),
-                    shape = RoundedCornerShape(18.dp),
+                    modifier = Modifier.weight(1f).height(54.dp).shadow(10.dp, RoundedCornerShape(20.dp), spotColor = VoltGreen.copy(alpha = 0.16f)),
+                    shape = RoundedCornerShape(20.dp),
                     border = BorderStroke(1.dp, VoltGreen.copy(alpha = 0.3f)),
                     colors = ButtonDefaults.outlinedButtonColors(contentColor = VoltGreen),
                 ) {
@@ -1479,10 +1487,9 @@ private fun SecurityHome(lockType: LockType, onLockNow: () -> Unit) {
                         Text("Lock each file", color = Color.White, fontWeight = FontWeight.Bold)
                         Text("Require your vault lock before viewing", color = VoltTextMuted, fontSize = 12.sp)
                     }
-                    Switch(
+                    PremiumSwitch(
                         checked = fileLockDefault,
                         onCheckedChange = { fileLockDefault = it },
-                        colors = SwitchDefaults.colors(checkedThumbColor = Color.Black, checkedTrackColor = VoltGreen, uncheckedThumbColor = Color.White.copy(alpha = 0.7f), uncheckedTrackColor = Color.White.copy(alpha = 0.12f)),
                     )
                 }
             }
@@ -1880,7 +1887,10 @@ private fun GlowButton(text: String, icon: ImageVector, onClick: () -> Unit, mod
     val elevation by androidx.compose.animation.core.animateDpAsState(if (text.isNotEmpty()) 12.dp else 0.dp, label = "button-glow")
     Button(
         onClick = onClick,
-        modifier = modifier.height(54.dp).shadow(elevation, RoundedCornerShape(18.dp), spotColor = VoltGreen.copy(alpha = 0.5f)),
+        modifier = modifier
+            .height(54.dp)
+            .shadow(elevation, RoundedCornerShape(20.dp), ambientColor = VoltGreen.copy(alpha = 0.18f), spotColor = VoltGreen.copy(alpha = 0.55f))
+            .border(1.dp, Color.White.copy(alpha = 0.18f), RoundedCornerShape(20.dp)),
         shape = RoundedCornerShape(18.dp),
         colors = ButtonDefaults.buttonColors(containerColor = VoltGreen, contentColor = Color.Black),
         contentPadding = PaddingValues(horizontal = 18.dp),
@@ -1892,10 +1902,42 @@ private fun GlowButton(text: String, icon: ImageVector, onClick: () -> Unit, mod
 }
 
 @Composable
+private fun PremiumSwitch(
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit,
+) {
+    val thumbOffset by androidx.compose.animation.core.animateDpAsState(
+        targetValue = if (checked) 27.dp else 4.dp,
+        animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
+        label = "premium-switch-thumb",
+    )
+    Box(
+        modifier = Modifier
+            .width(58.dp)
+            .height(34.dp)
+            .clip(RoundedCornerShape(18.dp))
+            .background(if (checked) VoltGreen.copy(alpha = 0.22f) else Color.White.copy(alpha = 0.10f))
+            .border(1.dp, if (checked) VoltGreen.copy(alpha = 0.72f) else Color.White.copy(alpha = 0.16f), RoundedCornerShape(18.dp))
+            .clickable { onCheckedChange(!checked) }
+            .padding(3.dp),
+        contentAlignment = Alignment.CenterStart,
+    ) {
+        Box(
+            modifier = Modifier
+                .offset(x = thumbOffset)
+                .size(26.dp)
+                .shadow(if (checked) 12.dp else 2.dp, CircleShape, spotColor = VoltGreen.copy(alpha = 0.58f))
+                .background(if (checked) VoltGreen else Color.White.copy(alpha = 0.72f), CircleShape),
+        )
+    }
+}
+
+@Composable
 private fun GlassCard(modifier: Modifier, accent: Color, padding: androidx.compose.ui.unit.Dp = 24.dp, content: @Composable ColumnScope.() -> Unit) {
     Column(
         modifier = modifier
-            .shadow(18.dp, RoundedCornerShape(26.dp), ambientColor = Color.Black, spotColor = accent.copy(alpha = 0.22f))
+            .shadow(34.dp, RoundedCornerShape(26.dp), ambientColor = Color.Black.copy(alpha = 0.92f), spotColor = Color.Black.copy(alpha = 0.9f))
+            .shadow(13.dp, RoundedCornerShape(26.dp), ambientColor = accent.copy(alpha = 0.08f), spotColor = accent.copy(alpha = 0.26f))
             .background(
                 Brush.verticalGradient(
                     listOf(accent.copy(alpha = 0.13f), VoltSurface, VoltSurface),
