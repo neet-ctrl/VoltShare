@@ -37,6 +37,7 @@ data class VaultFile(
     val createdAt: Long = System.currentTimeMillis(),
     val order: Long = createdAt,
     val transferDirection: TransferDirection = TransferDirection.LOCAL,
+    val contentHash: String? = null,
 )
 
 enum class VaultSort(val label: String) {
@@ -54,6 +55,7 @@ class VaultRepository(private val context: Context) {
     private val vaultDir = File(context.filesDir, "vault").apply { mkdirs() }
     private val metadataFile = File(vaultDir, "index.json")
     private val viewCacheDir = File(context.cacheDir, "view-cache").apply { mkdirs() }
+    private val preferences = context.getSharedPreferences("voltshare-vault", Context.MODE_PRIVATE)
 
     fun listFiles(): List<VaultFile> {
         if (!metadataFile.exists()) return emptyList()
@@ -75,6 +77,7 @@ class VaultRepository(private val context: Context) {
                             transferDirection = runCatching {
                                 TransferDirection.valueOf(item.optString("transferDirection", TransferDirection.LOCAL.name))
                             }.getOrDefault(TransferDirection.LOCAL),
+                            contentHash = item.optString("contentHash", "").ifBlank { null },
                         ),
                     )
                 }
@@ -82,31 +85,38 @@ class VaultRepository(private val context: Context) {
         }.getOrDefault(emptyList())
     }
 
-    fun importUri(uri: Uri, folderPath: String = "/"): VaultFile? {
+    fun importUri(uri: Uri, folderPath: String = primaryFolder()): VaultFile? {
         val resolver = context.contentResolver
         val displayName = queryDisplayName(uri) ?: "untitled-${System.currentTimeMillis()}"
         val mimeType = resolver.getType(uri) ?: mimeFromName(displayName)
         val id = UUID.randomUUID().toString()
         val encryptedFile = File(vaultDir, "$id.vault")
-        var size = 0L
+        var encoded: EncodedFile? = null
         return runCatching {
             resolver.openInputStream(uri)?.use { input ->
-                size = encrypt(input, encryptedFile)
+                encoded = encrypt(input, encryptedFile)
             } ?: return null
 
             val now = System.currentTimeMillis()
-            val targetFolder = normalizeFolderPath(folderPath)
+            val requestedFolder = normalizeFolderPath(folderPath)
+            val targetFolder = if (requestedFolder == "/" && primaryFolder() != "/") primaryFolder() else requestedFolder
             ensureFolderPath(targetFolder)
+            val existing = encoded?.sha256?.let(::findFileByHash)
+            if (existing != null) {
+                encryptedFile.delete()
+                return existing
+            }
             val record = VaultFile(
                 id = id,
                 name = displayName,
                 mimeType = mimeType,
-                sizeBytes = size,
+                sizeBytes = encoded?.sizeBytes ?: 0L,
                 locked = false,
                 folderPath = targetFolder,
                 createdAt = now,
                 order = now,
                 transferDirection = TransferDirection.LOCAL,
+                contentHash = encoded?.sha256,
             )
             writeFiles(listFiles() + record)
             record
@@ -117,7 +127,7 @@ class VaultRepository(private val context: Context) {
         source: File,
         displayName: String,
         mimeType: String,
-        folderPath: String = "/",
+        folderPath: String = primaryFolder(),
     ): VaultFile? {
         return runCatching {
             source.inputStream().use { input ->
@@ -129,7 +139,7 @@ class VaultRepository(private val context: Context) {
     fun createTextFile(
         text: String,
         displayName: String = "VoltShare-note-${System.currentTimeMillis()}.txt",
-        folderPath: String = "/",
+        folderPath: String = primaryFolder(),
     ): VaultFile? {
         return runCatching {
             ByteArrayInputStream(text.toByteArray(Charsets.UTF_8)).use { input ->
@@ -144,17 +154,23 @@ class VaultRepository(private val context: Context) {
         input: InputStream,
         size: Long,
         expectedSha256: String? = null,
-        folderPath: String = "/",
+        folderPath: String = primaryFolder(),
     ): VaultFile? {
         val id = UUID.randomUUID().toString()
         val encryptedFile = File(vaultDir, "$id.vault.tmp")
         return runCatching {
             val digest = encryptExact(input, encryptedFile, size)
             check(expectedSha256 == null || digest.equals(expectedSha256, ignoreCase = true)) { "Transfer checksum mismatch" }
+            val existing = findFileByHash(digest)
+            if (existing != null) {
+                encryptedFile.delete()
+                return existing
+            }
             val finalFile = File(vaultDir, "$id.vault")
             check(encryptedFile.renameTo(finalFile)) { "Could not commit received file" }
             val now = System.currentTimeMillis()
-            val targetFolder = normalizeFolderPath(folderPath)
+            val requestedFolder = normalizeFolderPath(folderPath)
+            val targetFolder = if (requestedFolder == "/" && primaryFolder() != "/") primaryFolder() else requestedFolder
             ensureFolderPath(targetFolder)
             val record = VaultFile(
                 id = id,
@@ -166,6 +182,7 @@ class VaultRepository(private val context: Context) {
                 createdAt = now,
                 order = now,
                 transferDirection = TransferDirection.RECEIVED,
+                contentHash = digest,
             )
             writeFiles(listFiles() + record)
             record
@@ -183,6 +200,31 @@ class VaultRepository(private val context: Context) {
         writeFiles(listFiles().map { if (it.id == file.id) updated else it })
         return updated
     }
+
+    fun renameFile(file: VaultFile, name: String): VaultFile? {
+        val cleanName = name.sanitizeName()
+        if (cleanName.isBlank()) return null
+        val updated = file.copy(name = cleanName)
+        writeFiles(listFiles().map { if (it.id == file.id) updated else it })
+        return updated
+    }
+
+    fun deleteFile(file: VaultFile): Boolean {
+        val existed = listFiles().any { it.id == file.id }
+        val deleted = encryptedFile(file).delete()
+        val remaining = listFiles().filterNot { it.id == file.id }
+        writeFiles(remaining)
+        return existed || deleted
+    }
+
+    fun setPrimaryFolder(path: String): String {
+        val normalized = normalizeFolderPath(path)
+        ensureFolderPath(normalized)
+        preferences.edit().putString(PRIMARY_FOLDER_KEY, normalized).apply()
+        return normalized
+    }
+
+    fun primaryFolder(): String = normalizeFolderPath(preferences.getString(PRIMARY_FOLDER_KEY, "/") ?: "/")
 
     fun moveFile(file: VaultFile, folderPath: String): VaultFile {
         val targetFolder = normalizeFolderPath(folderPath)
@@ -226,6 +268,9 @@ class VaultRepository(private val context: Context) {
                 else -> folder
             }
         })
+        if (primaryFolder() == path || primaryFolder().startsWith("$path/")) {
+            preferences.edit().putString(PRIMARY_FOLDER_KEY, newPath + primaryFolder().removePrefix(path)).apply()
+        }
         return newPath
     }
 
@@ -237,6 +282,10 @@ class VaultRepository(private val context: Context) {
         }
         writeFiles(updatedFiles)
         writeFolders(listFolders().filterNot { it == path || it.startsWith(prefix) })
+        if (primaryFolder() == path || primaryFolder().startsWith(prefix)) {
+            val parent = path.substringBeforeLast('/', "")
+            preferences.edit().putString(PRIMARY_FOLDER_KEY, if (parent.isBlank()) "/" else parent).apply()
+        }
         return true
     }
 
@@ -266,6 +315,24 @@ class VaultRepository(private val context: Context) {
         val ids = normalized.associateBy { it.id }
         writeFiles(listFiles().map { ids[it.id] ?: it })
         return normalized
+    }
+
+    fun reorderTo(file: VaultFile, targetIndex: Int): List<VaultFile> {
+        val siblings = listFiles().filter { it.folderPath == file.folderPath }.sortedBy { it.order }.toMutableList()
+        val currentIndex = siblings.indexOfFirst { it.id == file.id }
+        if (currentIndex < 0 || targetIndex !in siblings.indices || currentIndex == targetIndex) return siblings
+        val item = siblings.removeAt(currentIndex)
+        siblings.add(targetIndex.coerceIn(0, siblings.size), item)
+        val normalized = siblings.mapIndexed { position, entry -> entry.copy(order = position.toLong()) }
+        val ids = normalized.associateBy { it.id }
+        writeFiles(listFiles().map { ids[it.id] ?: it })
+        return normalized
+    }
+
+    fun deleteFiles(files: Collection<VaultFile>) {
+        val ids = files.map { it.id }.toSet()
+        files.forEach { encryptedFile(it).delete() }
+        writeFiles(listFiles().filterNot { it.id in ids })
     }
 
     fun sort(files: List<VaultFile>, sort: VaultSort): List<VaultFile> = when (sort) {
@@ -333,19 +400,26 @@ class VaultRepository(private val context: Context) {
         val id = UUID.randomUUID().toString()
         val encryptedFile = File(vaultDir, "$id.vault")
         return try {
-            val size = encrypt(input, encryptedFile)
+            val encoded = encrypt(input, encryptedFile)
             val now = System.currentTimeMillis()
-            val targetFolder = normalizeFolderPath(folderPath)
+            val requestedFolder = normalizeFolderPath(folderPath)
+            val targetFolder = if (requestedFolder == "/" && primaryFolder() != "/") primaryFolder() else requestedFolder
             ensureFolderPath(targetFolder)
+            val existing = findFileByHash(encoded.sha256)
+            if (existing != null) {
+                encryptedFile.delete()
+                return existing
+            }
             val record = VaultFile(
                 id = id,
                 name = displayName.sanitizeName(),
                 mimeType = mimeType,
-                sizeBytes = size,
+                sizeBytes = encoded.sizeBytes,
                 locked = false,
                 folderPath = targetFolder,
                 createdAt = now,
                 order = now,
+                contentHash = encoded.sha256,
             )
             writeFiles(listFiles() + record)
             record
@@ -366,12 +440,20 @@ class VaultRepository(private val context: Context) {
                     .put("sizeBytes", file.sizeBytes)
                     .put("locked", file.locked)
                     .put("folderPath", file.folderPath)
-                    .put("createdAt", file.createdAt)
+                     .put("createdAt", file.createdAt)
                      .put("order", file.order)
-                     .put("transferDirection", file.transferDirection.name),
+                     .put("transferDirection", file.transferDirection.name)
+                     .put("contentHash", file.contentHash ?: JSONObject.NULL),
             )
         }
         metadataFile.writeText(array.toString())
+    }
+
+    private fun findFileByHash(hash: String): VaultFile? {
+        return listFiles().firstOrNull { file ->
+            file.contentHash?.equals(hash, ignoreCase = true) == true ||
+                (file.contentHash == null && sha256(file)?.equals(hash, ignoreCase = true) == true)
+        }
     }
 
     private fun writeFolders(folders: List<String>) {
@@ -388,9 +470,12 @@ class VaultRepository(private val context: Context) {
         }
     }
 
-    private fun encrypt(input: InputStream, destination: File): Long {
+    private data class EncodedFile(val sizeBytes: Long, val sha256: String)
+
+    private fun encrypt(input: InputStream, destination: File): EncodedFile {
         val cipher = Cipher.getInstance(TRANSFORMATION)
         cipher.init(Cipher.ENCRYPT_MODE, key())
+        val digest = MessageDigest.getInstance("SHA-256")
         var count = 0L
         FileOutputStream(destination).use { output ->
             output.write(cipher.iv)
@@ -400,11 +485,12 @@ class VaultRepository(private val context: Context) {
                     val read = input.read(buffer)
                     if (read <= 0) break
                     encrypted.write(buffer, 0, read)
+                    digest.update(buffer, 0, read)
                     count += read
                 }
             }
         }
-        return count
+        return EncodedFile(count, digest.digest().joinToString("") { "%02x".format(it) })
     }
 
     private fun encryptExact(input: InputStream, destination: File, expectedSize: Long): String {
@@ -495,6 +581,7 @@ class VaultRepository(private val context: Context) {
     companion object {
         private const val KEY_ALIAS = "voltshare-vault-key"
         private const val TRANSFORMATION = "AES/GCM/NoPadding"
+        private const val PRIMARY_FOLDER_KEY = "primary-folder"
     }
 
     private val foldersFile: File

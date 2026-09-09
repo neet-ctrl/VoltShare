@@ -26,6 +26,7 @@ import java.net.Socket
 sealed interface PendingShareSource {
     data class UriSource(val uri: Uri) : PendingShareSource
     data class FileSource(val file: File) : PendingShareSource
+    data class VaultSource(val file: VaultFile) : PendingShareSource
 }
 
 data class PendingShare(
@@ -301,6 +302,7 @@ class PeerTransferManager(
         when (source) {
             is PendingShareSource.UriSource -> context.contentResolver.openInputStream(source.uri)
             is PendingShareSource.FileSource -> source.file.inputStream()
+            is PendingShareSource.VaultSource -> vault.openDecrypted(source.file)
         }
     }.getOrNull()
 
