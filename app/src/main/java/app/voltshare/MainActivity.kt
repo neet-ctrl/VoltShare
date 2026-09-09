@@ -1,0 +1,1150 @@
+package app.voltshare
+
+import android.graphics.BitmapFactory
+import android.graphics.pdf.PdfRenderer
+import android.os.Bundle
+import android.text.format.Formatter
+import android.view.ViewGroup
+import android.widget.ImageView
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.biometric.BiometricManager
+import androidx.biometric.BiometricPrompt
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.ArrowDownward
+import androidx.compose.material.icons.filled.ArrowUpward
+import androidx.compose.material.icons.filled.Bolt
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.ContentCopy
+import androidx.compose.material.icons.filled.Description
+import androidx.compose.material.icons.filled.Fingerprint
+import androidx.compose.material.icons.filled.Folder
+import androidx.compose.material.icons.filled.Image
+import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.LockOpen
+import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Security
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Share
+import androidx.compose.material.icons.filled.Smartphone
+import androidx.compose.material.icons.filled.TextSnippet
+import androidx.compose.material.icons.filled.VideoLibrary
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Divider
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.NavigationBar
+import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SmallTopAppBar
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.compose.ui.viewinterop.AndroidView
+import androidx.fragment.app.FragmentActivity
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.media3.common.MediaItem
+import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.ui.PlayerView
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import java.io.File
+
+private val VoltGreen = Color(0xFF00E676)
+private val VoltBlack = Color(0xFF000000)
+private val VoltSurface = Color(0xFF121212)
+private val VoltSurfaceRaised = Color(0xFF1B1F1E)
+private val VoltTextMuted = Color.White.copy(alpha = 0.52f)
+private val VoltTeal = Color(0xFF00796B)
+
+class MainActivity : FragmentActivity() {
+    private lateinit var vault: VaultRepository
+    private lateinit var lockManager: LockManager
+    private lateinit var transfer: PeerTransferManager
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        vault = VaultRepository(this)
+        lockManager = LockManager(this)
+        transfer = PeerTransferManager(this, vault)
+        setContent {
+            VoltShareTheme {
+                VoltShareApp(this, vault, lockManager, transfer)
+            }
+        }
+    }
+
+    fun authenticateWithBiometric(onSuccess: () -> Unit) {
+        val authenticators = BiometricManager.Authenticators.BIOMETRIC_STRONG or
+            BiometricManager.Authenticators.DEVICE_CREDENTIAL
+        if (BiometricManager.from(this).canAuthenticate(authenticators) != BiometricManager.BIOMETRIC_SUCCESS) return
+        val prompt = BiometricPrompt(
+            this,
+            mainExecutor,
+            object : BiometricPrompt.AuthenticationCallback() {
+                override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
+                    onSuccess()
+                }
+            },
+        )
+        prompt.authenticate(
+            BiometricPrompt.PromptInfo.Builder()
+                .setTitle("Unlock VoltShare")
+                .setSubtitle("Your files stay inside the private vault")
+                .setAllowedAuthenticators(authenticators)
+                .build(),
+        )
+    }
+
+    override fun onDestroy() {
+        transfer.close()
+        vault.clearViewCache()
+        super.onDestroy()
+    }
+}
+
+@Composable
+private fun VoltShareTheme(content: @Composable () -> Unit) {
+    MaterialTheme(
+        colorScheme = androidx.compose.material3.darkColorScheme(
+            background = VoltBlack,
+            surface = VoltSurface,
+            primary = VoltGreen,
+            onPrimary = Color.Black,
+            secondary = VoltTeal,
+            onBackground = Color.White,
+            onSurface = Color.White,
+        ),
+        typography = androidx.compose.material3.Typography(
+            headlineLarge = TextStyle(fontWeight = FontWeight.Black, letterSpacing = (-1.2).sp),
+            headlineMedium = TextStyle(fontWeight = FontWeight.Black, letterSpacing = (-0.8).sp),
+            titleLarge = TextStyle(fontWeight = FontWeight.Bold),
+            bodyMedium = TextStyle(fontSize = 14.sp),
+        ),
+        content = content,
+    )
+}
+
+private enum class AppTab(val label: String, val icon: ImageVector) {
+    VAULT("Vault", Icons.Default.Folder),
+    SHARE("Share", Icons.Default.Share),
+    SECURITY("Lock", Icons.Default.Security),
+}
+
+@Composable
+private fun VoltShareApp(
+    activity: MainActivity,
+    vault: VaultRepository,
+    lockManager: LockManager,
+    transfer: PeerTransferManager,
+) {
+    var configured by remember { mutableStateOf(lockManager.isConfigured()) }
+    var unlocked by remember { mutableStateOf(!configured) }
+    var tab by remember { mutableStateOf(AppTab.VAULT) }
+    var viewerFile by remember { mutableStateOf<VaultFile?>(null) }
+    var files by remember { mutableStateOf(vault.listFiles()) }
+    var fileToUnlock by remember { mutableStateOf<VaultFile?>(null) }
+    val picker = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenMultipleDocuments(),
+    ) { uris ->
+        uris.forEach { uri ->
+            activity.contentResolver.takePersistableUriPermission(
+                uri,
+                android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION,
+            )
+            vault.importUri(uri)
+        }
+        files = vault.listFiles()
+    }
+
+    if (!configured) {
+        SetupLockScreen(
+            onComplete = {
+                configured = true
+                unlocked = true
+            },
+        )
+        return
+    }
+
+    if (!unlocked) {
+        UnlockScreen(
+            lockManager = lockManager,
+            onUnlock = { unlocked = true },
+            onBiometric = { activity.authenticateWithBiometric { unlocked = true } },
+        )
+        return
+    }
+
+    viewerFile?.let { selected ->
+        FileViewerScreen(
+            activity = activity,
+            vault = vault,
+            file = selected,
+            onBack = { viewerFile = null },
+        )
+        return
+    }
+
+    fileToUnlock?.let { target ->
+        SecretDialog(
+            title = "Unlock ${target.name}",
+            type = lockManager.type(),
+            onDismiss = { fileToUnlock = null },
+            onConfirm = { secret ->
+                if (lockManager.verify(secret)) {
+                    fileToUnlock = null
+                    viewerFile = target
+                }
+            },
+        )
+    }
+
+    Scaffold(
+        containerColor = VoltBlack,
+        bottomBar = {
+            NavigationBar(
+                modifier = Modifier.navigationBarsPadding(),
+                containerColor = VoltSurface,
+                tonalElevation = 0.dp,
+            ) {
+                AppTab.entries.forEach { item ->
+                    NavigationBarItem(
+                        selected = tab == item,
+                        onClick = { tab = item },
+                        icon = { Icon(item.icon, item.label) },
+                        label = { Text(item.label) },
+                    )
+                }
+            }
+        },
+    ) { padding ->
+        AnimatedContent(
+            targetState = tab,
+            modifier = Modifier.padding(padding),
+            label = "tab-transition",
+        ) { current ->
+            when (current) {
+                AppTab.VAULT -> VaultHome(
+                    files = files,
+                    onImport = {
+                        picker.launch(arrayOf("*/*"))
+                    },
+                    onOpen = { file ->
+                        if (file.locked) fileToUnlock = file else viewerFile = file
+                    },
+                    onToggleLock = {
+                        vault.toggleLocked(it)
+                        files = vault.listFiles()
+                    },
+                )
+
+                AppTab.SHARE -> ShareHome(
+                    files = files,
+                    transfer = transfer,
+                )
+
+                AppTab.SECURITY -> SecurityHome(
+                    lockType = lockManager.type(),
+                    onLockNow = { unlocked = false },
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun SetupLockScreen(onComplete: () -> Unit) {
+    var selected by remember { mutableStateOf(LockType.PIN) }
+    var secret by remember { mutableStateOf("") }
+    var confirm by remember { mutableStateOf("") }
+    var pattern by remember { mutableStateOf<List<Int>>(emptyList()) }
+    var confirmPattern by remember { mutableStateOf<List<Int>>(emptyList()) }
+    var error by remember { mutableStateOf("") }
+    val manager = remember { LockManager(LocalContext.current) }
+
+    LockScaffold(
+        eyebrow = "PRIVATE BY DESIGN",
+        title = "Build your vault",
+        description = "Every file is encrypted inside VoltShare’s app-private folder. Choose how you want to open the vault.",
+    ) {
+        FloatingSegmentedControl(
+            items = LockType.entries.map { it.label },
+            selectedIndex = selected.ordinal,
+            onSelected = { selected = LockType.entries[it] },
+        )
+        Spacer(Modifier.height(28.dp))
+        if (selected == LockType.PATTERN) {
+            Text("Draw a 4+ point pattern", color = VoltTextMuted, fontSize = 12.sp)
+            Spacer(Modifier.height(12.dp))
+            PatternPad(pattern, onChange = { pattern = it })
+            Spacer(Modifier.height(18.dp))
+            Text("Draw it again to confirm", color = VoltTextMuted, fontSize = 12.sp)
+            Spacer(Modifier.height(12.dp))
+            PatternPad(confirmPattern, onChange = { confirmPattern = it })
+        } else {
+            SecureField(
+                value = secret,
+                label = "Create ${selected.label.lowercase()}",
+                keyboardType = if (selected == LockType.PIN) KeyboardType.NumberPassword else KeyboardType.Password,
+                onValueChange = { secret = it },
+            )
+            Spacer(Modifier.height(14.dp))
+            SecureField(
+                value = confirm,
+                label = "Confirm ${selected.label.lowercase()}",
+                keyboardType = if (selected == LockType.PIN) KeyboardType.NumberPassword else KeyboardType.Password,
+                onValueChange = { confirm = it },
+            )
+        }
+        AnimatedVisibility(error.isNotEmpty()) {
+            Text(error, color = Color(0xFFFF6B6B), modifier = Modifier.padding(top = 12.dp))
+        }
+        Spacer(Modifier.height(24.dp))
+        GlowButton(
+            text = "Secure my vault",
+            icon = Icons.Default.Lock,
+            onClick = {
+                error = when {
+                    selected == LockType.PATTERN && pattern.size < 4 -> "Use at least 4 points."
+                    selected == LockType.PATTERN && pattern != confirmPattern -> "The two patterns do not match."
+                    selected != LockType.PATTERN && secret.length < 4 -> "Use at least 4 characters."
+                    selected != LockType.PATTERN && secret != confirm -> "The two entries do not match."
+                    !manager.configure(selected, if (selected == LockType.PATTERN) pattern.joinToString("-") else secret) -> "Could not save the lock."
+                    else -> ""
+                }
+                if (error.isEmpty()) onComplete()
+            },
+        )
+        Spacer(Modifier.height(16.dp))
+        Text(
+            "Your passcode never leaves this device.",
+            color = VoltTextMuted,
+            fontSize = 12.sp,
+            modifier = Modifier.align(Alignment.CenterHorizontally),
+        )
+    }
+}
+
+@Composable
+private fun UnlockScreen(
+    lockManager: LockManager,
+    onUnlock: () -> Unit,
+    onBiometric: () -> Unit,
+) {
+    var secret by remember { mutableStateOf("") }
+    var pattern by remember { mutableStateOf<List<Int>>(emptyList()) }
+    var error by remember { mutableStateOf(false) }
+    LockScaffold(
+        eyebrow = "VAULT LOCKED",
+        title = "Welcome back",
+        description = "Your private files are still here. Unlock to continue.",
+    ) {
+        Box(
+            modifier = Modifier
+                .size(88.dp)
+                .shadow(20.dp, CircleShape, ambientColor = VoltGreen.copy(alpha = 0.25f), spotColor = VoltGreen.copy(alpha = 0.18f))
+                .background(VoltGreen.copy(alpha = 0.1f), CircleShape)
+                .align(Alignment.CenterHorizontally),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(Icons.Default.Lock, null, tint = VoltGreen, modifier = Modifier.size(34.dp))
+        }
+        Spacer(Modifier.height(28.dp))
+        if (lockManager.type() == LockType.PATTERN) {
+            PatternPad(pattern, onChange = {
+                pattern = it
+                error = false
+            })
+        } else {
+            SecureField(
+                value = secret,
+                label = "Enter ${lockManager.type().label.lowercase()}",
+                keyboardType = if (lockManager.type() == LockType.PIN) KeyboardType.NumberPassword else KeyboardType.Password,
+                onValueChange = {
+                    secret = it
+                    error = false
+                },
+            )
+        }
+        AnimatedVisibility(error) {
+            Text("That code does not unlock this vault.", color = Color(0xFFFF6B6B), modifier = Modifier.padding(top = 12.dp))
+        }
+        Spacer(Modifier.height(20.dp))
+        GlowButton(
+            text = "Unlock vault",
+            icon = Icons.Default.LockOpen,
+            onClick = {
+                val attempt = if (lockManager.type() == LockType.PATTERN) pattern.joinToString("-") else secret
+                if (lockManager.verify(attempt)) onUnlock() else error = true
+            },
+        )
+        Spacer(Modifier.height(12.dp))
+        OutlinedButton(
+            onClick = onBiometric,
+            modifier = Modifier.fillMaxWidth().height(54.dp),
+            shape = RoundedCornerShape(18.dp),
+            border = BorderStroke(1.dp, Color.White.copy(alpha = 0.16f)),
+            colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White),
+        ) {
+            Icon(Icons.Default.Fingerprint, null, modifier = Modifier.size(20.dp))
+            Spacer(Modifier.width(10.dp))
+            Text("Use fingerprint / device unlock")
+        }
+    }
+}
+
+@Composable
+private fun LockScaffold(
+    eyebrow: String,
+    title: String,
+    description: String,
+    content: @Composable ColumnScope.() -> Unit,
+) {
+    Surface(color = VoltBlack, modifier = Modifier.fillMaxSize()) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 24.dp, vertical = 48.dp),
+            verticalArrangement = Arrangement.Center,
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Default.Bolt, null, tint = VoltGreen, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.width(8.dp))
+                Text(eyebrow, color = VoltGreen, fontSize = 12.sp, fontWeight = FontWeight.Bold, letterSpacing = 2.sp)
+            }
+            Spacer(Modifier.height(14.dp))
+            Text(title, style = MaterialTheme.typography.headlineLarge, color = Color.White)
+            Spacer(Modifier.height(12.dp))
+            Text(description, color = VoltTextMuted, lineHeight = 22.sp)
+            Spacer(Modifier.height(32.dp))
+            Column(content = content)
+        }
+    }
+}
+
+@Composable
+private fun VaultHome(
+    files: List<VaultFile>,
+    onImport: () -> Unit,
+    onOpen: (VaultFile) -> Unit,
+    onToggleLock: (VaultFile) -> Unit,
+) {
+    LazyColumn(
+        modifier = Modifier.fillMaxSize().background(VoltBlack),
+        contentPadding = PaddingValues(horizontal = 20.dp, vertical = 22.dp),
+        verticalArrangement = Arrangement.spacedBy(18.dp),
+    ) {
+        item {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
+                Column {
+                    Text("V O L T S H A R E", color = VoltGreen, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 3.sp)
+                    Spacer(Modifier.height(8.dp))
+                    Text("Your private vault", style = MaterialTheme.typography.headlineMedium, color = Color.White)
+                }
+                Box(
+                    modifier = Modifier.size(46.dp).background(VoltGreen.copy(alpha = 0.12f), CircleShape),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(Icons.Default.Bolt, null, tint = VoltGreen, modifier = Modifier.size(24.dp))
+                }
+            }
+        }
+        item {
+            VaultMetricCard(files)
+        }
+        item {
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
+                GlowButton(
+                    text = "Import files",
+                    icon = Icons.Default.Add,
+                    onClick = onImport,
+                    modifier = Modifier.weight(1f),
+                )
+                OutlinedButton(
+                    onClick = onImport,
+                    modifier = Modifier.weight(0.65f).height(54.dp),
+                    shape = RoundedCornerShape(18.dp),
+                    border = BorderStroke(1.dp, VoltGreen.copy(alpha = 0.3f)),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = VoltGreen),
+                ) {
+                    Icon(Icons.Default.Search, null)
+                }
+            }
+        }
+        item {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
+                Text("Inside the vault", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                Text("${files.size} items", color = VoltTextMuted, fontSize = 12.sp)
+            }
+        }
+        if (files.isEmpty()) {
+            item { EmptyVaultCard(onImport) }
+        } else {
+            items(files, key = { it.id }) { file ->
+                FileRow(file, onOpen, onToggleLock)
+            }
+        }
+        item {
+            Text(
+                "Stored only in app-private encrypted storage",
+                color = VoltTextMuted,
+                fontSize = 12.sp,
+                modifier = Modifier.padding(top = 8.dp, bottom = 20.dp),
+            )
+        }
+    }
+}
+
+@Composable
+private fun VaultMetricCard(files: List<VaultFile>) {
+    val total = files.sumOf { it.sizeBytes }
+    GlassCard(
+        modifier = Modifier.fillMaxWidth(),
+        accent = VoltGreen,
+    ) {
+        Row(horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
+            Column {
+                Text("VAULT STATUS", color = VoltTextMuted, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.5.sp)
+                Spacer(Modifier.height(10.dp))
+                Text("Encrypted + hidden", color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.Black)
+                Spacer(Modifier.height(5.dp))
+                Text("${files.size} protected files • ${formatSize(total)}", color = VoltTextMuted, fontSize = 13.sp)
+            }
+            Box(
+                modifier = Modifier.size(62.dp).background(VoltGreen.copy(alpha = 0.12f), CircleShape),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(Icons.Default.Security, null, tint = VoltGreen, modifier = Modifier.size(29.dp))
+            }
+        }
+        Spacer(Modifier.height(22.dp))
+        LinearProgressIndicator(
+            progress = { (files.size / 20f).coerceIn(0.08f, 1f) },
+            modifier = Modifier.fillMaxWidth().height(5.dp).clip(CircleShape),
+            color = VoltGreen,
+            trackColor = Color.White.copy(alpha = 0.1f),
+        )
+    }
+}
+
+@Composable
+private fun EmptyVaultCard(onImport: () -> Unit) {
+    GlassCard(modifier = Modifier.fillMaxWidth(), accent = VoltTeal) {
+        Icon(Icons.Default.Folder, null, tint = VoltGreen, modifier = Modifier.size(30.dp))
+        Spacer(Modifier.height(16.dp))
+        Text("Your vault is quiet", color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+        Spacer(Modifier.height(7.dp))
+        Text("Bring in a photo, video, document, APK, or any file. It will disappear from shared storage and live here.", color = VoltTextMuted, lineHeight = 20.sp)
+        Spacer(Modifier.height(18.dp))
+        TextButton(onClick = onImport, colors = ButtonDefaults.textButtonColors(contentColor = VoltGreen)) {
+            Text("Choose your first file")
+            Spacer(Modifier.width(5.dp))
+            Icon(Icons.Default.ArrowUpward, null, modifier = Modifier.size(16.dp))
+        }
+    }
+}
+
+@Composable
+private fun FileRow(file: VaultFile, onOpen: (VaultFile) -> Unit, onToggleLock: (VaultFile) -> Unit) {
+    val icon = fileIcon(file)
+    GlassCard(
+        modifier = Modifier.fillMaxWidth().clickable { onOpen(file) },
+        accent = if (file.locked) Color(0xFF7C4DFF) else VoltGreen,
+        padding = 16.dp,
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+            Box(
+                modifier = Modifier.size(48.dp).background(VoltGreen.copy(alpha = 0.09f), RoundedCornerShape(16.dp)),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(icon, null, tint = VoltGreen, modifier = Modifier.size(24.dp))
+            }
+            Spacer(Modifier.width(14.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(file.name, color = Color.White, fontWeight = FontWeight.SemiBold, maxLines = 1)
+                Spacer(Modifier.height(4.dp))
+                Text("${file.mimeType.substringBefore('/')} • ${formatSize(file.sizeBytes)}", color = VoltTextMuted, fontSize = 12.sp)
+            }
+            IconButton(onClick = { onToggleLock(file) }) {
+                Icon(if (file.locked) Icons.Default.Lock else Icons.Default.LockOpen, null, tint = if (file.locked) VoltGreen else VoltTextMuted)
+            }
+            Icon(Icons.Default.MoreVert, null, tint = VoltTextMuted, modifier = Modifier.size(18.dp))
+        }
+    }
+}
+
+@Composable
+private fun ShareHome(files: List<VaultFile>, transfer: PeerTransferManager) {
+    val peers by transfer.peers.collectAsStateWithLifecycle()
+    val status by transfer.status.collectAsStateWithLifecycle()
+    var selectedFile by remember(files) { mutableStateOf(files.firstOrNull()) }
+
+    LazyColumn(
+        modifier = Modifier.fillMaxSize().background(VoltBlack),
+        contentPadding = PaddingValues(horizontal = 20.dp, vertical = 22.dp),
+        verticalArrangement = Arrangement.spacedBy(18.dp),
+    ) {
+        item {
+            Text("LOCAL TRANSFER", color = VoltGreen, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 3.sp)
+            Spacer(Modifier.height(8.dp))
+            Text("Share, without a server", style = MaterialTheme.typography.headlineMedium, color = Color.White)
+            Spacer(Modifier.height(8.dp))
+            Text("VoltShare connects devices directly over the same local network. Nothing routes through a cloud.", color = VoltTextMuted, lineHeight = 21.sp)
+        }
+        item {
+            GlassCard(modifier = Modifier.fillMaxWidth(), accent = VoltGreen) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(modifier = Modifier.size(48.dp).background(VoltGreen.copy(alpha = 0.12f), CircleShape), contentAlignment = Alignment.Center) {
+                        Icon(Icons.Default.Smartphone, null, tint = VoltGreen)
+                    }
+                    Spacer(Modifier.width(14.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("This device", color = Color.White, fontWeight = FontWeight.Bold)
+                        Text(if (status.active) "Visible to nearby devices" else "Private and ready", color = VoltTextMuted, fontSize = 12.sp)
+                    }
+                    Switch(
+                        checked = status.active,
+                        onCheckedChange = { if (it) transfer.startHosting() else transfer.close() },
+                        colors = SwitchDefaults.colors(checkedThumbColor = Color.Black, checkedTrackColor = VoltGreen, uncheckedThumbColor = Color.White.copy(alpha = 0.7f), uncheckedTrackColor = Color.White.copy(alpha = 0.12f)),
+                    )
+                }
+            }
+        }
+        item {
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
+                GlowButton("Find nearby", Icons.Default.Search, { transfer.discoverPeers() }, Modifier.weight(1f))
+                OutlinedButton(
+                    onClick = { transfer.startHosting() },
+                    modifier = Modifier.weight(1f).height(54.dp),
+                    shape = RoundedCornerShape(18.dp),
+                    border = BorderStroke(1.dp, VoltGreen.copy(alpha = 0.3f)),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = VoltGreen),
+                ) {
+                    Icon(Icons.Default.Bolt, null)
+                    Spacer(Modifier.width(7.dp))
+                    Text("Host")
+                }
+            }
+        }
+        item {
+            Text("1. Choose a file", color = Color.White, fontSize = 17.sp, fontWeight = FontWeight.Bold)
+            Spacer(Modifier.height(10.dp))
+            Row(modifier = Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                files.take(12).forEach { file ->
+                    val selected = file.id == selectedFile?.id
+                    Surface(
+                        modifier = Modifier.width(140.dp).clickable { selectedFile = file },
+                        shape = RoundedCornerShape(18.dp),
+                        color = if (selected) VoltGreen.copy(alpha = 0.16f) else VoltSurface,
+                        border = BorderStroke(1.dp, if (selected) VoltGreen else Color.White.copy(alpha = 0.08f)),
+                    ) {
+                        Column(Modifier.padding(14.dp)) {
+                            Icon(fileIcon(file), null, tint = if (selected) VoltGreen else VoltTextMuted, modifier = Modifier.size(20.dp))
+                            Spacer(Modifier.height(12.dp))
+                            Text(file.name, color = Color.White, maxLines = 1, fontSize = 12.sp)
+                        }
+                    }
+                }
+            }
+        }
+        item {
+            Text("2. Choose a nearby device", color = Color.White, fontSize = 17.sp, fontWeight = FontWeight.Bold)
+        }
+        if (peers.isEmpty()) {
+            item {
+                GlassCard(modifier = Modifier.fillMaxWidth(), accent = VoltTeal, padding = 18.dp) {
+                    Text("No devices yet", color = Color.White, fontWeight = FontWeight.Bold)
+                    Spacer(Modifier.height(5.dp))
+                    Text("Open VoltShare on the other phone, tap Host, then tap Find nearby here.", color = VoltTextMuted, fontSize = 13.sp)
+                }
+            }
+        } else {
+            items(peers) { peer ->
+                GlassCard(modifier = Modifier.fillMaxWidth(), accent = VoltGreen, padding = 16.dp) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Default.Smartphone, null, tint = VoltGreen)
+                        Spacer(Modifier.width(12.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(peer.name, color = Color.White, fontWeight = FontWeight.SemiBold)
+                            Text("Direct local connection", color = VoltTextMuted, fontSize = 12.sp)
+                        }
+                        TextButton(
+                            onClick = { selectedFile?.let { transfer.send(peer, it) } },
+                            enabled = selectedFile != null,
+                            colors = ButtonDefaults.textButtonColors(contentColor = VoltGreen),
+                        ) {
+                            Icon(Icons.Default.ArrowUpward, null, modifier = Modifier.size(16.dp))
+                            Spacer(Modifier.width(5.dp))
+                            Text("Send")
+                        }
+                    }
+                }
+            }
+        }
+        item {
+            AnimatedVisibility(status.active || status.progress > 0f, enter = fadeIn() + scaleIn(), exit = fadeOut()) {
+                GlassCard(modifier = Modifier.fillMaxWidth(), accent = VoltGreen, padding = 18.dp) {
+                    Text(status.label, color = Color.White, fontWeight = FontWeight.SemiBold)
+                    Spacer(Modifier.height(12.dp))
+                    LinearProgressIndicator(
+                        progress = { status.progress },
+                        modifier = Modifier.fillMaxWidth().height(5.dp).clip(CircleShape),
+                        color = VoltGreen,
+                        trackColor = Color.White.copy(alpha = 0.1f),
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun SecurityHome(lockType: LockType, onLockNow: () -> Unit) {
+    var fileLockDefault by remember { mutableStateOf(true) }
+    LazyColumn(
+        modifier = Modifier.fillMaxSize().background(VoltBlack),
+        contentPadding = PaddingValues(horizontal = 20.dp, vertical = 22.dp),
+        verticalArrangement = Arrangement.spacedBy(18.dp),
+    ) {
+        item {
+            Text("SECURITY LAYER", color = VoltGreen, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 3.sp)
+            Spacer(Modifier.height(8.dp))
+            Text("Control your boundary", style = MaterialTheme.typography.headlineMedium, color = Color.White)
+            Spacer(Modifier.height(8.dp))
+            Text("Your vault is encrypted at rest and invisible to normal file browsers.", color = VoltTextMuted, lineHeight = 21.sp)
+        }
+        item {
+            GlassCard(modifier = Modifier.fillMaxWidth(), accent = VoltGreen) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Default.Lock, null, tint = VoltGreen, modifier = Modifier.size(26.dp))
+                    Spacer(Modifier.width(14.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("App lock", color = Color.White, fontWeight = FontWeight.Bold)
+                        Text("${lockType.label} + fingerprint available", color = VoltTextMuted, fontSize = 12.sp)
+                    }
+                    Icon(Icons.Default.Check, null, tint = VoltGreen)
+                }
+                Divider(color = Color.White.copy(alpha = 0.08f), modifier = Modifier.padding(vertical = 18.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Default.Security, null, tint = VoltGreen, modifier = Modifier.size(26.dp))
+                    Spacer(Modifier.width(14.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("Lock each file", color = Color.White, fontWeight = FontWeight.Bold)
+                        Text("Require your vault lock before viewing", color = VoltTextMuted, fontSize = 12.sp)
+                    }
+                    Switch(
+                        checked = fileLockDefault,
+                        onCheckedChange = { fileLockDefault = it },
+                        colors = SwitchDefaults.colors(checkedThumbColor = Color.Black, checkedTrackColor = VoltGreen, uncheckedThumbColor = Color.White.copy(alpha = 0.7f), uncheckedTrackColor = Color.White.copy(alpha = 0.12f)),
+                    )
+                }
+            }
+        }
+        item {
+            GlowButton("Lock vault now", Icons.Default.Lock, onLockNow)
+        }
+        item {
+            Text("Security note", color = VoltTextMuted, fontSize = 12.sp)
+            Spacer(Modifier.height(5.dp))
+            Text("VoltShare never uploads your vault. Local discovery and transfers are initiated only when you tap Share.", color = Color.White.copy(alpha = 0.72f), fontSize = 13.sp, lineHeight = 19.sp)
+        }
+    }
+}
+
+@Composable
+private fun FileViewerScreen(activity: MainActivity, vault: VaultRepository, file: VaultFile, onBack: () -> Unit) {
+    var prepared by remember(file.id) { mutableStateOf<File?>(null) }
+    LaunchedEffect(file.id) {
+        prepared = withContext(Dispatchers.IO) { vault.prepareViewing(file) }
+    }
+    Column(Modifier.fillMaxSize().background(VoltBlack)) {
+        SmallTopAppBar(
+            title = { Text(file.name, maxLines = 1, color = Color.White) },
+            navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.Default.ArrowBack, "Back", tint = Color.White) } },
+            colors = TopAppBarDefaults.smallTopAppBarColors(containerColor = VoltBlack),
+        )
+        if (prepared == null) {
+            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                Text("Preparing a private preview…", color = VoltTextMuted)
+            }
+        } else {
+            when {
+                isImage(file) -> ImageViewer(prepared!!)
+                isVideo(file) -> VideoViewer(prepared!!)
+                isAudio(file) -> AudioViewer(prepared!!)
+                isPdf(file) -> PdfViewer(prepared!!)
+                isText(file) -> TextViewer(prepared!!)
+                isInstallable(file) -> InstallerViewer(activity, prepared!!, file)
+                else -> GenericViewer(activity, prepared!!, file)
+            }
+        }
+    }
+}
+
+@Composable
+private fun ImageViewer(file: File) {
+    val bitmap = remember(file) { BitmapFactory.decodeFile(file.absolutePath) }
+    Box(Modifier.fillMaxSize().background(Color.Black), contentAlignment = Alignment.Center) {
+        bitmap?.let {
+            Image(it.asImageBitmap(), contentDescription = null, modifier = Modifier.fillMaxWidth(), contentScale = ContentScale.Fit)
+        } ?: Text("Could not decode this image", color = VoltTextMuted)
+    }
+}
+
+@Composable
+private fun VideoViewer(file: File) {
+    val context = LocalContext.current
+    val player = remember(file) {
+        ExoPlayer.Builder(context).build().apply {
+            setMediaItem(MediaItem.fromUri(android.net.Uri.fromFile(file)))
+            prepare()
+            playWhenReady = true
+        }
+    }
+    androidx.compose.runtime.DisposableEffect(player) {
+        onDispose { player.release() }
+    }
+    AndroidView(
+        factory = {
+            PlayerView(it).apply {
+                this.player = player
+                useController = true
+                layoutParams = ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
+            }
+        },
+        modifier = Modifier.fillMaxSize().background(Color.Black),
+    )
+}
+
+@Composable
+private fun AudioViewer(file: File) {
+    val context = LocalContext.current
+    val player = remember(file) {
+        ExoPlayer.Builder(context).build().apply {
+            setMediaItem(MediaItem.fromUri(android.net.Uri.fromFile(file)))
+            prepare()
+        }
+    }
+    androidx.compose.runtime.DisposableEffect(player) {
+        onDispose { player.release() }
+    }
+    Column(Modifier.fillMaxSize().padding(24.dp), verticalArrangement = Arrangement.Center) {
+        Icon(Icons.Default.PlayArrow, null, tint = VoltGreen, modifier = Modifier.size(48.dp).align(Alignment.CenterHorizontally))
+        Spacer(Modifier.height(18.dp))
+        Text("Audio preview", color = Color.White, fontWeight = FontWeight.Bold, modifier = Modifier.align(Alignment.CenterHorizontally))
+        Spacer(Modifier.height(22.dp))
+        AndroidView(
+            factory = { PlayerView(it).apply { this.player = player; useController = true } },
+            modifier = Modifier.fillMaxWidth().height(72.dp),
+        )
+    }
+}
+
+@Composable
+private fun PdfViewer(file: File) {
+    var bitmap by remember(file) { mutableStateOf<android.graphics.Bitmap?>(null) }
+    var pageCount by remember(file) { mutableIntStateOf(0) }
+    LaunchedEffect(file) {
+        withContext(Dispatchers.IO) {
+            PdfRenderer(android.os.ParcelFileDescriptor.open(file, android.os.ParcelFileDescriptor.MODE_READ_ONLY)).use { renderer ->
+                pageCount = renderer.pageCount
+                if (renderer.pageCount > 0) {
+                    renderer.openPage(0).use { page ->
+                        val pageBitmap = android.graphics.Bitmap.createBitmap(page.width * 2, page.height * 2, android.graphics.Bitmap.Config.ARGB_8888)
+                        page.render(pageBitmap, null, null, PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY)
+                        bitmap = pageBitmap
+                    }
+                }
+            }
+        }
+    }
+    Box(Modifier.fillMaxSize().background(Color(0xFF202020)), contentAlignment = Alignment.Center) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            bitmap?.let { Image(it.asImageBitmap(), "PDF preview", modifier = Modifier.fillMaxWidth().padding(18.dp), contentScale = ContentScale.Fit) }
+            Text("$pageCount page${if (pageCount == 1) "" else "s"} • showing first page", color = VoltTextMuted, fontSize = 12.sp)
+        }
+    }
+}
+
+@Composable
+private fun TextViewer(file: File) {
+    var text by remember(file) { mutableStateOf("Loading private text…") }
+    LaunchedEffect(file) {
+        text = withContext(Dispatchers.IO) {
+            file.inputStream().bufferedReader().use { it.readText().take(200_000) }
+        }
+    }
+    androidx.compose.foundation.layout.Column(Modifier.fillMaxSize().background(Color(0xFF0A0A0A)).verticalScroll(rememberScrollState()).padding(22.dp)) {
+        Text(text, color = Color(0xFFE6F5EC), fontFamily = FontFamily.Monospace, fontSize = 13.sp, lineHeight = 21.sp)
+    }
+}
+
+@Composable
+private fun InstallerViewer(activity: MainActivity, file: File, vaultFile: VaultFile) {
+    val installResult = remember { mutableStateOf<String?>(null) }
+    Column(Modifier.fillMaxSize().padding(24.dp), verticalArrangement = Arrangement.Center, horizontalAlignment = Alignment.CenterHorizontally) {
+        Box(Modifier.size(92.dp).background(VoltGreen.copy(alpha = 0.12f), CircleShape), contentAlignment = Alignment.Center) {
+            Icon(Icons.Default.Bolt, null, tint = VoltGreen, modifier = Modifier.size(42.dp))
+        }
+        Spacer(Modifier.height(22.dp))
+        Text(vaultFile.name, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 20.sp)
+        Spacer(Modifier.height(8.dp))
+        Text("Installer package stays in your private vault until you choose to install it.", color = VoltTextMuted, textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+        Spacer(Modifier.height(26.dp))
+        GlowButton("Install package", Icons.Default.ArrowDownward, onClick = {
+            installResult.value = ApkInstaller.install(activity, file).fold(
+                onSuccess = { "Android installer opened" },
+                onFailure = { "Could not open this package" },
+            )
+        })
+        installResult.value?.let { Text(it, color = VoltGreen, modifier = Modifier.padding(top = 16.dp)) }
+    }
+}
+
+@Composable
+private fun GenericViewer(activity: MainActivity, file: File, vaultFile: VaultFile) {
+    Column(Modifier.fillMaxSize().padding(24.dp), verticalArrangement = Arrangement.Center, horizontalAlignment = Alignment.CenterHorizontally) {
+        Icon(Icons.Default.Description, null, tint = VoltGreen, modifier = Modifier.size(48.dp))
+        Spacer(Modifier.height(18.dp))
+        Text(vaultFile.name, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 19.sp)
+        Spacer(Modifier.height(8.dp))
+        Text("No specialized preview is available for this format yet.", color = VoltTextMuted, textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+        Spacer(Modifier.height(20.dp))
+        Text("${formatSize(file.length())} stored privately", color = VoltTextMuted, fontSize = 12.sp)
+    }
+}
+
+@Composable
+private fun SecretDialog(title: String, type: LockType, onDismiss: () -> Unit, onConfirm: (String) -> Unit) {
+    var secret by remember { mutableStateOf("") }
+    var pattern by remember { mutableStateOf<List<Int>>(emptyList()) }
+    androidx.compose.material3.AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = VoltSurfaceRaised,
+        title = { Text(title, color = Color.White) },
+        text = {
+            if (type == LockType.PATTERN) {
+                PatternPad(pattern, onChange = { pattern = it })
+            } else {
+                SecureField(
+                    value = secret,
+                    label = "Enter ${type.label.lowercase()}",
+                    keyboardType = if (type == LockType.PIN) KeyboardType.NumberPassword else KeyboardType.Password,
+                    onValueChange = { secret = it },
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = { onConfirm(if (type == LockType.PATTERN) pattern.joinToString("-") else secret) },
+                colors = ButtonDefaults.textButtonColors(contentColor = VoltGreen),
+            ) { Text("Unlock") }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss, colors = ButtonDefaults.textButtonColors(contentColor = VoltTextMuted)) { Text("Cancel") }
+        },
+    )
+}
+
+@Composable
+private fun PatternPad(pattern: List<Int>, onChange: (List<Int>) -> Unit) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
+        repeat(3) { row ->
+            Row(horizontalArrangement = Arrangement.spacedBy(26.dp), modifier = Modifier.padding(vertical = 9.dp)) {
+                repeat(3) { column ->
+                    val point = row * 3 + column
+                    val selected = point in pattern
+                    Box(
+                        modifier = Modifier
+                            .size(48.dp)
+                            .shadow(if (selected) 14.dp else 0.dp, CircleShape, spotColor = VoltGreen.copy(alpha = 0.65f))
+                            .background(if (selected) VoltGreen else Color.White.copy(alpha = 0.1f), CircleShape)
+                            .border(1.dp, if (selected) VoltGreen else Color.White.copy(alpha = 0.2f), CircleShape)
+                            .clickable {
+                                onChange(if (selected) pattern - point else pattern + point)
+                            },
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        if (selected) {
+                            Box(Modifier.size(12.dp).background(Color.Black, CircleShape))
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun SecureField(value: String, label: String, keyboardType: KeyboardType, onValueChange: (String) -> Unit) {
+    OutlinedTextField(
+        value = value,
+        onValueChange = onValueChange,
+        label = { Text(label) },
+        modifier = Modifier.fillMaxWidth(),
+        singleLine = true,
+        keyboardOptions = KeyboardOptions(keyboardType = keyboardType),
+        visualTransformation = PasswordVisualTransformation(),
+        shape = RoundedCornerShape(18.dp),
+        colors = androidx.compose.material3.OutlinedTextFieldDefaults.colors(
+            focusedBorderColor = VoltGreen,
+            focusedLabelColor = VoltGreen,
+            cursorColor = VoltGreen,
+            unfocusedBorderColor = Color.White.copy(alpha = 0.16f),
+            unfocusedLabelColor = VoltTextMuted,
+            focusedTextColor = Color.White,
+            unfocusedTextColor = Color.White,
+        ),
+    )
+}
+
+@Composable
+private fun FloatingSegmentedControl(items: List<String>, selectedIndex: Int, onSelected: (Int) -> Unit) {
+    Row(
+        modifier = Modifier.fillMaxWidth().background(VoltSurface, RoundedCornerShape(18.dp)).padding(5.dp),
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        items.forEachIndexed { index, item ->
+            val selected = index == selectedIndex
+            Surface(
+                modifier = Modifier.weight(1f).clickable { onSelected(index) },
+                shape = RoundedCornerShape(14.dp),
+                color = if (selected) VoltGreen else Color.Transparent,
+            ) {
+                Text(item, color = if (selected) Color.Black else VoltTextMuted, fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal, modifier = Modifier.padding(vertical = 12.dp), textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+            }
+        }
+    }
+}
+
+@Composable
+private fun GlowButton(text: String, icon: ImageVector, onClick: () -> Unit, modifier: Modifier = Modifier) {
+    val elevation by androidx.compose.animation.core.animateDpAsState(if (text.isNotEmpty()) 12.dp else 0.dp, label = "button-glow")
+    Button(
+        onClick = onClick,
+        modifier = modifier.height(54.dp).shadow(elevation, RoundedCornerShape(18.dp), spotColor = VoltGreen.copy(alpha = 0.5f)),
+        shape = RoundedCornerShape(18.dp),
+        colors = ButtonDefaults.buttonColors(containerColor = VoltGreen, contentColor = Color.Black),
+        contentPadding = PaddingValues(horizontal = 18.dp),
+    ) {
+        Icon(icon, null, modifier = Modifier.size(18.dp))
+        Spacer(Modifier.width(8.dp))
+        Text(text, fontWeight = FontWeight.Bold)
+    }
+}
+
+@Composable
+private fun GlassCard(modifier: Modifier, accent: Color, padding: androidx.compose.ui.unit.Dp = 24.dp, content: @Composable ColumnScope.() -> Unit) {
+    Column(
+        modifier = modifier
+            .shadow(18.dp, RoundedCornerShape(26.dp), ambientColor = Color.Black, spotColor = accent.copy(alpha = 0.22f))
+            .background(
+                Brush.verticalGradient(
+                    listOf(accent.copy(alpha = 0.13f), VoltSurface, VoltSurface),
+                ),
+                RoundedCornerShape(26.dp),
+            )
+            .border(1.dp, Color.White.copy(alpha = 0.08f), RoundedCornerShape(26.dp))
+            .padding(padding),
+        content = content,
+    )
+}
+
+private fun fileIcon(file: VaultFile): ImageVector = when {
+    isImage(file) -> Icons.Default.Image
+    isVideo(file) -> Icons.Default.VideoLibrary
+    isText(file) -> Icons.Default.TextSnippet
+    isInstallable(file) -> Icons.Default.Bolt
+    else -> Icons.Default.Description
+}
+
+private fun isImage(file: VaultFile) = file.mimeType.startsWith("image") || file.name.isMediaExtension("jpg", "jpeg", "png", "webp", "gif", "heic")
+private fun isVideo(file: VaultFile) = file.mimeType.startsWith("video") || file.name.isMediaExtension("mp4", "mkv", "webm", "mov", "avi")
+private fun isAudio(file: VaultFile) = file.mimeType.startsWith("audio") || file.name.isMediaExtension("mp3", "wav", "m4a", "flac", "aac", "ogg")
+private fun isPdf(file: VaultFile) = file.mimeType == "application/pdf" || file.name.endsWith(".pdf", true)
+private fun isText(file: VaultFile) = file.mimeType.startsWith("text") || file.name.isMediaExtension("txt", "md", "json", "xml", "csv", "log", "kt", "java", "js", "ts", "html", "css")
+private fun isInstallable(file: VaultFile) = file.name.isMediaExtension("apk", "xapk", "apks")
+private fun String.isMediaExtension(vararg extensions: String) = extensions.any { endsWith(".$it", ignoreCase = true) }
+private fun formatSize(bytes: Long): String = Formatter.formatFileSize(null, bytes)

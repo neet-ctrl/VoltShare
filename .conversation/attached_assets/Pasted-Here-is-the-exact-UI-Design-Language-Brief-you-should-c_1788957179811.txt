@@ -1,0 +1,50 @@
+Here is the exact UI Design Language Brief you should copy-paste to your app-building agent.
+
+Do not describe screens to them. Describe the system that generates the UI. Tell them this:
+
+---
+
+"Build the UI using this exact visual engine and design system:"
+
+1. The Core Foundation (Material You with a Cyber Twist)
+
+· Base Theme: Enforce a Pure Dark palette (#000000 background) with a secondary layer tint of #121212 for surfaces.
+· Primary Accent: Use Neon/Volt Green (#00E676). This is the only color that grabs attention—it is used exclusively for active states, key data points, and primary CTAs.
+· Typography: Use Inter or Roboto with extreme weight contrast. Headline numbers (like 2h 28m) are weight 900 with wide letter-spacing, while subtitles are weight 400 with 50% opacity to create instant visual hierarchy.
+
+2. The "3D Premium" Illusion (Depth Architecture)
+
+Do not use actual 3D rendering. Create the premium illusion through Multi-Layer Elevation:
+
+· All container cards (like the Top Used Apps or 21-day chart boxes) must use elevation with two distinct shadows—a tight, dark ambient shadow and a wider, soft translucent shadow—to make them float aggressively off the screen.
+· Apply a subtle linear gradient overlay (top-to-bottom, from 20% accent color to 0% transparent) on the top edges of these floating cards to simulate a "glow" catching the light, giving a high-end, metallic hardware feel.
+
+3. The "Glow" Element (Vital for Premium Feel)
+
+· Any active toggle, the "Save" button, or selected segmented control must have a soft outer glow (using dropShadow or blur behind the view) rather than a standard flat color. This makes the UI look reactive and OLED-optimized.
+
+4. Component Architecture (Building Blocks)
+
+Implement these specific widgets universally across the app:
+
+· Floating Segmented Controls: Instead of tabs, use pill-shaped dividers (like the 15s/30s/60s) where the selected option is a filled neon circle with white text, and unselected options are just text with 60% opacity.
+· The "Glass" Toggles: The permission toggles (Notifications, Usage Stats) should be large, custom Switch components with a translucent track (#FFFFFF at 15% opacity) and a neon-filled thumb that casts a tiny glow underneath.
+· Spacer-Heavy Layouts: Maintain extreme negative space. Every card must have a minimum internal padding of 24dp, and elements inside must be separated by thick, invisible gutters to mimic high-end dashboard software.
+
+5. The Data Visualization Style
+
+For the 21-day chart:
+
+· Use Cylindrical 3D bars (achieved by drawing a normal bar with a slightly darker slanted cap on top).
+· The bar color must be a gradient from Neon Green to a darker teal, with a sharp drop-shadow beneath each bar to make them look like physical pillars rising from the X-axis.
+
+6. Micro-interactions (Non-Negotiable for "Modern")
+
+· All card expansions, screen transitions, and toggle switches must trigger a Staggered Fade-in with a spring damping effect.
+· When a user interacts with a button (like Save Delay), the button must perform a morphing ripple—where the background fills outward from the center as a circular reveal, rather than a standard rectangular click effect.
+
+---
+
+Final instruction to the Agent: "Do not prioritize functionality over this visual architecture. Everything—from the onboarding permissions to the file transfer progress—must inherit these 6 rules. If a component doesn't have a floating shadow, a neon glow, or extreme rounded corners (min 20dp radius), it doesn't belong in the app."
+
+This brief gives your agent the mechanics of the UI, ensuring every screen your agent builds automatically looks like the reference, regardless of the function.

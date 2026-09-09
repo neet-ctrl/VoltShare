@@ -1,45 +1,22 @@
-# [Project name]
+# VoltShare Android
 
-_Replace the heading above with the project's name, and this line with one sentence describing what this app does for users._
+Native Android vault and app-to-app sharing app. Files are encrypted in app-private storage and transferred directly between nearby VoltShare devices without an application server.
 
-## Run & Operate
+## Build
 
-- `pnpm --filter @workspace/api-server run dev` — run the API server (port 5000)
-- `pnpm run typecheck` — full typecheck across all packages
-- `pnpm run build` — typecheck + build all packages
-- `pnpm --filter @workspace/api-spec run codegen` — regenerate API hooks and Zod schemas from the OpenAPI spec
-- `pnpm --filter @workspace/db run push` — push DB schema changes (dev only)
-- Required env: `DATABASE_URL` — Postgres connection string
-
-## Stack
-
-- pnpm workspaces, Node.js 24, TypeScript 5.9
-- API: Express 5
-- DB: PostgreSQL + Drizzle ORM
-- Validation: Zod (`zod/v4`), `drizzle-zod`
-- API codegen: Orval (from OpenAPI spec)
-- Build: esbuild (CJS bundle)
-
-## Where things live
-
-_Populate as you build — short repo map plus pointers to the source-of-truth file for DB schema, API contracts, theme files, etc._
-
-## Architecture decisions
-
-_Populate as you build — non-obvious choices a reader couldn't infer from the code (3-5 bullets)._
+Open the repository as an Android Gradle project and build the `app` module. The release workflow is `.github/workflows/release.yml`; it runs `assembleRelease` only and attaches the signed APK to a GitHub Release.
 
 ## Product
 
-_Describe the high-level user-facing capabilities of this app once they exist._
+- PIN, pattern/password mode, and biometric/device unlock.
+- AES-GCM encrypted vault files backed by Android Keystore.
+- File-level lock gate.
+- Image, video, text/code, PDF, APK, XAPK/APKS, and generic-file viewer routes.
+- Local NSD discovery plus direct TCP transfer between two devices running the same app.
+- Pure dark / volt-green premium UI with elevated glass cards and glow controls.
 
-## User preferences
+## Architecture decisions
 
-_Populate as you build — explicit user instructions worth remembering across sessions._
-
-## Gotchas
-
-_Populate as you build — sharp edges, "always run X before Y" rules._
-
-## Pointers
-
-- See the `pnpm-workspace` skill for workspace structure, TypeScript setup, and package details
+- No backend or cloud dependency: discovery is Android NSD and the transfer stream is a direct socket.
+- Every imported file is encrypted before it is written under `filesDir/vault`; viewer previews are temporary cache files.
+- Release signing is supplied only through GitHub Actions secrets; keystore files are ignored locally.
