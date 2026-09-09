@@ -1,0 +1,109 @@
+i told u n to make A Native android sharing app that has all universal viewer {customized for each type of file like mainly fully customized video player and image viewer and all type of text view and pdf viewer and any .apk installer and any spilt files apk installer or xapk installlr of any type and all other type of fully customized viewer but main feature app to app only sharing and all files directly store in app private folder and no visible any where in storage and full app level lock { with option of fingerprint ,pattern,pin and password and all in modern premium 3d design and ui fully premium and even file level lock ok and main is how all files from one device to another device it can be transfeered app to app ok but both device has same app and but make sure there should be no need of server and full ui in best Ui and see pasted text i described UI and dont make any type of web related thing or expo only android app ok and a github workflow to make it that donot upload artifact just create a github release with attached apk file and make no debug apk and use all github secret to sign app and
+
+The native app skeleton and core flows are in place now: encrypted app-private vault storage, lock types, file-level lock gate, local NSD/socket transfer, image/video/text/PDF preview routing, and APK/XAPK split-package installation entry points. I’m tightening the build/release configuration next and then doing a static pass for Android/Kotlin issues since this workspace does not have the Android SDK installed locally.
+
+The first native build pass is complete and the static checks are clean: the XML resources parse, the repository has no debug build or artifact-upload step, and the Android-only source is isolated from the removed web artifacts. I’m flagging two worthwhile next passes separately: real-device verification of direct transfer/signing, and deeper format-specific viewer polish beyond the current universal routing.
+
+Built the native Android-only VoltShare foundation.
+
+Included
+Kotlin + Jetpack Compose Android app
+Premium black / volt-green UI based on your design brief
+AES-GCM encrypted files using Android Keystore
+Files stored only in the app-private filesDir/vault folder
+App lock with:
+PIN
+Password
+Pattern
+Fingerprint/device biometric unlock
+File-level locking
+Direct device-to-device transfer using:
+Android NSD local discovery
+Direct TCP sockets
+No cloud server or backend
+Viewers for:
+Images
+Video
+Audio
+Text/code files
+PDF files
+APK files
+XAPK/APKS split installers
+Generic file fallback
+GitHub Actions release workflow:
+Builds assembleRelease only
+Does not build or upload a debug APK
+Does not use Actions artifacts
+Attaches the signed APK directly to a GitHub Release
+GitHub secrets required
+ANDROID_KEYSTORE_BASE64
+KEYSTORE_PASSWORD
+KEY_ALIAS
+KEY_PASSWORD
+Tagging a release such as v1.0.0 will trigger the signed APK release workflow.
+
+Static validation passed for the Android project files and XML resources. This workspace does not currently have the Android SDK or Java toolchain installed, so a local APK compilation and real two-device transfer test still need to run through GitHub Actions or an Android development machine.
+
+How sharing will working and will 100% fast as Quick share of android and after successfull sharing ,will everything is stored is perfectly and does u have even Full Reordering and all sorting type and and full folder organisation and all thing i could and i customized and all full in modern ui ok and make sure u decide all things like modern developer and customized everything perfectly and add more related features to it that are missing ok and do best ok and make as fast and allways working like quick share and more modern than that ok
+
+You’re right to call this out: the current build has the secure direct-transfer foundation, but it does not yet have full folders, custom ordering, or reliable-transfer safeguards. I’m upgrading those now instead of pretending they already exist. I’ll make sharing resumable-safe with validation, improve the transfer path for speed, and add an organized vault with folders, sorting, and manual reorder controls.
+
+The vault is now being upgraded beyond the initial demo path: imported and received files keep folder metadata, custom order, timestamps, and size/type metadata; the transfer protocol now uses a 1 MiB buffered stream, direct socket tuning, a protocol handshake, exact-size reads, SHA-256 verification, and atomic rejection of partial/corrupt transfers. I’m doing the final consistency pass now.
+
+Sharing now works like this:
+
+Both phones install VoltShare.
+Both phones connect to the same local Wi‑Fi network.
+Receiver taps Host.
+Sender taps Find nearby.
+Sender selects a file and taps Send.
+VoltShare opens a direct phone-to-phone TCP connection. No cloud server is involved.
+The receiver validates:
+VoltShare protocol version
+File size
+SHA-256 checksum
+Only after validation succeeds, the file is encrypted and committed into the receiver’s private vault.
+If the transfer is interrupted or corrupted, the incomplete file is deleted and never appears in the vault.
+I also added:
+
+1 MiB buffered transfer chunks for better throughput
+TCP socket tuning
+Exact-size transfer validation
+SHA-256 integrity verification
+Safe rejection of partial/corrupted transfers
+Folder metadata preserved during transfer
+Nested private folders
+Folder rename, delete, and move
+File search
+Eight sorting modes:
+Custom order
+Name A–Z
+Name Z–A
+Newest
+Oldest
+Largest
+Smallest
+File type
+Manual file reordering with up/down controls
+Move files between folders
+Received files automatically refresh inside the vault
+Important speed limitation
+I cannot truthfully promise “100% exactly like Quick Share” yet. Quick Share uses Android system-level Wi‑Fi Direct and hotspot fallback, while the current VoltShare implementation uses direct TCP over the same Wi‑Fi network.
+
+That means:
+
+On a strong 5 GHz or Wi‑Fi 6 network, transfer can be very fast.
+Speed depends on both phones, Wi‑Fi quality, distance, and Android restrictions.
+If the phones are not on the same local network, the current version will not discover them.
+No software can guarantee 100% transfer speed or availability across every Android device.
+For true Quick Share-style behavior, the next networking upgrade should add:
+
+Wi‑Fi Direct discovery
+Temporary device-to-device hotspot fallback
+Automatic transport selection
+Transfer resume after interruption
+Multiple-file transfer queue
+Background transfer notification
+Pause and resume controls
+The current implementation is now safe and organized, but I am deliberately not claiming it is already a full replacement for Quick Share until those Wi‑Fi Direct and resume features are added.
+
