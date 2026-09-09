@@ -224,7 +224,23 @@ private fun VoltShareApp(
     var tab by remember { mutableStateOf(AppTab.VAULT) }
     var viewerFile by remember { mutableStateOf<VaultFile?>(null) }
     var files by remember { mutableStateOf(vault.listFiles()) }
+    var folders by remember { mutableStateOf(vault.listFolders()) }
+    var currentFolder by remember { mutableStateOf("/") }
+    var sortMode by remember { mutableStateOf(VaultSort.CUSTOM) }
     var fileToUnlock by remember { mutableStateOf<VaultFile?>(null) }
+    var fileToMove by remember { mutableStateOf<VaultFile?>(null) }
+    var showNewFolder by remember { mutableStateOf(false) }
+    var showRenameFolder by remember { mutableStateOf(false) }
+    var showSort by remember { mutableStateOf(false) }
+    var importFolder by remember { mutableStateOf("/") }
+    LaunchedEffect(transfer) {
+        transfer.status.collect { status ->
+            if (status.label.startsWith("Received and verified")) {
+                files = vault.listFiles()
+                folders = vault.listFolders()
+            }
+        }
+    }
     val picker = rememberLauncherForActivityResult(
         ActivityResultContracts.OpenMultipleDocuments(),
     ) { uris ->
@@ -233,7 +249,7 @@ private fun VoltShareApp(
                 uri,
                 android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION,
             )
-            vault.importUri(uri)
+            vault.importUri(uri, importFolder)
         }
         files = vault.listFiles()
     }
@@ -281,6 +297,57 @@ private fun VoltShareApp(
         )
     }
 
+    if (showNewFolder) {
+        NewFolderDialog(
+            onDismiss = { showNewFolder = false },
+            onCreate = { name ->
+                vault.createFolder(name, currentFolder)
+                folders = vault.listFolders()
+                showNewFolder = false
+            },
+        )
+    }
+
+    if (showRenameFolder && currentFolder != "/") {
+        NewFolderDialog(
+            title = "Rename private folder",
+            confirmLabel = "Rename",
+            initialName = currentFolder.substringAfterLast('/'),
+            onDismiss = { showRenameFolder = false },
+            onCreate = { name ->
+                val renamed = vault.renameFolder(currentFolder, name)
+                if (renamed != null) currentFolder = renamed
+                folders = vault.listFolders()
+                files = vault.listFiles()
+                showRenameFolder = false
+            },
+        )
+    }
+
+    if (showSort) {
+        SortDialog(
+            selected = sortMode,
+            onDismiss = { showSort = false },
+            onSelected = {
+                sortMode = it
+                showSort = false
+            },
+        )
+    }
+
+    fileToMove?.let { target ->
+        MoveFileDialog(
+            file = target,
+            folders = folders,
+            onDismiss = { fileToMove = null },
+            onMove = { folder ->
+                vault.moveFile(target, folder)
+                files = vault.listFiles()
+                fileToMove = null
+            },
+        )
+    }
+
     Scaffold(
         containerColor = VoltBlack,
         bottomBar = {
@@ -308,14 +375,33 @@ private fun VoltShareApp(
             when (current) {
                 AppTab.VAULT -> VaultHome(
                     files = files,
+                    folders = folders,
+                    currentFolder = currentFolder,
+                    sortMode = sortMode,
                     onImport = {
+                        importFolder = currentFolder
                         picker.launch(arrayOf("*/*"))
                     },
+                    onFolderSelected = { currentFolder = it },
+                    onCreateFolder = { showNewFolder = true },
+                    onRenameFolder = { showRenameFolder = true },
+                    onDeleteFolder = { folder ->
+                        vault.deleteFolder(folder)
+                        folders = vault.listFolders()
+                        currentFolder = "/"
+                        files = vault.listFiles()
+                    },
+                    onSort = { showSort = true },
                     onOpen = { file ->
                         if (file.locked) fileToUnlock = file else viewerFile = file
                     },
                     onToggleLock = {
                         vault.toggleLocked(it)
+                        files = vault.listFiles()
+                    },
+                    onMove = { fileToMove = it },
+                    onReorder = { file, direction ->
+                        vault.reorder(file, direction)
                         files = vault.listFiles()
                     },
                 )
@@ -507,10 +593,30 @@ private fun LockScaffold(
 @Composable
 private fun VaultHome(
     files: List<VaultFile>,
+    folders: List<String>,
+    currentFolder: String,
+    sortMode: VaultSort,
     onImport: () -> Unit,
+    onFolderSelected: (String) -> Unit,
+    onCreateFolder: () -> Unit,
+    onRenameFolder: () -> Unit,
+    onDeleteFolder: (String) -> Unit,
+    onSort: () -> Unit,
     onOpen: (VaultFile) -> Unit,
     onToggleLock: (VaultFile) -> Unit,
+    onMove: (VaultFile) -> Unit,
+    onReorder: (VaultFile, Int) -> Unit,
 ) {
+    var searchOpen by remember { mutableStateOf(false) }
+    var searchQuery by remember { mutableStateOf("") }
+    val visibleFiles = sortVaultFiles(
+        files.filter {
+            it.folderPath == currentFolder &&
+                (searchQuery.isBlank() || it.name.contains(searchQuery.trim(), ignoreCase = true))
+        },
+        sortMode,
+    )
+    val childFolders = folders.filter { it.parentFolder() == currentFolder }
     LazyColumn(
         modifier = Modifier.fillMaxSize().background(VoltBlack),
         contentPadding = PaddingValues(horizontal = 20.dp, vertical = 22.dp),
@@ -531,8 +637,81 @@ private fun VaultHome(
                 }
             }
         }
+        if (searchOpen) {
+            item {
+                OutlinedTextField(
+                    value = searchQuery,
+                    onValueChange = { searchQuery = it },
+                    label = { Text("Search private files") },
+                    leadingIcon = { Icon(Icons.Default.Search, null, tint = VoltGreen) },
+                    trailingIcon = {
+                        IconButton(onClick = { searchQuery = ""; searchOpen = false }) {
+                            Icon(Icons.Default.Close, "Close search", tint = VoltTextMuted)
+                        }
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    shape = RoundedCornerShape(18.dp),
+                    colors = androidx.compose.material3.OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = VoltGreen,
+                        focusedLabelColor = VoltGreen,
+                        cursorColor = VoltGreen,
+                        unfocusedBorderColor = Color.White.copy(alpha = 0.16f),
+                        focusedTextColor = Color.White,
+                        unfocusedTextColor = Color.White,
+                    ),
+                )
+            }
+        }
         item {
             VaultMetricCard(files)
+        }
+        item {
+            GlassCard(modifier = Modifier.fillMaxWidth(), accent = VoltTeal, padding = 16.dp) {
+                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+                    if (currentFolder != "/") {
+                        IconButton(onClick = { onFolderSelected(currentFolder.parentFolder()) }) {
+                            Icon(Icons.Default.ArrowBack, "Parent folder", tint = VoltGreen)
+                        }
+                    } else {
+                        Icon(Icons.Default.Folder, null, tint = VoltGreen, modifier = Modifier.padding(12.dp))
+                    }
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(if (currentFolder == "/") "All files" else currentFolder.substringAfterLast('/'), color = Color.White, fontWeight = FontWeight.Bold)
+                        Text(if (currentFolder == "/") "Private root" else currentFolder, color = VoltTextMuted, fontSize = 12.sp)
+                    }
+                    TextButton(onClick = onCreateFolder, colors = ButtonDefaults.textButtonColors(contentColor = VoltGreen)) {
+                        Icon(Icons.Default.Add, null, modifier = Modifier.size(16.dp))
+                        Spacer(Modifier.width(4.dp))
+                        Text("Folder")
+                    }
+                    if (currentFolder != "/") {
+                        TextButton(onClick = onRenameFolder, colors = ButtonDefaults.textButtonColors(contentColor = VoltGreen)) {
+                            Text("Rename", fontSize = 11.sp)
+                        }
+                    }
+                }
+            }
+        }
+        if (childFolders.isNotEmpty()) {
+            item {
+                Row(modifier = Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    childFolders.forEach { folder ->
+                        Surface(
+                            modifier = Modifier.width(150.dp).clickable { onFolderSelected(folder) },
+                            shape = RoundedCornerShape(18.dp),
+                            color = VoltSurface,
+                            border = BorderStroke(1.dp, VoltGreen.copy(alpha = 0.22f)),
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(14.dp)) {
+                                Icon(Icons.Default.Folder, null, tint = VoltGreen, modifier = Modifier.size(20.dp))
+                                Spacer(Modifier.width(9.dp))
+                                Text(folder.substringAfterLast('/'), color = Color.White, maxLines = 1)
+                            }
+                        }
+                    }
+                }
+            }
         }
         item {
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
@@ -543,7 +722,7 @@ private fun VaultHome(
                     modifier = Modifier.weight(1f),
                 )
                 OutlinedButton(
-                    onClick = onImport,
+                    onClick = { searchOpen = true },
                     modifier = Modifier.weight(0.65f).height(54.dp),
                     shape = RoundedCornerShape(18.dp),
                     border = BorderStroke(1.dp, VoltGreen.copy(alpha = 0.3f)),
@@ -556,14 +735,41 @@ private fun VaultHome(
         item {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
                 Text("Inside the vault", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 18.sp)
-                Text("${files.size} items", color = VoltTextMuted, fontSize = 12.sp)
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("${visibleFiles.size} items", color = VoltTextMuted, fontSize = 12.sp)
+                    TextButton(onClick = onSort, colors = ButtonDefaults.textButtonColors(contentColor = VoltGreen)) {
+                        Icon(Icons.Default.MoreVert, null, modifier = Modifier.size(16.dp))
+                        Spacer(Modifier.width(4.dp))
+                        Text(sortMode.label, fontSize = 11.sp)
+                    }
+                }
             }
         }
-        if (files.isEmpty()) {
+        if (visibleFiles.isEmpty()) {
             item { EmptyVaultCard(onImport) }
         } else {
-            items(files, key = { it.id }) { file ->
-                FileRow(file, onOpen, onToggleLock)
+            items(visibleFiles, key = { it.id }) { file ->
+                FileRow(
+                    file = file,
+                    onOpen = onOpen,
+                    onToggleLock = onToggleLock,
+                    onMove = onMove,
+                    onMoveUp = { onReorder(file, -1) },
+                    onMoveDown = { onReorder(file, 1) },
+                    allowReorder = sortMode == VaultSort.CUSTOM,
+                )
+            }
+        }
+        if (currentFolder != "/") {
+            item {
+                TextButton(
+                    onClick = { onDeleteFolder(currentFolder) },
+                    colors = ButtonDefaults.textButtonColors(contentColor = Color(0xFFFF6B6B)),
+                ) {
+                    Icon(Icons.Default.Close, null, modifier = Modifier.size(16.dp))
+                    Spacer(Modifier.width(5.dp))
+                    Text("Delete this folder and move its files to root")
+                }
             }
         }
         item {
@@ -627,7 +833,15 @@ private fun EmptyVaultCard(onImport: () -> Unit) {
 }
 
 @Composable
-private fun FileRow(file: VaultFile, onOpen: (VaultFile) -> Unit, onToggleLock: (VaultFile) -> Unit) {
+private fun FileRow(
+    file: VaultFile,
+    onOpen: (VaultFile) -> Unit,
+    onToggleLock: (VaultFile) -> Unit,
+    onMove: (VaultFile) -> Unit,
+    onMoveUp: () -> Unit,
+    onMoveDown: () -> Unit,
+    allowReorder: Boolean,
+) {
     val icon = fileIcon(file)
     GlassCard(
         modifier = Modifier.fillMaxWidth().clickable { onOpen(file) },
@@ -647,10 +861,22 @@ private fun FileRow(file: VaultFile, onOpen: (VaultFile) -> Unit, onToggleLock: 
                 Spacer(Modifier.height(4.dp))
                 Text("${file.mimeType.substringBefore('/')} • ${formatSize(file.sizeBytes)}", color = VoltTextMuted, fontSize = 12.sp)
             }
+            if (allowReorder) {
+                Column {
+                    IconButton(onClick = onMoveUp, modifier = Modifier.size(28.dp)) {
+                        Icon(Icons.Default.ArrowUpward, "Move up", tint = VoltTextMuted, modifier = Modifier.size(15.dp))
+                    }
+                    IconButton(onClick = onMoveDown, modifier = Modifier.size(28.dp)) {
+                        Icon(Icons.Default.ArrowDownward, "Move down", tint = VoltTextMuted, modifier = Modifier.size(15.dp))
+                    }
+                }
+            }
+            IconButton(onClick = { onMove(file) }) {
+                Icon(Icons.Default.Folder, "Move to folder", tint = VoltTextMuted, modifier = Modifier.size(18.dp))
+            }
             IconButton(onClick = { onToggleLock(file) }) {
                 Icon(if (file.locked) Icons.Default.Lock else Icons.Default.LockOpen, null, tint = if (file.locked) VoltGreen else VoltTextMuted)
             }
-            Icon(Icons.Default.MoreVert, null, tint = VoltTextMuted, modifier = Modifier.size(18.dp))
         }
     }
 }
@@ -997,6 +1223,117 @@ private fun GenericViewer(activity: MainActivity, file: File, vaultFile: VaultFi
 }
 
 @Composable
+private fun NewFolderDialog(
+    title: String = "Create private folder",
+    confirmLabel: String = "Create",
+    initialName: String = "",
+    onDismiss: () -> Unit,
+    onCreate: (String) -> Unit,
+) {
+    var name by remember { mutableStateOf(initialName) }
+    androidx.compose.material3.AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = VoltSurfaceRaised,
+        title = { Text(title, color = Color.White) },
+        text = {
+            OutlinedTextField(
+                value = name,
+                onValueChange = { name = it },
+                label = { Text("Folder name") },
+                singleLine = true,
+                shape = RoundedCornerShape(18.dp),
+                colors = androidx.compose.material3.OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = VoltGreen,
+                    focusedLabelColor = VoltGreen,
+                    cursorColor = VoltGreen,
+                    unfocusedBorderColor = Color.White.copy(alpha = 0.16f),
+                    focusedTextColor = Color.White,
+                    unfocusedTextColor = Color.White,
+                ),
+            )
+        },
+        confirmButton = {
+            TextButton(
+                onClick = { onCreate(name) },
+                enabled = name.trim().isNotEmpty(),
+                colors = ButtonDefaults.textButtonColors(contentColor = VoltGreen),
+            ) { Text(confirmLabel) }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss, colors = ButtonDefaults.textButtonColors(contentColor = VoltTextMuted)) { Text("Cancel") }
+        },
+    )
+}
+
+@Composable
+private fun SortDialog(selected: VaultSort, onDismiss: () -> Unit, onSelected: (VaultSort) -> Unit) {
+    androidx.compose.material3.AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = VoltSurfaceRaised,
+        title = { Text("Sort this folder", color = Color.White) },
+        text = {
+            Column(Modifier.verticalScroll(rememberScrollState())) {
+                VaultSort.entries.forEach { option ->
+                    Surface(
+                        modifier = Modifier.fillMaxWidth().clickable { onSelected(option) },
+                        color = if (option == selected) VoltGreen.copy(alpha = 0.14f) else Color.Transparent,
+                        shape = RoundedCornerShape(14.dp),
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(horizontal = 12.dp, vertical = 14.dp)) {
+                            Box(
+                                modifier = Modifier.size(18.dp).border(1.dp, if (option == selected) VoltGreen else VoltTextMuted, CircleShape),
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                if (option == selected) Box(Modifier.size(8.dp).background(VoltGreen, CircleShape))
+                            }
+                            Spacer(Modifier.width(12.dp))
+                            Text(option.label, color = if (option == selected) VoltGreen else Color.White)
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {},
+    )
+}
+
+@Composable
+private fun MoveFileDialog(
+    file: VaultFile,
+    folders: List<String>,
+    onDismiss: () -> Unit,
+    onMove: (String) -> Unit,
+) {
+    androidx.compose.material3.AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = VoltSurfaceRaised,
+        title = { Text("Move ${file.name}", color = Color.White, maxLines = 1) },
+        text = {
+            Column(Modifier.verticalScroll(rememberScrollState())) {
+                folders.forEach { folder ->
+                    Surface(
+                        modifier = Modifier.fillMaxWidth().clickable { onMove(folder) },
+                        color = if (folder == file.folderPath) VoltGreen.copy(alpha = 0.14f) else Color.Transparent,
+                        shape = RoundedCornerShape(14.dp),
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(12.dp)) {
+                            Icon(Icons.Default.Folder, null, tint = if (folder == file.folderPath) VoltGreen else VoltTextMuted, modifier = Modifier.size(18.dp))
+                            Spacer(Modifier.width(10.dp))
+                            Text(if (folder == "/") "All files" else folder, color = Color.White)
+                            if (folder == file.folderPath) {
+                                Spacer(Modifier.weight(1f))
+                                Icon(Icons.Default.Check, null, tint = VoltGreen, modifier = Modifier.size(17.dp))
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {},
+    )
+}
+
+@Composable
 private fun SecretDialog(title: String, type: LockType, onDismiss: () -> Unit, onConfirm: (String) -> Unit) {
     var secret by remember { mutableStateOf("") }
     var pattern by remember { mutableStateOf<List<Int>>(emptyList()) }
@@ -1138,6 +1475,23 @@ private fun fileIcon(file: VaultFile): ImageVector = when {
     isText(file) -> Icons.Default.TextSnippet
     isInstallable(file) -> Icons.Default.Bolt
     else -> Icons.Default.Description
+}
+
+private fun sortVaultFiles(files: List<VaultFile>, sort: VaultSort): List<VaultFile> = when (sort) {
+    VaultSort.CUSTOM -> files.sortedBy { it.order }
+    VaultSort.NAME_ASC -> files.sortedBy { it.name.lowercase() }
+    VaultSort.NAME_DESC -> files.sortedByDescending { it.name.lowercase() }
+    VaultSort.NEWEST -> files.sortedByDescending { it.createdAt }
+    VaultSort.OLDEST -> files.sortedBy { it.createdAt }
+    VaultSort.LARGEST -> files.sortedByDescending { it.sizeBytes }
+    VaultSort.SMALLEST -> files.sortedBy { it.sizeBytes }
+    VaultSort.TYPE -> files.sortedWith(compareBy({ it.mimeType }, { it.name.lowercase() }))
+}
+
+private fun String.parentFolder(): String {
+    if (this == "/") return "/"
+    val parent = substringBeforeLast('/', "")
+    return if (parent.isBlank()) "/" else parent
 }
 
 private fun isImage(file: VaultFile) = file.mimeType.startsWith("image") || file.name.isMediaExtension("jpg", "jpeg", "png", "webp", "gif", "heic")
