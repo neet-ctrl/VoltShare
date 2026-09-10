@@ -2126,6 +2126,7 @@ private fun FolderCard(
     onMakePrimary: () -> Unit,
     onDelete: () -> Unit,
     compact: Boolean = false,
+    selectionOnly: Boolean = false,
 ) {
     val rowContent: @Composable ColumnScope.() -> Unit = {
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
@@ -2175,19 +2176,23 @@ private fun FolderCard(
                     Text(path, color = VoltTextMuted.copy(alpha = 0.7f), fontSize = 10.sp, maxLines = 1)
                 }
             }
-            IconButton(
-                onClick = onMakePrimary,
-                modifier = Modifier.size(if (compact) 40.dp else 48.dp),
-            ) {
-                Icon(
-                    if (path == primaryFolder) Icons.Default.Star else Icons.Default.StarBorder,
-                    "Make primary folder",
-                    tint = if (path == primaryFolder) VoltGreen else VoltTextMuted,
-                )
+            if (!selectionOnly) {
+                IconButton(
+                    onClick = onMakePrimary,
+                    modifier = Modifier.size(if (compact) 40.dp else 48.dp),
+                ) {
+                    Icon(
+                        if (path == primaryFolder) Icons.Default.Star else Icons.Default.StarBorder,
+                        "Make primary folder",
+                        tint = if (path == primaryFolder) VoltGreen else VoltTextMuted,
+                    )
+                }
             }
             if (compact) {
-                IconButton(onClick = onDelete, modifier = Modifier.size(40.dp)) {
-                    Icon(Icons.Default.Delete, "Delete folder", tint = Color(0xFFFF8A80))
+                if (!selectionOnly) {
+                    IconButton(onClick = onDelete, modifier = Modifier.size(40.dp)) {
+                        Icon(Icons.Default.Delete, "Delete folder", tint = Color(0xFFFF8A80))
+                    }
                 }
                 IconButton(onClick = onOpen, modifier = Modifier.size(40.dp)) {
                     Icon(Icons.Default.ArrowForward, "Open folder", tint = Color.White.copy(alpha = 0.75f))
@@ -2197,8 +2202,10 @@ private fun FolderCard(
                     IconButton(onClick = onOpen) {
                         Icon(Icons.Default.ArrowForward, "Open folder", tint = Color.White.copy(alpha = 0.75f))
                     }
-                    IconButton(onClick = onDelete) {
-                        Icon(Icons.Default.Delete, "Delete folder", tint = Color(0xFFFF8A80))
+                    if (!selectionOnly) {
+                        IconButton(onClick = onDelete) {
+                            Icon(Icons.Default.Delete, "Delete folder", tint = Color(0xFFFF8A80))
+                        }
                     }
                 }
             }
