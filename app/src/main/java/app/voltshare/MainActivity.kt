@@ -166,6 +166,7 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -4343,14 +4344,87 @@ private fun PdfViewer(file: File) {
 
 @Composable
 private fun TextViewer(file: File) {
-    var text by remember(file) { mutableStateOf("Loading private text…") }
+    val clipboard = LocalClipboardManager.current
+    val context = LocalContext.current
+    var text by remember(file) { mutableStateOf<String?>(null) }
+    var readError by remember(file) { mutableStateOf<String?>(null) }
     LaunchedEffect(file) {
-        text = withContext(Dispatchers.IO) {
-            file.inputStream().bufferedReader().use { it.readText().take(200_000) }
+        runCatching {
+            withContext(Dispatchers.IO) {
+                file.inputStream().bufferedReader(Charsets.UTF_8).use { it.readText() }
+            }
+        }.onSuccess { contents ->
+            text = contents
+        }.onFailure {
+            readError = "This text file could not be read."
         }
     }
-    androidx.compose.foundation.layout.Column(Modifier.fillMaxSize().background(Color(0xFF0A0A0A)).verticalScroll(rememberScrollState()).padding(22.dp)) {
-        Text(text, color = Color(0xFFE6F5EC), fontFamily = FontFamily.Monospace, fontSize = 13.sp, lineHeight = 21.sp)
+    Column(
+        Modifier
+            .fillMaxSize()
+            .background(Color(0xFF0A0A0A))
+            .padding(horizontal = 22.dp),
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                "Text preview",
+                color = VoltTextMuted,
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Bold,
+            )
+            OutlinedButton(
+                onClick = {
+                    text?.let { contents ->
+                        clipboard.setText(AnnotatedString(contents))
+                        Toast.makeText(context, "Copied full text", Toast.LENGTH_SHORT).show()
+                    }
+                },
+                enabled = text != null,
+                modifier = Modifier.height(42.dp),
+                contentPadding = PaddingValues(horizontal = 14.dp),
+                shape = RoundedCornerShape(14.dp),
+                border = BorderStroke(1.dp, VoltGreen.copy(alpha = 0.55f)),
+                colors = ButtonDefaults.outlinedButtonColors(contentColor = VoltGreen),
+            ) {
+                Icon(Icons.Default.ContentCopy, "Copy all text", modifier = Modifier.size(16.dp))
+                Spacer(Modifier.width(7.dp))
+                Text("Copy all")
+            }
+        }
+        when {
+            readError != null -> {
+                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    Text(readError!!, color = VoltTextMuted)
+                }
+            }
+            text == null -> {
+                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    CircularProgressIndicator(color = VoltGreen, strokeWidth = 2.dp)
+                }
+            }
+            else -> {
+                SelectionContainer {
+                    Column(
+                        Modifier
+                            .fillMaxSize()
+                            .verticalScroll(rememberScrollState())
+                            .padding(bottom = 22.dp),
+                    ) {
+                        Text(
+                            text!!,
+                            color = Color(0xFFE6F5EC),
+                            fontFamily = FontFamily.Monospace,
+                            fontSize = 13.sp,
+                            lineHeight = 21.sp,
+                        )
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -5130,7 +5204,32 @@ private fun isImage(file: VaultFile) = file.mimeType.startsWith("image") || file
 private fun isVideo(file: VaultFile) = file.mimeType.startsWith("video") || file.name.isMediaExtension("mp4", "mkv", "webm", "mov", "avi")
 private fun isAudio(file: VaultFile) = file.mimeType.startsWith("audio") || file.name.isMediaExtension("mp3", "wav", "m4a", "flac", "aac", "ogg")
 private fun isPdf(file: VaultFile) = file.mimeType == "application/pdf" || file.name.endsWith(".pdf", true)
-private fun isText(file: VaultFile) = file.mimeType.startsWith("text") || file.name.isMediaExtension("txt", "md", "json", "xml", "csv", "log", "kt", "java", "js", "ts", "html", "css")
+private fun isText(file: VaultFile): Boolean {
+    val mimeType = file.mimeType.lowercase()
+    return mimeType.startsWith("text/") ||
+        mimeType in setOf(
+            "application/json",
+            "application/javascript",
+            "application/ld+json",
+            "application/xml",
+            "application/rtf",
+            "application/sql",
+            "application/x-javascript",
+            "application/x-sh",
+            "application/x-yaml",
+            "application/yaml",
+            "image/svg+xml",
+        ) ||
+        file.name.isMediaExtension(
+            "txt", "text", "md", "markdown", "json", "jsonl", "ndjson", "xml", "xsl", "xslt",
+            "csv", "tsv", "log", "kt", "kts", "java", "js", "jsx", "mjs", "ts", "tsx",
+            "html", "htm", "css", "scss", "sass", "less", "svg", "yaml", "yml", "toml",
+            "ini", "conf", "config", "properties", "env", "sql", "sh", "bash", "zsh",
+            "fish", "gradle", "groovy", "diff", "patch", "srt", "vtt", "tex", "graphql",
+            "gql", "c", "h", "cc", "cpp", "cxx", "hpp", "cs", "swift", "go", "rs", "py",
+            "rb", "php", "vue", "webmanifest",
+        )
+}
 private fun isInstallable(file: VaultFile) = file.name.isMediaExtension("apk", "xapk", "apks")
 private fun String.isMediaExtension(vararg extensions: String) = extensions.any { endsWith(".$it", ignoreCase = true) }
 private fun formatSize(bytes: Long): String = Formatter.formatFileSize(null, bytes)
