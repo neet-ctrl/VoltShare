@@ -1,0 +1,4 @@
+- [EncryptedFile builder API](encrypted-file-builder.md) — this dependency requires the `(Context, File, MasterKey, scheme)` constructor followed by `.build()`.
+- [Android Wi-Fi verification](wifi-verification.md) — `WifiNetworkSpecifier` is best-effort; save scan details with an honest fallback status when verification is unavailable.
+- [Secret attachment privacy](secret-attachment-privacy.md) — keep attachment bytes encrypted at rest and stream decrypted content without plaintext cache files.
+- [Cloud universal sync encryption](cloud-universal-sync.md) — Drive uses the universal container; background jobs reuse the verified key instead of storing passwords.

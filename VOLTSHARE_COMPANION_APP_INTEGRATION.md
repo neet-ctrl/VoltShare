@@ -1,7 +1,7 @@
 # VoltShare Vault Import Integration
 
 This document describes the completed provider-side setup in VoltShare and the
-exact work required in the companion app.
+completed attachment integration in the companion app under `2FA/`.
 
 The result is an offline attachment flow:
 
@@ -55,14 +55,42 @@ shared UID. Do not add an internet service for this feature.
 
 ## Companion app manifest
 
-Add this permission before the `<application>` element:
+The 2FA companion app now declares this permission before the `<application>`
+element:
 
 ```xml
 <uses-permission android:name="app.voltshare.permission.ACCESS_VAULT" />
 ```
 
-The companion app does not need to declare VoltShare's provider or activity.
-It only needs the permission and the explicit intent described below.
+The 2FA app also declares `app.voltshare` in its `<queries>` package list so
+the source can be diagnosed cleanly on Android versions with package
+visibility restrictions. The companion app does not declare VoltShare's
+provider or activity. It only needs the permission and the explicit intent
+described below.
+
+## Implemented 2FA box-manager flow
+
+The implementation lives in:
+
+- `2FA/app/src/main/AndroidManifest.xml`
+- `2FA/feature/secrets/src/main/java/com/twofasapp/feature/secrets/ui/SecretsScreen.kt`
+- `2FA/feature/secrets/src/main/java/com/twofasapp/feature/secrets/data/SecretsRepository.kt`
+
+Inside every box manager's secure-entry editor, **Attach any file** first opens
+a source dialog with:
+
+- **VoltShare Vault** — launches the protected VoltShare picker using the
+  existing vault UI and supports multiple selected files.
+- **Device storage** — launches the original `OpenDocument` SAF flow.
+
+Both paths call the existing encrypted attachment import method. VoltShare
+URIs are copied immediately into the 2FA app's encrypted private attachment
+storage and are not retained as the attachment's durable URI. If an encrypted
+copy fails after creating its destination, the destination is deleted so a
+partial attachment is not left behind.
+
+The complete 2FA-specific verification checklist is in
+`2FA/VOLTSHARE_ATTACHMENT_INTEGRATION.md`.
 
 ## Companion app: launch the VoltShare picker
 
@@ -126,12 +154,10 @@ private fun Intent.voltShareResultUris(): List<Uri> {
         }
     }
 
-    if (action == Intent.ACTION_SEND) {
-        getParcelableExtra<Uri>(Intent.EXTRA_STREAM)?.let(result::add)
-    } else {
-        @Suppress("DEPRECATION")
-        getParcelableArrayListExtra<Uri>(Intent.EXTRA_STREAM)?.forEach(result::add)
-    }
+    @Suppress("DEPRECATION")
+    getParcelableExtra<Uri>(Intent.EXTRA_STREAM)?.let(result::add)
+    @Suppress("DEPRECATION")
+    getParcelableArrayListExtra<Uri>(Intent.EXTRA_STREAM)?.forEach(result::add)
 
     return result.toList()
 }

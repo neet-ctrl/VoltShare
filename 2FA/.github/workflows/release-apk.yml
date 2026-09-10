@@ -1,0 +1,95 @@
+name: Release APK
+
+on:
+  push:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "GitHub Release tag to create"
+        required: true
+        default: "v5.6.0"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Build and release APK
+    runs-on: ubuntu-latest
+
+    env:
+      # These values are configured in the repository's GitHub Actions secrets.
+      RELEASE_KEYSTORE_PASSWORD: ${{ secrets.RELEASE_KEYSTORE_PASSWORD }}
+      RELEASE_KEY_ALIAS: ${{ secrets.RELEASE_KEY_ALIAS }}
+      RELEASE_KEY_PASSWORD: ${{ secrets.RELEASE_KEY_PASSWORD }}
+      GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+          cache: gradle
+
+      - name: Prepare release inputs
+        shell: bash
+        env:
+          RELEASE_KEYSTORE_BASE64: ${{ secrets.RELEASE_KEYSTORE_BASE64 }}
+        run: |
+          set -euo pipefail
+
+          test -n "$RELEASE_KEYSTORE_BASE64" || {
+            echo "::error::Missing RELEASE_KEYSTORE_BASE64 repository secret"
+            exit 1
+          }
+          test -n "$RELEASE_KEYSTORE_PASSWORD" || {
+            echo "::error::Missing RELEASE_KEYSTORE_PASSWORD repository secret"
+            exit 1
+          }
+          test -n "$RELEASE_KEY_ALIAS" || {
+            echo "::error::Missing RELEASE_KEY_ALIAS repository secret"
+            exit 1
+          }
+          test -n "$RELEASE_KEY_PASSWORD" || {
+            echo "::error::Missing RELEASE_KEY_PASSWORD repository secret"
+            exit 1
+          }
+
+          mkdir -p config
+          printf '%s' "$RELEASE_KEYSTORE_BASE64" | base64 --decode > config/release_signing.jks
+
+          cat > config/config.properties <<EOF
+          release.storePassword=$RELEASE_KEYSTORE_PASSWORD
+          release.keyAlias=$RELEASE_KEY_ALIAS
+          release.keyPassword=$RELEASE_KEY_PASSWORD
+          EOF
+          test -n "$GOOGLE_SERVICES_JSON" || {
+            echo "::error::Missing GOOGLE_SERVICES_JSON repository secret"
+            exit 1
+          }
+          mkdir -p app/src/releaseLocal
+          printf '%s' "$GOOGLE_SERVICES_JSON" > app/src/releaseLocal/google-services.json
+
+      - name: Build release APK
+        run: ./gradlew --no-daemon --build-cache assembleReleaseLocal
+
+      - name: Create GitHub Release and attach APK
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || format('build-{0}', github.run_number) }}
+        run: |
+          set -euo pipefail
+          apk="$(find app/build/outputs/apk/releaseLocal -type f -name '*.apk' -print -quit)"
+          test -n "$apk" || {
+            echo "::error::No release APK was produced"
+            exit 1
+          }
+          gh release create "$RELEASE_TAG" "$apk" \
+            --target "$GITHUB_SHA" \
+            --title "2FAS Android $RELEASE_TAG" \
+            --generate-notes

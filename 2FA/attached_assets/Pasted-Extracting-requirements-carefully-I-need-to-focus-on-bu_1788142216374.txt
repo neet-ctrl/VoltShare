@@ -1,0 +1,80 @@
+Extracting requirements carefully
+
+I need to focus on building and reading the attachments for the project. The user clearly wants me to implement everything without interfering with the existing app. I'll start by carefully extracting the requirements from the uploaded files, and I may also need to check my memory. Using commands like shell ls or cat might help me view the files I know about. It could be beneficial to read the skill and files in parallel while setting a preamble.
+
+I’ll first compare the three pasted documents with the current codebase, then I’ll implement only the missing pieces in the existing app and verify the result without replacing or disrupting its current behavior.
+
+Investigating code issues
+
+I've got a missing memory issue to address, and I need to check the current code in my Android project. I'll use some tools to find deeper issues, possibly employing rg to look for secrets as well. It seems like I might also have to read the third pasted item that was done. I really want to assess the actual implementation to ensure everything is functioning as it should. Let’s dig into it!
+
+I’ve read all three pasted documents. They confirm the earlier work was explicitly incomplete, especially around encrypted attachments/backup, trash lifecycle, hidden locking, Wi‑Fi flow, field actions, and generator actions. I’m now locating the actual current implementation so I can close those gaps in place rather than assume the pasted status is current.
+
+The current code is not just missing features; the latest partial edits also introduced a data-model mismatch (the editor still references attachment URIs while the model now stores encrypted files), so it cannot be considered complete yet. I’m fixing that boundary first, then I’ll wire the full trash, lock, Wi‑Fi, attachment viewer, and generator flows around the corrected encrypted model.
+
+The first broad screen patch did not apply, so no screen code was changed by that attempt. I’m splitting the changes into smaller, safer edits now; the model, repository, view-model, and generator updates are already in place.
+
+The remaining work is now centered in the isolated Secrets module. I’ve corrected the data flow so picked files are copied into encrypted internal storage instead of retaining external URIs, and I’m adding the user-facing restore/delete lifecycle, in-app attachment preview, roller date picker, real field paste/test actions, and the Wi‑Fi password verification step.
+
+The core feature paths are now wired end-to-end. I’m doing a direct compile pass next to catch Android/Compose API issues from the new in-app viewer, roller picker, reorder controls, and encrypted attachment migration, then I’ll correct any errors before checking the final requirement coverage.
+
+No local build pk just build every single thing that i told
+
+Honoring user requests
+
+The user mentioned there's no local build since the client already canceled it, so I need to respect that. It seems like I need to read the new attachments the user provided, which likely includes updated duplicates. They referenced needing to consider "every single thing," so I’ll focus on these new files first. I should use the read tool and maybe check for differences in the files, but it sounds like there's no need for a build at this point.
+
+Understood — I won’t run a local build. I’ll continue from the source-level implementation and use the two newly attached copies as the latest specification reference, then finish the remaining code consistency pass without changing the existing app’s feature logic.
+
+I’m honoring the no-build instruction. I found and fixed one more integration detail before the final pass: the universal trash label now keeps manager names even for removed managers, and I’m adding timed clipboard clearing so sensitive copied values do not remain indefinitely.
+
+Continuing patch logic
+
+I need to keep working on the home patch logic. It feels essential to make sure everything is running smoothly and any issues are addressed. It’s kind of like tweaking a recipe; a little adjustment can make a big difference! I'm curious about what specific aspects need more attention, so I'll focus on refining the details. Let’s see how I can implement improvements effectively!
+
+Exploring context and imports
+
+I'm working on LocalView and noting that EntryCard will maintain a modern touch. I realize I need to patch in some imports: specifically android.view.HapticFeedbackConstants and androidx.compose.ui.platform.LocalView. However, in my current setup for ManagerCard, it seems I'm lacking context. I need to figure out how to incorporate that context to make everything work smoothly! I'll dive deeper into this as I go along.
+
+Inspecting UI functions
+
+I need to continue my work by checking the UI function signatures after the patch. It seems like LocalView might be utilized in ManagerCard and EntryCard, so I'll focus on inspecting those specific areas. I want to ensure everything is functioning correctly, and pinpointing the usage of LocalView will help clarify things. Just a bit more digging to ensure I'm on the right track!
+
+Addressing WiFi Bug
+
+I see that we have some specifications to work with. For open networks, the builder shouldn't require a password but the user wants a password prompt. Maybe we could support a blank option with a “Verify & continue” button. We need to ensure that the requirements specifically allow for open, WPA, and WPA2 networks while clearly indicating unsupported WEP. So, for validation, if it’s WEP, we display an error, and if it’s WPA/WPA2, we proceed with the appropriate settings.Evaluating Scanner Connectivity
+
+I’m considering the scenario where no scanner is connected, which might be acceptable for open networks. The ScanResult.capabilities includes [WPA2-PSK-CCMP][ESS], confirming WPA support. I need to handle the onUnavailable callback on the main thread, focusing on network callbacks. There's a chance state writes from the background could invalidate the request, so I’ll need proper error handling as well.
+
+If WEP or EAP is detected, we’ll show an unsupported error. For open networks, I can allow a blank password and ensure the details are saved. Also, I need to include permissions for API 33.
+
+Analyzing boolean precedence
+
+I need to catch boolean precedence in the expression enabled = !selectedNeedsPassword && unsupported != true && !verifying || selectedNeedsPassword.... The selectedNeedsPassword definition is crucial: for WPA it’s true and unsupported is false, while for unsupported WEP it's false, leading to the button being disabled. I’m confirming that the conditions in the expression are correct. I also need to ensure that I properly handle WEP conditions and verify the model field equality that uses SecretFieldKind.PASSWORD. Lastly, I’ll update memory without follow-up tasks.
+
+The remaining source-level gaps are covered: legacy attachment/trash data is migrated instead of being discarded, hidden-lock updates stay synchronized with Settings, clipboard contents clear after 30 seconds, trash shows the deleted entry’s details, and Wi-Fi handling now distinguishes open, WPA/WPA2, WEP, and enterprise networks. I’m doing the final non-build consistency checks now.
+
+Identifying password generator issues
+
+I need to address an issue with ordering in PasswordGenerator's imports. I found a serious bug with the required characters: if the exclusions remove all uppercase letters, nextInt(0) will crash. I must fix this to ensure robustness. If the required size exceeds requested length, it should return an adjusted length.
+
+I need to implement strict category choices, making sure to exclude ambiguous or similar options. For the required minimum counts, I should limit this to length. If a category is disabled but minimum is greater than zero, I’ll skip it as currently expected.Fixing character filtering
+
+I need to ensure that if the character pool is empty, it defaults to using "abcdefghijklmnopqrstuvwxyz." I should then filter out exclusions and, if that results in an empty set, return "x" instead. I also want to build in features to manage ambiguous or similar characters.
+
+I should create a helper function called allowedChars within the generate function to handle this. For required categories, I need to apply the same constraints and validate the PIN length. Time to patch this!
+
+Fixing password generator logic
+
+I need to continue refining the password generator logic. The allowed exclusions are good for avoiding ambiguity, but if only uppercase letters are selected as false, it defaults to lowercase. Custom exclusions could make the fallback unnecessary, so I’ll adjust that. For passphrases, I’ll include numbers using Int 10-99, but there might be an issue with Entropy in random mode since it uses a count of 26. Also, I should fix the app SDK compile manifest attribute for API 33 support and check the git diff around SecretsRepository.
+
+Continuing with the code analysis
+
+I need to keep going. I noticed the repository has SecretTrashEntry within the same package but isn't imported, which should be okay. However, there's a compile issue with the @kotlinx.serialization.Serializable annotation on the private Legacy class with the defaultSecretManagers() function. The serializer for SecretEntry recognizes SecretAttachment as an alias for uri, which is good. I’m concerned about possible data loss in read() if both the current decode and legacy decode fail due to an unknown trash shape. I'll be sure to rerun git diff --check and review the build.gradle dependencies just in case.
+
+Evaluating onRemove usage
+
+I need to figure out if we still require the onRemove parameter. It was passed to the SecretFieldEditor and its function signature, but I don't see it being actively used. Kotlin is pretty good at pointing out unused parameters, so maybe I can clean things up by removing onRemove entirely. Since the field action is already handling removals, I should patch the code to eliminate that parameter.
+
+You've reached your daily free quota limit. It will reset at 12:00 AM UTC.
+

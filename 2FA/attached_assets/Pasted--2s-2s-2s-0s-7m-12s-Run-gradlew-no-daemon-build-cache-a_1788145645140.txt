@@ -1,0 +1,631 @@
+
+2s
+2s
+2s
+0s
+7m 12s
+Run ./gradlew --no-daemon --build-cache assembleReleaseLocal
+Downloading https://services.gradle.org/distributions/gradle-9.0.0-bin.zip
+................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................
+Unzipping /home/runner/.gradle/wrapper/dists/gradle-9.0.0-bin/d6wjpkvcgsg3oed0qlfss3wgl/gradle-9.0.0-bin.zip to /home/runner/.gradle/wrapper/dists/gradle-9.0.0-bin/d6wjpkvcgsg3oed0qlfss3wgl
+Set executable permissions for: /home/runner/.gradle/wrapper/dists/gradle-9.0.0-bin/d6wjpkvcgsg3oed0qlfss3wgl/gradle-9.0.0/bin/gradle
+Welcome to Gradle 9.0.0!
+Here are the highlights of this release:
+ - Configuration Cache is the recommended execution mode
+ - Gradle requires JVM 17 or higher to run
+ - Build scripts use Kotlin 2.2 and Groovy 4.0
+ - Improved Kotlin DSL script compilation avoidance
+For more details see https://docs.gradle.org/9.0.0/release-notes.html
+To honour the JVM settings for this build a single-use Daemon process will be forked. For more on this, please refer to https://docs.gradle.org/9.0.0/userguide/gradle_daemon.html#sec:disabling_the_daemon in the Gradle documentation.
+Daemon will be stopped at the end of the build 
+Calculating task graph as no cached configuration is available for tasks: assembleReleaseLocal
+> Configure project :buildlogic
+w: file:///home/runner/work/2FA/2FA/buildlogic/build.gradle.kts:23:15: This code uses error suppression for 'DSL_SCOPE_VIOLATION'. While it might compile and work, the compiler behavior is UNSPECIFIED and WILL NOT BE PRESERVED. Please report your use case to the Kotlin issue tracker instead: https://kotl.in/issue
+> Configure project :
+w: file:///home/runner/work/2FA/2FA/build.gradle.kts:25:24: 'var buildDir: File' is deprecated. Deprecated in Java.
+> Task :buildlogic:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :buildlogic:pluginDescriptors
+> Task :buildlogic:processResources
+> Task :buildlogic:compileKotlin
+> Task :buildlogic:compileJava NO-SOURCE
+> Task :buildlogic:classes
+> Task :buildlogic:jar
+> Task :base:preBuild UP-TO-DATE
+> Task :app:preBuild UP-TO-DATE
+> Task :app:preReleaseLocalBuild UP-TO-DATE
+> Task :base:preReleaseBuild UP-TO-DATE
+> Task :base:mergeReleaseJniLibFolders
+> Task :app:mergeReleaseLocalJniLibFolders
+> Task :parsers:preBuild UP-TO-DATE
+> Task :base:mergeReleaseNativeLibs NO-SOURCE
+> Task :parsers:preReleaseBuild UP-TO-DATE
+> Task :parsers:mergeReleaseJniLibFolders
+> Task :parsers:mergeReleaseNativeLibs NO-SOURCE
+> Task :base:copyReleaseJniLibsProjectOnly
+> Task :prefs:preBuild UP-TO-DATE
+> Task :prefs:preReleaseBuild UP-TO-DATE
+> Task :parsers:copyReleaseJniLibsProjectOnly
+> Task :core:android:preBuild UP-TO-DATE
+> Task :core:android:preReleaseBuild UP-TO-DATE
+> Task :core:android:mergeReleaseJniLibFolders
+> Task :prefs:mergeReleaseJniLibFolders
+> Task :prefs:mergeReleaseNativeLibs NO-SOURCE
+> Task :core:android:mergeReleaseNativeLibs NO-SOURCE
+> Task :prefs:copyReleaseJniLibsProjectOnly
+> Task :core:cipher:preBuild UP-TO-DATE
+> Task :core:cipher:preReleaseBuild UP-TO-DATE
+> Task :core:android:copyReleaseJniLibsProjectOnly
+> Task :core:common:preBuild UP-TO-DATE
+> Task :core:common:preReleaseBuild UP-TO-DATE
+> Task :core:cipher:mergeReleaseJniLibFolders
+> Task :core:common:mergeReleaseJniLibFolders
+> Task :core:cipher:mergeReleaseNativeLibs NO-SOURCE
+> Task :core:common:mergeReleaseNativeLibs NO-SOURCE
+> Task :core:cipher:copyReleaseJniLibsProjectOnly
+> Task :core:common:copyReleaseJniLibsProjectOnly
+> Task :core:designsystem:preBuild UP-TO-DATE
+> Task :core:designsystem:preReleaseBuild UP-TO-DATE
+> Task :core:locale:preBuild UP-TO-DATE
+> Task :core:locale:preReleaseBuild UP-TO-DATE
+> Task :core:designsystem:mergeReleaseJniLibFolders
+> Task :core:locale:mergeReleaseJniLibFolders
+> Task :core:designsystem:mergeReleaseNativeLibs NO-SOURCE
+> Task :core:locale:mergeReleaseNativeLibs NO-SOURCE
+> Task :core:designsystem:copyReleaseJniLibsProjectOnly
+> Task :core:network:preBuild UP-TO-DATE
+> Task :core:locale:copyReleaseJniLibsProjectOnly
+> Task :core:otp:preBuild UP-TO-DATE
+> Task :core:otp:preReleaseBuild UP-TO-DATE
+> Task :core:network:preReleaseBuild UP-TO-DATE
+> Task :core:network:mergeReleaseJniLibFolders
+> Task :core:otp:mergeReleaseJniLibFolders
+> Task :core:network:mergeReleaseNativeLibs NO-SOURCE
+> Task :core:otp:mergeReleaseNativeLibs NO-SOURCE
+> Task :core:network:copyReleaseJniLibsProjectOnly
+> Task :core:storage:preBuild UP-TO-DATE
+> Task :core:storage:preReleaseBuild UP-TO-DATE
+> Task :core:otp:copyReleaseJniLibsProjectOnly
+> Task :data:browserext:preBuild UP-TO-DATE
+> Task :data:browserext:preReleaseBuild UP-TO-DATE
+> Task :core:storage:mergeReleaseJniLibFolders
+> Task :data:browserext:mergeReleaseJniLibFolders
+> Task :core:storage:mergeReleaseNativeLibs NO-SOURCE
+> Task :data:browserext:mergeReleaseNativeLibs NO-SOURCE
+> Task :core:storage:copyReleaseJniLibsProjectOnly
+> Task :data:browserext:copyReleaseJniLibsProjectOnly
+> Task :data:cloud:preBuild UP-TO-DATE
+> Task :data:cloud:preReleaseBuild UP-TO-DATE
+> Task :data:notifications:preBuild UP-TO-DATE
+> Task :data:notifications:preReleaseBuild UP-TO-DATE
+> Task :data:cloud:mergeReleaseJniLibFolders
+> Task :data:notifications:mergeReleaseJniLibFolders
+> Task :data:cloud:mergeReleaseNativeLibs NO-SOURCE
+> Task :data:notifications:mergeReleaseNativeLibs NO-SOURCE
+> Task :data:cloud:copyReleaseJniLibsProjectOnly
+> Task :data:push:preBuild UP-TO-DATE
+> Task :data:notifications:copyReleaseJniLibsProjectOnly
+> Task :data:services:preBuild UP-TO-DATE
+> Task :data:push:preReleaseBuild UP-TO-DATE
+> Task :data:services:preReleaseBuild UP-TO-DATE
+> Task :data:services:mergeReleaseJniLibFolders
+> Task :data:push:mergeReleaseJniLibFolders
+> Task :data:services:mergeReleaseNativeLibs NO-SOURCE
+> Task :data:push:mergeReleaseNativeLibs NO-SOURCE
+> Task :data:services:copyReleaseJniLibsProjectOnly
+> Task :data:session:preBuild UP-TO-DATE
+> Task :data:push:copyReleaseJniLibsProjectOnly
+> Task :feature:about:preBuild UP-TO-DATE
+> Task :feature:about:preReleaseBuild UP-TO-DATE
+> Task :data:session:preReleaseBuild UP-TO-DATE
+> Task :feature:about:mergeReleaseJniLibFolders
+> Task :data:session:mergeReleaseJniLibFolders
+> Task :data:session:mergeReleaseNativeLibs NO-SOURCE
+> Task :feature:about:mergeReleaseNativeLibs NO-SOURCE
+> Task :data:session:copyReleaseJniLibsProjectOnly
+> Task :feature:appsettings:preBuild UP-TO-DATE
+> Task :feature:appsettings:preReleaseBuild UP-TO-DATE
+> Task :feature:about:copyReleaseJniLibsProjectOnly
+> Task :feature:backup:preBuild UP-TO-DATE
+> Task :feature:backup:preReleaseBuild UP-TO-DATE
+> Task :feature:appsettings:mergeReleaseJniLibFolders
+> Task :feature:backup:mergeReleaseJniLibFolders
+> Task :feature:appsettings:mergeReleaseNativeLibs NO-SOURCE
+> Task :feature:backup:mergeReleaseNativeLibs NO-SOURCE
+> Task :feature:appsettings:copyReleaseJniLibsProjectOnly
+> Task :feature:browserext:preBuild UP-TO-DATE
+> Task :feature:backup:copyReleaseJniLibsProjectOnly
+> Task :feature:externalimport:preBuild UP-TO-DATE
+> Task :feature:browserext:preReleaseBuild UP-TO-DATE
+> Task :feature:externalimport:preReleaseBuild UP-TO-DATE
+> Task :feature:browserext:mergeReleaseJniLibFolders
+> Task :feature:externalimport:mergeReleaseJniLibFolders
+> Task :feature:browserext:mergeReleaseNativeLibs NO-SOURCE
+> Task :feature:externalimport:mergeReleaseNativeLibs NO-SOURCE
+> Task :feature:externalimport:copyReleaseJniLibsProjectOnly
+> Task :feature:home:preBuild UP-TO-DATE
+> Task :feature:home:preReleaseBuild UP-TO-DATE
+> Task :feature:browserext:copyReleaseJniLibsProjectOnly
+> Task :feature:qrscan:preBuild UP-TO-DATE
+> Task :feature:qrscan:preReleaseBuild UP-TO-DATE
+> Task :feature:home:mergeReleaseJniLibFolders
+> Task :feature:home:mergeReleaseNativeLibs NO-SOURCE
+> Task :feature:qrscan:mergeReleaseJniLibFolders
+> Task :feature:home:copyReleaseJniLibsProjectOnly
+> Task :feature:secrets:preBuild UP-TO-DATE
+> Task :feature:secrets:preReleaseBuild UP-TO-DATE
+> Task :feature:qrscan:mergeReleaseNativeLibs NO-SOURCE
+> Task :feature:qrscan:copyReleaseJniLibsProjectOnly
+> Task :feature:security:preBuild UP-TO-DATE
+> Task :feature:security:preReleaseBuild UP-TO-DATE
+> Task :feature:secrets:mergeReleaseJniLibFolders
+> Task :feature:secrets:mergeReleaseNativeLibs NO-SOURCE
+> Task :feature:secrets:copyReleaseJniLibsProjectOnly
+> Task :feature:security:mergeReleaseJniLibFolders
+> Task :feature:startup:preBuild UP-TO-DATE
+> Task :feature:startup:preReleaseBuild UP-TO-DATE
+> Task :feature:security:mergeReleaseNativeLibs NO-SOURCE
+> Task :feature:security:copyReleaseJniLibsProjectOnly
+> Task :feature:trash:preBuild UP-TO-DATE
+> Task :feature:trash:preReleaseBuild UP-TO-DATE
+> Task :feature:startup:mergeReleaseJniLibFolders
+> Task :feature:startup:mergeReleaseNativeLibs NO-SOURCE
+> Task :feature:trash:mergeReleaseJniLibFolders
+> Task :feature:startup:copyReleaseJniLibsProjectOnly
+> Task :feature:widget:preBuild UP-TO-DATE
+> Task :feature:widget:preReleaseBuild UP-TO-DATE
+> Task :feature:trash:mergeReleaseNativeLibs NO-SOURCE
+> Task :feature:trash:copyReleaseJniLibsProjectOnly
+> Task :feature:widget:mergeReleaseJniLibFolders
+> Task :feature:widget:mergeReleaseNativeLibs NO-SOURCE
+> Task :feature:widget:copyReleaseJniLibsProjectOnly
+> Task :base:prepareReleaseArtProfile
+> Task :parsers:prepareReleaseArtProfile
+> Task :prefs:prepareReleaseArtProfile
+> Task :core:android:prepareReleaseArtProfile
+> Task :core:cipher:prepareReleaseArtProfile
+> Task :core:common:prepareReleaseArtProfile
+> Task :core:designsystem:prepareReleaseArtProfile
+> Task :core:locale:prepareReleaseArtProfile
+> Task :core:network:prepareReleaseArtProfile
+> Task :core:otp:prepareReleaseArtProfile
+> Task :core:storage:prepareReleaseArtProfile
+> Task :data:browserext:prepareReleaseArtProfile
+> Task :data:cloud:prepareReleaseArtProfile
+> Task :data:notifications:prepareReleaseArtProfile
+> Task :data:push:prepareReleaseArtProfile
+> Task :data:services:prepareReleaseArtProfile
+> Task :data:session:prepareReleaseArtProfile
+> Task :feature:about:prepareReleaseArtProfile
+> Task :feature:appsettings:prepareReleaseArtProfile
+> Task :feature:backup:prepareReleaseArtProfile
+> Task :feature:browserext:prepareReleaseArtProfile
+> Task :feature:externalimport:prepareReleaseArtProfile
+> Task :feature:home:prepareReleaseArtProfile
+> Task :feature:qrscan:prepareReleaseArtProfile
+> Task :feature:secrets:prepareReleaseArtProfile
+> Task :feature:security:prepareReleaseArtProfile
+> Task :feature:startup:prepareReleaseArtProfile
+> Task :feature:trash:prepareReleaseArtProfile
+> Task :feature:widget:prepareReleaseArtProfile
+> Task :app:mergeReleaseLocalArtProfile
+> Task :app:mergeReleaseLocalNativeLibs
+> Task :app:stripReleaseLocalDebugSymbols
+Unable to strip the following libraries, packaging them as they are: libandroidx.graphics.path.so, libbarhopper_v3.so, libdatastore_shared_counter.so, libimage_processing_util_jni.so, libsqlcipher.so, libsurface_util_jni.so. Run with --info option to learn more.
+> Task :app:extractReleaseLocalNativeSymbolTables
+> Task :app:mergeReleaseLocalNativeDebugMetadata NO-SOURCE
+> Task :core:android:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :core:android:generateReleaseBuildConfig
+> Task :core:android:generateReleaseResValues
+> Task :core:android:generateReleaseResources
+> Task :core:android:packageReleaseResources
+> Task :core:android:processReleaseNavigationResources
+> Task :core:android:parseReleaseLocalResources
+> Task :core:android:generateReleaseRFile
+> Task :app:expandReleaseLocalL8ArtProfileWildcards
+> Task :core:android:javaPreCompileRelease
+> Task :core:common:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :core:common:generateReleaseBuildConfig
+> Task :core:common:generateReleaseResValues FROM-CACHE
+> Task :core:common:generateReleaseResources FROM-CACHE
+> Task :core:common:packageReleaseResources
+> Task :core:common:processReleaseNavigationResources FROM-CACHE
+> Task :core:common:parseReleaseLocalResources FROM-CACHE
+> Task :core:common:generateReleaseRFile
+> Task :core:android:compileReleaseKotlin
+w: Opt-in requirement marker kotlin.Experimental is unresolved. Please make sure it's present in the module dependencies
+w: Opt-in requirement marker androidx.lifecycle.compose.ExperimentalLifecycleComposeApi is unresolved. Please make sure it's present in the module dependencies
+> Task :core:common:compileReleaseKotlin
+w: Opt-in requirement marker kotlin.Experimental is unresolved. Please make sure it's present in the module dependencies
+w: Opt-in requirement marker androidx.compose.material3.ExperimentalMaterial3Api is unresolved. Please make sure it's present in the module dependencies
+w: Opt-in requirement marker androidx.lifecycle.compose.ExperimentalLifecycleComposeApi is unresolved. Please make sure it's present in the module dependencies
+w: file:///home/runner/work/2FA/2FA/core/common/src/main/java/com/twofasapp/common/ktx/Base64.kt:72:37 'fun toInt(): Int' is deprecated. Conversion of Char to Number is deprecated. Use Char.code property instead.
+> Task :core:common:javaPreCompileRelease FROM-CACHE
+> Task :core:common:compileReleaseJavaWithJavac
+> Task :core:android:compileReleaseJavaWithJavac
+> Task :core:common:bundleLibCompileToJarRelease
+> Task :core:designsystem:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :core:android:bundleLibCompileToJarRelease
+> Task :core:designsystem:generateReleaseResValues FROM-CACHE
+> Task :core:designsystem:generateReleaseBuildConfig
+> Task :core:designsystem:processReleaseNavigationResources
+> Task :core:locale:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :core:designsystem:generateReleaseResources
+> Task :core:locale:generateReleaseBuildConfig
+> Task :core:locale:generateReleaseResValues FROM-CACHE
+> Task :core:locale:generateReleaseResources
+> Task :core:locale:processReleaseNavigationResources
+> Task :core:locale:javaPreCompileRelease FROM-CACHE
+> Task :core:designsystem:javaPreCompileRelease FROM-CACHE
+> Task :prefs:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :prefs:generateReleaseBuildConfig
+> Task :prefs:generateReleaseResValues FROM-CACHE
+> Task :prefs:generateReleaseResources
+> Task :prefs:processReleaseNavigationResources
+> Task :core:storage:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :core:storage:generateReleaseBuildConfig
+> Task :core:storage:generateReleaseResValues FROM-CACHE
+> Task :core:storage:generateReleaseResources FROM-CACHE
+> Task :core:storage:processReleaseNavigationResources FROM-CACHE
+> Task :core:storage:javaPreCompileRelease FROM-CACHE
+> Task :prefs:javaPreCompileRelease FROM-CACHE
+> Task :data:session:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :data:session:generateReleaseBuildConfig
+> Task :data:session:generateReleaseResValues FROM-CACHE
+> Task :data:session:generateReleaseResources FROM-CACHE
+> Task :data:session:processReleaseNavigationResources FROM-CACHE
+> Task :data:session:javaPreCompileRelease FROM-CACHE
+> Task :feature:startup:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :feature:startup:generateReleaseBuildConfig
+> Task :feature:startup:generateReleaseResValues FROM-CACHE
+> Task :feature:startup:generateReleaseResources
+> Task :feature:startup:processReleaseNavigationResources
+> Task :feature:startup:javaPreCompileRelease FROM-CACHE
+> Task :parsers:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :parsers:generateReleaseBuildConfig
+> Task :parsers:generateReleaseResValues FROM-CACHE
+> Task :parsers:generateReleaseResources
+> Task :parsers:processReleaseNavigationResources
+> Task :parsers:javaPreCompileRelease FROM-CACHE
+> Task :core:network:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :core:network:generateReleaseBuildConfig
+> Task :core:network:generateReleaseResValues FROM-CACHE
+> Task :core:network:generateReleaseResources FROM-CACHE
+> Task :core:network:processReleaseNavigationResources FROM-CACHE
+> Task :core:network:javaPreCompileRelease FROM-CACHE
+> Task :data:notifications:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :data:notifications:generateReleaseBuildConfig
+> Task :data:notifications:generateReleaseResValues FROM-CACHE
+> Task :data:notifications:generateReleaseResources FROM-CACHE
+> Task :data:notifications:processReleaseNavigationResources FROM-CACHE
+> Task :data:notifications:javaPreCompileRelease FROM-CACHE
+> Task :core:cipher:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :core:cipher:generateReleaseBuildConfig
+> Task :core:cipher:generateReleaseResValues FROM-CACHE
+> Task :core:cipher:generateReleaseResources FROM-CACHE
+> Task :core:cipher:processReleaseNavigationResources FROM-CACHE
+> Task :core:cipher:javaPreCompileRelease FROM-CACHE
+> Task :core:otp:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :core:otp:generateReleaseBuildConfig
+> Task :core:otp:generateReleaseResValues FROM-CACHE
+> Task :core:otp:generateReleaseResources FROM-CACHE
+> Task :core:otp:processReleaseNavigationResources FROM-CACHE
+> Task :core:otp:javaPreCompileRelease FROM-CACHE
+> Task :data:cloud:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :data:cloud:generateReleaseBuildConfig
+> Task :data:cloud:generateReleaseResValues FROM-CACHE
+> Task :data:cloud:generateReleaseResources FROM-CACHE
+> Task :data:cloud:processReleaseNavigationResources FROM-CACHE
+> Task :data:cloud:javaPreCompileRelease FROM-CACHE
+> Task :data:services:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :data:services:generateReleaseBuildConfig
+> Task :data:services:generateReleaseResValues FROM-CACHE
+> Task :data:services:generateReleaseResources FROM-CACHE
+> Task :data:services:processReleaseNavigationResources FROM-CACHE
+> Task :data:services:javaPreCompileRelease FROM-CACHE
+> Task :feature:home:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :feature:home:generateReleaseBuildConfig
+> Task :feature:home:generateReleaseResValues FROM-CACHE
+> Task :feature:home:generateReleaseResources
+> Task :feature:home:processReleaseNavigationResources
+> Task :feature:qrscan:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :feature:qrscan:generateReleaseBuildConfig
+> Task :feature:qrscan:generateReleaseResValues FROM-CACHE
+> Task :feature:qrscan:generateReleaseResources FROM-CACHE
+> Task :feature:qrscan:processReleaseNavigationResources FROM-CACHE
+> Task :feature:qrscan:javaPreCompileRelease FROM-CACHE
+> Task :feature:secrets:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :feature:secrets:generateReleaseBuildConfig
+> Task :feature:secrets:generateReleaseResValues FROM-CACHE
+> Task :feature:secrets:generateReleaseResources FROM-CACHE
+> Task :feature:secrets:processReleaseNavigationResources FROM-CACHE
+> Task :feature:secrets:javaPreCompileRelease FROM-CACHE
+> Task :feature:home:javaPreCompileRelease FROM-CACHE
+> Task :feature:trash:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :feature:trash:generateReleaseBuildConfig
+> Task :feature:trash:generateReleaseResValues FROM-CACHE
+> Task :feature:trash:generateReleaseResources
+> Task :feature:trash:processReleaseNavigationResources
+> Task :feature:trash:javaPreCompileRelease FROM-CACHE
+> Task :feature:about:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :feature:about:generateReleaseBuildConfig
+> Task :feature:about:generateReleaseResValues FROM-CACHE
+> Task :feature:about:generateReleaseResources FROM-CACHE
+> Task :feature:about:processReleaseNavigationResources FROM-CACHE
+> Task :feature:about:javaPreCompileRelease FROM-CACHE
+> Task :feature:externalimport:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :feature:externalimport:generateReleaseBuildConfig
+> Task :core:android:bundleLibRuntimeToJarRelease
+> Task :core:android:processReleaseJavaRes
+> Task :core:android:createFullJarRelease
+> Task :core:common:bundleLibRuntimeToJarRelease
+> Task :core:common:processReleaseJavaRes
+> Task :core:common:createFullJarRelease
+> Task :feature:externalimport:protobufDummy UP-TO-DATE
+> Task :feature:externalimport:extractProto
+> Task :feature:externalimport:extractReleaseProto
+> Task :feature:externalimport:generateReleaseResValues FROM-CACHE
+> Task :feature:externalimport:generateReleaseResources
+> Task :feature:externalimport:processReleaseNavigationResources
+> Task :feature:externalimport:javaPreCompileRelease FROM-CACHE
+> Task :base:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :base:generateReleaseBuildConfig
+> Task :base:generateReleaseResValues FROM-CACHE
+> Task :base:generateReleaseResources FROM-CACHE
+> Task :base:processReleaseNavigationResources FROM-CACHE
+> Task :base:javaPreCompileRelease FROM-CACHE
+> Task :data:browserext:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :data:browserext:generateReleaseBuildConfig
+> Task :data:browserext:generateReleaseResValues FROM-CACHE
+> Task :data:browserext:generateReleaseResources FROM-CACHE
+> Task :data:browserext:processReleaseNavigationResources FROM-CACHE
+> Task :data:browserext:javaPreCompileRelease FROM-CACHE
+> Task :feature:browserext:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :feature:browserext:generateReleaseBuildConfig
+> Task :feature:browserext:generateReleaseResValues FROM-CACHE
+> Task :feature:browserext:generateReleaseResources
+> Task :feature:browserext:processReleaseNavigationResources
+> Task :feature:browserext:javaPreCompileRelease FROM-CACHE
+> Task :feature:appsettings:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :feature:appsettings:generateReleaseBuildConfig
+> Task :feature:appsettings:generateReleaseResValues FROM-CACHE
+> Task :feature:appsettings:generateReleaseResources FROM-CACHE
+> Task :feature:appsettings:processReleaseNavigationResources FROM-CACHE
+> Task :feature:appsettings:javaPreCompileRelease FROM-CACHE
+> Task :feature:backup:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :feature:backup:generateReleaseBuildConfig
+> Task :feature:backup:generateReleaseResValues FROM-CACHE
+> Task :feature:backup:generateReleaseResources FROM-CACHE
+> Task :feature:backup:processReleaseNavigationResources FROM-CACHE
+> Task :feature:backup:javaPreCompileRelease FROM-CACHE
+> Task :feature:widget:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :feature:widget:generateReleaseBuildConfig
+> Task :feature:widget:generateReleaseResValues FROM-CACHE
+> Task :feature:widget:generateReleaseResources
+> Task :feature:widget:processReleaseNavigationResources
+> Task :feature:widget:javaPreCompileRelease FROM-CACHE
+> Task :feature:security:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :feature:security:generateReleaseBuildConfig
+> Task :feature:security:generateReleaseResValues FROM-CACHE
+> Task :feature:security:generateReleaseResources FROM-CACHE
+> Task :feature:security:processReleaseNavigationResources FROM-CACHE
+> Task :feature:security:javaPreCompileRelease FROM-CACHE
+> Task :data:push:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :data:push:generateReleaseBuildConfig
+> Task :data:push:generateReleaseResValues FROM-CACHE
+> Task :data:push:generateReleaseResources FROM-CACHE
+> Task :data:push:processReleaseNavigationResources FROM-CACHE
+> Task :data:push:javaPreCompileRelease FROM-CACHE
+> Task :core:common:mergeReleaseGeneratedProguardFiles
+> Task :core:common:exportReleaseConsumerProguardFiles
+> Task :core:android:mergeReleaseGeneratedProguardFiles
+> Task :core:android:exportReleaseConsumerProguardFiles
+> Task :core:designsystem:packageReleaseResources
+> Task :core:designsystem:parseReleaseLocalResources
+> Task :core:designsystem:generateReleaseRFile
+> Task :app:buildKotlinToolingMetadata
+> Task :core:locale:packageReleaseResources
+> Task :core:locale:parseReleaseLocalResources
+> Task :app:checkReleaseLocalDuplicateClasses
+> Task :core:locale:generateReleaseRFile
+> Task :prefs:packageReleaseResources
+> Task :prefs:parseReleaseLocalResources
+> Task :prefs:generateReleaseRFile
+> Task :core:storage:packageReleaseResources
+> Task :core:storage:parseReleaseLocalResources FROM-CACHE
+> Task :core:storage:generateReleaseRFile
+> Task :core:storage:compileReleaseKotlin
+w: Opt-in requirement marker kotlin.Experimental is unresolved. Please make sure it's present in the module dependencies
+w: Opt-in requirement marker androidx.compose.material3.ExperimentalMaterial3Api is unresolved. Please make sure it's present in the module dependencies
+w: Opt-in requirement marker androidx.lifecycle.compose.ExperimentalLifecycleComposeApi is unresolved. Please make sure it's present in the module dependencies
+w: file:///home/runner/work/2FA/2FA/core/storage/src/main/java/com/twofasapp/storage/internal/EncryptedSharedPreferencesFactory.kt:5:8 'class EncryptedSharedPreferences : Any, SharedPreferences' is deprecated. Deprecated in Java.
+w: file:///home/runner/work/2FA/2FA/core/storage/src/main/java/com/twofasapp/storage/internal/EncryptedSharedPreferencesFactory.kt:6:8 'class MasterKey : Any' is deprecated. Deprecated in Java.
+w: file:///home/runner/work/2FA/2FA/core/storage/src/main/java/com/twofasapp/storage/internal/EncryptedSharedPreferencesFactory.kt:11:23 'class MasterKey : Any' is deprecated. Deprecated in Java.
+w: file:///home/runner/work/2FA/2FA/core/storage/src/main/java/com/twofasapp/storage/internal/EncryptedSharedPreferencesFactory.kt:11:33 'constructor(p0: Context): MasterKey.Builder' is deprecated. Deprecated in Java.
+w: file:///home/runner/work/2FA/2FA/core/storage/src/main/java/com/twofasapp/storage/internal/EncryptedSharedPreferencesFactory.kt:14:27 'class MasterKey : Any' is deprecated. Deprecated in Java.
+w: file:///home/runner/work/2FA/2FA/core/storage/src/main/java/com/twofasapp/storage/internal/EncryptedSharedPreferencesFactory.kt:14:37 'enum class KeyScheme : Enum<MasterKey.KeyScheme!>' is deprecated. Deprecated in Java.
+w: file:///home/runner/work/2FA/2FA/core/storage/src/main/java/com/twofasapp/storage/internal/EncryptedSharedPreferencesFactory.kt:17:16 'class EncryptedSharedPreferences : Any, SharedPreferences' is deprecated. Deprecated in Java.
+w: file:///home/runner/work/2FA/2FA/core/storage/src/main/java/com/twofasapp/storage/internal/EncryptedSharedPreferencesFactory.kt:21:13 'class EncryptedSharedPreferences : Any, SharedPreferences' is deprecated. Deprecated in Java.
+w: file:///home/runner/work/2FA/2FA/core/storage/src/main/java/com/twofasapp/storage/internal/EncryptedSharedPreferencesFactory.kt:21:40 'enum class PrefKeyEncryptionScheme : Enum<EncryptedSharedPreferences.PrefKeyEncryptionScheme!>' is deprecated. Deprecated in Java.
+w: file:///home/runner/work/2FA/2FA/core/storage/src/main/java/com/twofasapp/storage/internal/EncryptedSharedPreferencesFactory.kt:22:13 'class EncryptedSharedPreferences : Any, SharedPreferences' is deprecated. Deprecated in Java.
+w: file:///home/runner/work/2FA/2FA/core/storage/src/main/java/com/twofasapp/storage/internal/EncryptedSharedPreferencesFactory.kt:22:40 'enum class PrefValueEncryptionScheme : Enum<EncryptedSharedPreferences.PrefValueEncryptionScheme!>' is deprecated. Deprecated in Java.
+> Task :core:storage:compileReleaseJavaWithJavac
+> Task :core:storage:bundleLibCompileToJarRelease
+> Task :core:locale:compileReleaseKotlin
+w: Opt-in requirement marker kotlin.Experimental is unresolved. Please make sure it's present in the module dependencies
+w: Opt-in requirement marker androidx.lifecycle.compose.ExperimentalLifecycleComposeApi is unresolved. Please make sure it's present in the module dependencies
+> Task :core:locale:compileReleaseJavaWithJavac
+> Task :core:locale:bundleLibCompileToJarRelease
+> Task :prefs:compileReleaseKotlin
+w: Opt-in requirement marker kotlin.Experimental is unresolved. Please make sure it's present in the module dependencies
+w: Opt-in requirement marker androidx.compose.material3.ExperimentalMaterial3Api is unresolved. Please make sure it's present in the module dependencies
+w: Opt-in requirement marker androidx.lifecycle.compose.ExperimentalLifecycleComposeApi is unresolved. Please make sure it's present in the module dependencies
+w: file:///home/runner/work/2FA/2FA/prefs/src/main/java/com/twofasapp/prefs/PreferencesPlainModule.kt:10:8 'class PinCodePreference : PreferenceString' is deprecated. Since version 2.1.10 use PinSecuredPreference.
+w: file:///home/runner/work/2FA/2FA/prefs/src/main/java/com/twofasapp/prefs/PreferencesPlainModule.kt:25:18 'constructor(preferences: Preferences): PinCodePreference' is deprecated. Since version 2.1.10 use PinSecuredPreference.
+w: file:///home/runner/work/2FA/2FA/prefs/src/main/java/com/twofasapp/prefs/internals/InstantSerializer.kt:14:1 @Serializer annotation has no effect on class 'object InstantSerializer : KSerializer<Instant>', because all members of KSerializer are already overridden
+w: file:///home/runner/work/2FA/2FA/prefs/src/main/java/com/twofasapp/prefs/model/RateAppStatus.kt:1:52 This declaration needs opt-in. Its usage should be marked with '@kotlinx.serialization.ExperimentalSerializationApi' or '@OptIn(kotlinx.serialization.ExperimentalSerializationApi::class)'
+> Task :prefs:compileReleaseJavaWithJavac
+> Task :prefs:bundleLibCompileToJarRelease
+> Task :data:session:packageReleaseResources
+> Task :data:session:parseReleaseLocalResources FROM-CACHE
+> Task :data:session:generateReleaseRFile
+> Task :data:session:compileReleaseKotlin
+w: Opt-in requirement marker kotlin.Experimental is unresolved. Please make sure it's present in the module dependencies
+w: Opt-in requirement marker androidx.compose.material3.ExperimentalMaterial3Api is unresolved. Please make sure it's present in the module dependencies
+w: Opt-in requirement marker androidx.lifecycle.compose.ExperimentalLifecycleComposeApi is unresolved. Please make sure it's present in the module dependencies
+> Task :data:session:compileReleaseJavaWithJavac
+> Task :data:session:bundleLibCompileToJarRelease
+> Task :feature:startup:packageReleaseResources
+> Task :feature:startup:parseReleaseLocalResources
+> Task :feature:startup:generateReleaseRFile
+> Task :parsers:packageReleaseResources
+> Task :parsers:parseReleaseLocalResources
+> Task :parsers:generateReleaseRFile
+> Task :parsers:compileReleaseKotlin
+w: Opt-in requirement marker kotlin.Experimental is unresolved. Please make sure it's present in the module dependencies
+w: Opt-in requirement marker androidx.compose.material3.ExperimentalMaterial3Api is unresolved. Please make sure it's present in the module dependencies
+w: Opt-in requirement marker androidx.lifecycle.compose.ExperimentalLifecycleComposeApi is unresolved. Please make sure it's present in the module dependencies
+> Task :parsers:compileReleaseJavaWithJavac
+> Task :parsers:bundleLibCompileToJarRelease
+> Task :core:network:packageReleaseResources
+> Task :core:network:parseReleaseLocalResources FROM-CACHE
+> Task :core:network:generateReleaseRFile
+> Task :core:designsystem:compileReleaseKotlin
+w: Opt-in requirement marker kotlin.Experimental is unresolved. Please make sure it's present in the module dependencies
+w: Opt-in requirement marker androidx.lifecycle.compose.ExperimentalLifecycleComposeApi is unresolved. Please make sure it's present in the module dependencies
+w: file:///home/runner/work/2FA/2FA/core/designsystem/src/main/java/com/twofasapp/designsystem/AppTheme.kt:16:8 'class WindowWidthSizeClass : Any' is deprecated. WindowWidthSizeClass will not be developed further, use WindowSizeClass instead.
+w: file:///home/runner/work/2FA/2FA/core/designsystem/src/main/java/com/twofasapp/designsystem/AppTheme.kt:111:35 'val windowWidthSizeClass: WindowWidthSizeClass' is deprecated. Use either isWidthAtLeastBreakpoint or isAtLeastBreakpoint to check matching bounds.
+w: file:///home/runner/work/2FA/2FA/core/designsystem/src/main/java/com/twofasapp/designsystem/AppTheme.kt:111:59 'class WindowWidthSizeClass : Any' is deprecated. WindowWidthSizeClass will not be developed further, use WindowSizeClass instead.
+w: file:///home/runner/work/2FA/2FA/core/designsystem/src/main/java/com/twofasapp/designsystem/AppTheme.kt:111:80 'val COMPACT: WindowWidthSizeClass' is deprecated. WindowWidthSizeClass not be developed further.
+w: file:///home/runner/work/2FA/2FA/core/designsystem/src/main/java/com/twofasapp/designsystem/common/CrossSlide.kt:45:37 'fun <T> updateTransition(transitionState: MutableTransitionState<T>, label: String? = ...): Transition<T>' is deprecated. Use rememberTransition() instead.
+w: file:///home/runner/work/2FA/2FA/core/designsystem/src/main/java/com/twofasapp/designsystem/common/ModalBottomSheet.kt:24:8 'class BottomSheetNavigator : Navigator<BottomSheetNavigator.Destination>' is deprecated. Migrate to Androidx compose.material.navigation BottomSheetNavigator with the same parameters. To migrate, change import from com.google.accompanist.navigation.material.BottomSheetNavigator to androidx.compose.material.navigation.BottomSheetNavigator.
+w: file:///home/runner/work/2FA/2FA/core/designsystem/src/main/java/com/twofasapp/designsystem/common/ModalBottomSheet.kt:32:27 'class BottomSheetNavigator : Navigator<BottomSheetNavigator.Destination>' is deprecated. Migrate to Androidx compose.material.navigation BottomSheetNavigator with the same parameters. To migrate, change import from com.google.accompanist.navigation.material.BottomSheetNavigator to androidx.compose.material.navigation.BottomSheetNavigator.
+w: file:///home/runner/work/2FA/2FA/core/designsystem/src/main/java/com/twofasapp/designsystem/common/ModalBottomSheet.kt:43:48 'fun ModalBottomSheetLayout(bottomSheetNavigator: BottomSheetNavigator, modifier: Modifier = ..., sheetShape: Shape = ..., sheetElevation: Dp = ..., sheetBackgroundColor: Color = ..., sheetContentColor: Color = ..., scrimColor: Color = ..., content: ComposableFunction0<Unit>): Unit' is deprecated. Migrate to Androidx compose.material.navigation ModalBottomSheetLayout with the same parameters. To migrate, change import from com.google.accompanist.navigation.material.ModalBottomSheetLayout to androidx.compose.material.navigation.ModalBottomSheetLayout.
+w: file:///home/runner/work/2FA/2FA/core/designsystem/src/main/java/com/twofasapp/designsystem/common/TwDivider.kt:19:5 'fun Divider(modifier: Modifier = ..., thickness: Dp = ..., color: Color = ...): Unit' is deprecated. Renamed to HorizontalDivider.
+w: file:///home/runner/work/2FA/2FA/core/designsystem/src/main/java/com/twofasapp/designsystem/common/TwOutlinedTextField.kt:68:38 'val outlinedShape: Shape' is deprecated. Renamed to `OutlinedTextFieldDefaults.shape`.
+w: file:///home/runner/work/2FA/2FA/core/designsystem/src/main/java/com/twofasapp/designsystem/dialog/Dialog.kt:164:9 'fun ClickableText(text: AnnotatedString, modifier: Modifier = ..., style: TextStyle = ..., softWrap: Boolean = ..., overflow: TextOverflow = ..., maxLines: Int = ..., onTextLayout: (TextLayoutResult) -> Unit = ..., onClick: (Int) -> Unit): Unit' is deprecated. Use Text or BasicText and pass an AnnotatedString that contains a LinkAnnotation. Check LinkAnnotation's documentation for more details and samples.
+w: file:///home/runner/work/2FA/2FA/core/designsystem/src/main/java/com/twofasapp/designsystem/ktx/ContextKtx.kt:133:41 'val allNetworks: Array<(out) Network!>' is deprecated. Deprecated in Java.
+w: file:///home/runner/work/2FA/2FA/core/designsystem/src/main/java/com/twofasapp/designsystem/reorderable/DetectReorder.kt:28:13 'suspend fun PointerInputScope.forEachGesture(block: suspend PointerInputScope.() -> Unit): Unit' is deprecated. Use awaitEachGesture instead. forEachGesture() can drop events between gestures.
+w: file:///home/runner/work/2FA/2FA/core/designsystem/src/main/java/com/twofasapp/designsystem/reorderable/DetectReorder.kt:51:13 'suspend fun PointerInputScope.forEachGesture(block: suspend PointerInputScope.() -> Unit): Unit' is deprecated. Use awaitEachGesture instead. forEachGesture() can drop events between gestures.
+w: file:///home/runner/work/2FA/2FA/core/designsystem/src/main/java/com/twofasapp/designsystem/reorderable/Reorderable.kt:34:9 'suspend fun PointerInputScope.forEachGesture(block: suspend PointerInputScope.() -> Unit): Unit' is deprecated. Use awaitEachGesture instead. forEachGesture() can drop events between gestures.
+w: file:///home/runner/work/2FA/2FA/core/designsystem/src/main/java/com/twofasapp/designsystem/service/DsService.kt:566:17 'fun Divider(modifier: Modifier = ..., thickness: Dp = ..., color: Color = ...): Unit' is deprecated. Renamed to HorizontalDivider.
+w: file:///home/runner/work/2FA/2FA/core/designsystem/src/main/java/com/twofasapp/designsystem/service/atoms/ServiceTimer.kt:38:9 'fun CircularProgressIndicator(progress: Float, modifier: Modifier = ..., color: Color = ..., strokeWidth: Dp = ..., trackColor: Color = ..., strokeCap: StrokeCap = ...): Unit' is deprecated. Use the overload that takes `progress` as a lambda.
+> Task :core:network:compileReleaseKotlin
+w: Opt-in requirement marker kotlin.Experimental is unresolved. Please make sure it's present in the module dependencies
+w: Opt-in requirement marker androidx.compose.material3.ExperimentalMaterial3Api is unresolved. Please make sure it's present in the module dependencies
+w: Opt-in requirement marker androidx.lifecycle.compose.ExperimentalLifecycleComposeApi is unresolved. Please make sure it's present in the module dependencies
+> Task :core:network:compileReleaseJavaWithJavac
+> Task :core:designsystem:compileReleaseJavaWithJavac
+> Task :core:network:bundleLibCompileToJarRelease
+> Task :data:notifications:packageReleaseResources
+> Task :data:notifications:parseReleaseLocalResources FROM-CACHE
+> Task :core:designsystem:bundleLibCompileToJarRelease
+> Task :data:notifications:generateReleaseRFile
+> Task :feature:startup:compileReleaseKotlin
+w: Opt-in requirement marker kotlin.Experimental is unresolved. Please make sure it's present in the module dependencies
+w: Opt-in requirement marker androidx.lifecycle.compose.ExperimentalLifecycleComposeApi is unresolved. Please make sure it's present in the module dependencies
+w: file:///home/runner/work/2FA/2FA/feature/startup/src/main/java/com/twofasapp/feature/startup/di/StartupModule.kt:10:9 'fun <reified R : ViewModel, reified T1> Module.viewModelOf(crossinline constructor: (T1) -> R, noinline options: (BeanDefinition<R>.() -> Unit)? = ...): KoinDefinition<R>' is deprecated. Moved ViewModel DSL package. Remove old imports and use org.koin.core.module.dsl.*.
+w: file:///home/runner/work/2FA/2FA/feature/startup/src/main/java/com/twofasapp/feature/startup/ui/startup/StartupScreen.kt:144:17 'fun HorizontalPagerIndicator(pagerState: PagerState, pageCount: Int, modifier: Modifier = ..., pageIndexMapping: (Int) -> Int = ..., activeColor: Color = ..., inactiveColor: Color = ..., indicatorWidth: Dp = ..., indicatorHeight: Dp = ..., spacing: Dp = ..., indicatorShape: Shape = ...): Unit' is deprecated. PagerIndicator for is deprecated, we recommend forking this implementation and
+   customising for your needs.
+For more migration information, please visit https://google.github.io/accompanist/pager/.
+> Task :data:notifications:compileReleaseKotlin
+w: Opt-in requirement marker kotlin.Experimental is unresolved. Please make sure it's present in the module dependencies
+w: Opt-in requirement marker androidx.compose.material3.ExperimentalMaterial3Api is unresolved. Please make sure it's present in the module dependencies
+w: Opt-in requirement marker androidx.lifecycle.compose.ExperimentalLifecycleComposeApi is unresolved. Please make sure it's present in the module dependencies
+> Task :feature:startup:compileReleaseJavaWithJavac
+> Task :feature:startup:mergeReleaseGeneratedProguardFiles
+> Task :feature:startup:exportReleaseConsumerProguardFiles
+> Task :core:cipher:packageReleaseResources
+> Task :core:cipher:parseReleaseLocalResources FROM-CACHE
+> Task :core:cipher:generateReleaseRFile
+> Task :data:notifications:compileReleaseJavaWithJavac
+> Task :data:notifications:bundleLibCompileToJarRelease
+> Task :core:otp:packageReleaseResources
+> Task :core:otp:parseReleaseLocalResources FROM-CACHE
+> Task :core:otp:generateReleaseRFile
+> Task :core:otp:compileReleaseKotlin
+w: Opt-in requirement marker kotlinx.coroutines.ExperimentalCoroutinesApi is unresolved. Please make sure it's present in the module dependencies
+w: Opt-in requirement marker kotlinx.coroutines.FlowPreview is unresolved. Please make sure it's present in the module dependencies
+w: Opt-in requirement marker kotlin.Experimental is unresolved. Please make sure it's present in the module dependencies
+w: Opt-in requirement marker androidx.compose.material3.ExperimentalMaterial3Api is unresolved. Please make sure it's present in the module dependencies
+w: Opt-in requirement marker androidx.lifecycle.compose.ExperimentalLifecycleComposeApi is unresolved. Please make sure it's present in the module dependencies
+> Task :core:otp:compileReleaseJavaWithJavac
+> Task :core:otp:bundleLibCompileToJarRelease
+> Task :data:cloud:packageReleaseResources
+> Task :data:cloud:parseReleaseLocalResources FROM-CACHE
+> Task :data:cloud:generateReleaseRFile
+> Task :core:cipher:compileReleaseKotlin
+w: Opt-in requirement marker kotlin.Experimental is unresolved. Please make sure it's present in the module dependencies
+w: Opt-in requirement marker androidx.compose.material3.ExperimentalMaterial3Api is unresolved. Please make sure it's present in the module dependencies
+w: Opt-in requirement marker androidx.lifecycle.compose.ExperimentalLifecycleComposeApi is unresolved. Please make sure it's present in the module dependencies
+> Task :core:cipher:compileReleaseJavaWithJavac
+> Task :core:cipher:bundleLibCompileToJarRelease
+> Task :data:services:packageReleaseResources
+> Task :data:services:parseReleaseLocalResources FROM-CACHE
+> Task :data:services:generateReleaseRFile
+> Task :feature:home:packageReleaseResources
+> Task :feature:home:parseReleaseLocalResources
+> Task :feature:home:generateReleaseRFile
+> Task :feature:qrscan:packageReleaseResources
+> Task :feature:qrscan:parseReleaseLocalResources FROM-CACHE
+> Task :feature:qrscan:generateReleaseRFile
+> Task :data:cloud:compileReleaseKotlin
+w: Opt-in requirement marker kotlin.Experimental is unresolved. Please make sure it's present in the module dependencies
+w: Opt-in requirement marker androidx.compose.material3.ExperimentalMaterial3Api is unresolved. Please make sure it's present in the module dependencies
+w: Opt-in requirement marker androidx.lifecycle.compose.ExperimentalLifecycleComposeApi is unresolved. Please make sure it's present in the module dependencies
+w: file:///home/runner/work/2FA/2FA/data/cloud/src/main/java/com/twofasapp/data/cloud/googleauth/GoogleAuthImpl.kt:7:8 'class GoogleSignIn : Any' is deprecated. Deprecated in Java.
+w: file:///home/runner/work/2FA/2FA/data/cloud/src/main/java/com/twofasapp/data/cloud/googleauth/GoogleAuthImpl.kt:8:8 'class GoogleSignInOptions : AbstractSafeParcelable, Api.ApiOptions.Optional, ReflectedParcelable' is deprecated. Deprecated in Java.
+w: file:///home/runner/work/2FA/2FA/data/cloud/src/main/java/com/twofasapp/data/cloud/googleauth/GoogleAuthImpl.kt:27:33 'class GoogleSignInOptions : AbstractSafeParcelable, Api.ApiOptions.Optional, ReflectedParcelable' is deprecated. Deprecated in Java.
+w: file:///home/runner/work/2FA/2FA/data/cloud/src/main/java/com/twofasapp/data/cloud/googleauth/GoogleAuthImpl.kt:32:26 'class GoogleSignIn : Any' is deprecated. Deprecated in Java.
+w: file:///home/runner/work/2FA/2FA/data/cloud/src/main/java/com/twofasapp/data/cloud/googleauth/GoogleAuthImpl.kt:46:21 'class GoogleSignIn : Any' is deprecated. Deprecated in Java.
+w: file:///home/runner/work/2FA/2FA/data/cloud/src/main/java/com/twofasapp/data/cloud/googleauth/GoogleAuthImpl.kt:64:17 'class GoogleSignIn : Any' is deprecated. Deprecated in Java.
+w: file:///home/runner/work/2FA/2FA/data/cloud/src/main/java/com/twofasapp/data/cloud/googleauth/GoogleAuthImpl.kt:65:30 'class GoogleSignInOptions : AbstractSafeParcelable, Api.ApiOptions.Optional, ReflectedParcelable' is deprecated. Deprecated in Java.
+w: file:///home/runner/work/2FA/2FA/data/cloud/src/main/java/com/twofasapp/data/cloud/googleauth/GoogleAuthImpl.kt:80:17 'class GoogleSignIn : Any' is deprecated. Deprecated in Java.
+w: file:///home/runner/work/2FA/2FA/data/cloud/src/main/java/com/twofasapp/data/cloud/googleauth/GoogleAuthImpl.kt:81:30 'class GoogleSignInOptions : AbstractSafeParcelable, Api.ApiOptions.Optional, ReflectedParcelable' is deprecated. Deprecated in Java.
+w: file:///home/runner/work/2FA/2FA/data/cloud/src/main/java/com/twofasapp/data/cloud/googleauth/GoogleAuthImpl.kt:94:16 'class GoogleSignIn : Any' is deprecated. Deprecated in Java.
+w: file:///home/runner/work/2FA/2FA/data/cloud/src/main/java/com/twofasapp/data/cloud/googleauth/GoogleAuthImpl.kt:105:29 'fun <T : Parcelable!> getParcelableExtra(p0: String!): T?' is deprecated. Deprecated in Java.
+> Task :feature:qrscan:compileReleaseKotlin
+w: Opt-in requirement marker kotlin.Experimental is unresolved. Please make sure it's present in the module dependencies
+w: Opt-in requirement marker androidx.lifecycle.compose.ExperimentalLifecycleComposeApi is unresolved. Please make sure it's present in the module dependencies
+w: file:///home/runner/work/2FA/2FA/feature/qrscan/src/main/java/com/twofasapp/feature/qrscan/QrScan.kt:48:26 'val LocalLifecycleOwner: ProvidableCompositionLocal<LifecycleOwner>' is deprecated. Moved to lifecycle-runtime-compose library in androidx.lifecycle.compose package.
+> Task :feature:qrscan:compileReleaseJavaWithJavac
+> Task :data:cloud:compileReleaseJavaWithJavac
+> Task :feature:qrscan:bundleLibCompileToJarRelease
+> Task :data:cloud:bundleLibCompileToJarRelease
+> Task :feature:secrets:packageReleaseResources
+> Task :feature:secrets:parseReleaseLocalResources FROM-CACHE
+> Task :feature:secrets:generateReleaseRFile
+e: file:///home/runner/work/2FA/2FA/feature/secrets/src/main/java/com/twofasapp/feature/secrets/data/SecretsRepository.kt:220:30 None of the following candidates is applicable:
+constructor(p0: File, p1: Context, p2: String, p3: EncryptedFile.FileEncryptionScheme): EncryptedFile.Builder
+> Task :feature:secrets:compileReleaseKotlin FAILED
+constructor(p0: Context, p1: File, p2: MasterKey, p3: EncryptedFile.FileEncryptionScheme): EncryptedFile.Builder
+e: file:///home/runner/work/2FA/2FA/feature/secrets/src/main/java/com/twofasapp/feature/secrets/data/SecretsRepository.kt:225:11 Unresolved reference 'build'.
+e: file:///home/runner/work/2FA/2FA/feature/secrets/src/main/java/com/twofasapp/feature/secrets/ui/SecretsScreen.kt:240:21 No parameter with name 'reorderableState' found.
+e: file:///home/runner/work/2FA/2FA/feature/secrets/src/main/java/com/twofasapp/feature/secrets/ui/SecretsScreen.kt:241:21 No value passed for parameter 'state'.
+e: file:///home/runner/work/2FA/2FA/feature/secrets/src/main/java/com/twofasapp/feature/secrets/ui/SecretsScreen.kt:764:21 No parameter with name 'reorderableState' found.
+e: file:///home/runner/work/2FA/2FA/feature/secrets/src/main/java/com/twofasapp/feature/secrets/ui/SecretsScreen.kt:765:21 No value passed for parameter 'state'.
+e: file:///home/runner/work/2FA/2FA/feature/secrets/src/main/java/com/twofasapp/feature/secrets/ui/SecretsScreen.kt:827:17 Unresolved reference 'generatorFor'.
+e: file:///home/runner/work/2FA/2FA/feature/secrets/src/main/java/com/twofasapp/feature/secrets/ui/SecretsScreen.kt:836:17 @Composable invocations can only happen from the context of a @Composable function
+e: file:///home/runner/work/2FA/2FA/feature/secrets/src/main/java/com/twofasapp/feature/secrets/ui/SecretsScreen.kt:1201:29 No parameter with name 'reorderableState' found.
+e: file:///home/runner/work/2FA/2FA/feature/secrets/src/main/java/com/twofasapp/feature/secrets/ui/SecretsScreen.kt:1202:29 No value passed for parameter 'state'.
+e: file:///home/runner/work/2FA/2FA/feature/secrets/src/main/java/com/twofasapp/feature/secrets/ui/SecretsSettingsCard.kt:24:34 Unresolved reference 'koinInject'.
+e: file:///home/runner/work/2FA/2FA/feature/secrets/src/main/java/com/twofasapp/feature/secrets/ui/SecretsSettingsCard.kt:27:57 Unresolved reference 'koinInject'.
+> Task :data:services:compileReleaseKotlin
+w: Opt-in requirement marker kotlin.Experimental is unresolved. Please make sure it's present in the module dependencies
+w: Opt-in requirement marker androidx.compose.material3.ExperimentalMaterial3Api is unresolved. Please make sure it's present in the module dependencies
+w: Opt-in requirement marker androidx.lifecycle.compose.ExperimentalLifecycleComposeApi is unresolved. Please make sure it's present in the module dependencies
+w: file:///home/runner/work/2FA/2FA/data/services/src/main/java/com/twofasapp/data/services/BackupRepositoryImpl.kt:74:9 This is a delicate API and its use requires care. Make sure you fully read and understand documentation of the declaration that is marked as a delicate API.
+w: file:///home/runner/work/2FA/2FA/data/services/src/main/java/com/twofasapp/data/services/local/ServicesLocalSource.kt:135:9 This is a delicate API and its use requires care. Make sure you fully read and understand documentation of the declaration that is marked as a delicate API.
+358 actionable tasks: 255 executed, 103 from cache
+FAILURE: Build failed with an exception.
+* What went wrong:
+Execution failed for task ':feature:secrets:compileReleaseKotlin'.
+> A failure occurred while executing org.jetbrains.kotlin.compilerRunner.GradleCompilerRunnerWithWorkers$GradleKotlinCompilerWorkAction
+   > Compilation error. See log for more details
+* Try:
+> Run with --stacktrace option to get the stack trace.
+> Run with --info or --debug option to get more log output.
+> Run with --scan to generate a Build Scan (Powered by Develocity).
+> Get more help at https://help.gradle.org.
+BUILD FAILED in 7m 10s
+Configuration cache entry stored.
+Error: Process completed with exit code

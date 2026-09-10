@@ -1,0 +1,200 @@
+Now see, whatever I am telling you now, this will be the completely new feature that would be added in our app. And make sure you will not touch any of the features of the existing app. Do not interfere with that. Okay? 100% they should be different, and these features are different. Now, just make a new More tab next to the Token tab. Now, this tab named will be Secrets. Now, you just take the Secrets perfect SVG icon for it. Okay? Perfect SVG icon. In that, what you do? You have to make the perfect... Now, whatever you are doing now, completely in a modern, premium UI design, layout and everything, the visual, completely modern and premium appearance. Okay. So, in that tab, you have to just give a top header. Okay? Perfect top header. Then below it, just you have to add three boxes per row and... Okay. Means, in a row-wise, we could say that three box, perfect box. Okay, just make a premium modern box. Okay. And you have to make the box for each. Okay. Such that horizontally, there will be three boxes. Okay. Like that, it will be continued. Okay. So, the first box will be the Password Manager. Okay? Then Note Manager, then Debit/Credit Card Manager, Wi-Fi Manager, API Key Manager, SSH Key Manager, Bank Account Manager. Okay. Identity Manager. GitHub. Sorry. Personal Token Manager. Means, . P-A-T. Okay. Then see. So, this is our boxes. Okay. Now, on the top header, what you do, just you add a perfect SVG icon for reordering button. Now, when I tap on that button, now it will come in a reordering page. Okay. All will come in a reordering page. Now, I can just hold any and drag to any position so that they can be reordered perfectly. Okay. And again, when I tap on that button, it just exits that reordering mode. So, use the perfect indicator. All must be in the modern premium UI. Then next to it, add the comment SVG icon on the top header. Okay. Perfect SVG icon. When I tap on it, it adds the star rating. Means they will be five stars. Okay. On one tap, they will be 0.5 in each. Like that, there will be up to five-star rating. Okay. And below it, there will be a comment box, then Submit button. Now see, actually, this is not the comment something. It is a hidden manager, okay, that will hide the box. That will hide the complete box. Okay. And those now means at a perfect rating and a perfect comment, only when you just tap Submit, then it will show that box just for the time in which you are inside the tab. As you exit the tab, it automatically again hidden. Okay. And its perfect rating and its perfect comment, that will be its password, and it will be add later Now see. Now, on each boxes, when we long press, then it opens a perfect dialog with the premium modern options. In a premium modern UI, it will show the options like Remove, Pin, Hide. Okay. And if someone is already hidden and we have used the Comment button to unhide it for a time, then when I long press on it for that time, then it will show Unhide button. Okay. Now, see what happens when we tap Remove. Now, as we long press on it and we just tap on the Remove button, then what it will do, it will remove that box from the UI, and it will automatically come to the options of Plus box. Now, at the end of the last box, there will be a Plus model box. Then there will be a Plus in that, so that we can add more boxes like that. So, as I tap on it, it will again open a modal premium dialog. Okay, there it will be showing all the boxes that we have removed. Okay? It will not show the boxes which are already present. It will only show the boxes which we have removed. Okay. That we have removed. Now, at the end, there will be one more option there when we tap on that Plus box. In that, there will be a Custom Manager option. When we tap on it, it first asks a box name. So we just tap and it asks a box name. Then it makes a box with that name. Now, when we single tap on that box, it will open it. And whatever the inside it, I will tell you later. Okay So, on the top header, means along that two previous existing buttons, add one more button that is trash or recycle bin. Okay. Now it is a universal trash bin for all the boxes in which we will delete any type of entry in them then. Now, there it will open a screen in a modern premium UI, showing the entry that we have deleted with all its information along with in which box it was present. Okay. And it will be exactly the same features that I will tell you later when we tap any box and in that what will be the features I will tell you. Okay Now I am telling you, when we single tap on any box, then what will be inside it. So as we tap inside any box, then it will open a screen in a modern premium UI. So it will have a modern premium header with the buttons, the same comment button with the same feature, the same reordering button with the same feature, and a trash button. Okay, but this trash will only show the entries of that particular box. Okay. Then now see. Inside the box, now all the entries will be in the list form. Now, so as we type, then on the beginning, there will be a first horizontal plus icon button, the modern and premium. When we tap on it, then it will open a screen in a modern premium UI. Okay, with the modern premium looking make sure. Now, what entries it will ask? It will ask the title. Okay, first input is title, second is email/username, third is password, fourth is 2FA secret or TOTP. Fourth one is website. Then after that, add More Field  Button. When you tap add custom field, then Then it will again open a premium dialog, okay, with the fields. It will give the pre-sample of the field like recovery code, security question, okay? Then pass key. Now, these are just options. If they want to add, just they have to click it, and they will add. And at the last of that options, there will be custom field option. Okay. That would have these elements. When we tap that custom field option Then it will make a new field, asking the first field name after that field value. Okay? And once you add, it will again come below to it, again, the same add field button. Now, below to the add field button, then after more field button  there will be a note-taking, and then after that there will be an attachment. Now, make sure in each box there will be having  more field button Now see, in the Note Manager, you customize it. Okay? However you want to make it, make it perfect, but in the modern premium UI. Okay? after the last field, and after that there will be note, and after that there will be attachment. Now in that attachment button, as you tap on it, now you can add image. Okay? PDF, JSON file or any text file or any other type. It can take any format of the file. Any means any. Okay? Any format of the file. And if you are taking or accepting any format of the file, then you have to make the viewer fit. It means the viewer for that attachment. It means when I will tap on it, it will open its universal viewer so that you can view that attachment. Now, make sure each and every field must have their own modern and premium-looking appearance. Just like title, note, and everything. Make perfect modern, premium looks. Okay? Make sure everything is perfect, unique, modern, premium. You decide how it will be. Okay. Now, and at the end, there will be a save button.   But remember that whatever the field it has or we have added, okay. Now, on those fields, when we long press, then it will show the options like Remove. When we tap Remove, that input field will get removed, and it will be added into the More Field button option. Okay. Now, and many other options, they will be like Reordering. Now, as we tap Reordering, now we can reorder all the input fields between the title and the More Field button. We can reorder it perfectly by dragging it. So again, the same thing. And again, we can exit the reordering by a button tapping. So you just decide perfectly, and make sure that each and every input field will have the Test button, okay? Each and every field will have a Test button at the right end. Okay. Now, as we have tapped Save, then it will get saved. and then reture to main page of that box showing list ok after newly addded that  plus button come below it ok Now, whatever we have done, it was the first time. It is something that will happen when we tap on the plus button of that box, then it will open that screen. But after saving an entry, now you have the complete list. In a single tap, it will open a perfect dialogue. With all the title, all the inputs bar, all the input field names and values, everything. Means it will just, all the attachments and every attachment and its name and showing the button to open it in the viewer and all the notes and everything. And each and every field value will have a copy button at their right end. But when we tap on any list, then it will open the dialogue. In there, it will have all of them in a modern premium UI. Fully modern premium UI. And with her. And make sure it is perfect. And as we tap out of the box, then it will again, means that dialogue will disappear. Do your best. Now, this was when we tap single time, when we tap on the list. But when we long press on the list, then it will open again a dialogue with the options like Delete or Edit, Pin, and Hide. These will be the options. Now, when we tap Edit, it will open the same screen, but all the preloaded values that we have saved, and we can edit it, again save it, and the same thing. Now, what you have done, now you are having every feature of every box. Now, I will just telling you the field name that every box will have, and all the features will be common in all the boxes other than that. Okay? Because I have told everything to you. Make sure you build everything in a perfect modern premium UI  So, in the Note Manager, I have already told you that you decide how you want to design the Note Manager. Okay? You just design it perfectly. Perfect means perfect. You design it  like tile amd more  and at last attachment It is on you how you want to design, make it completely modern, premium, and the best note manager. Now, in the debit/credit card manager, title, cardholder name, card type, card number, expiry date. Now, in expiry date, it will be having the perfect modern date picker. Make sure that it opens a perfect dialog to choose the date perfectly with the year roller and date and the month roller . The perfect one. Okay? In the modern UI, I want to say. And then next, after the expiry date, CVV, then pin. After that, the same more field button. When we tap on it, it will have the options bank/ issuer, then billing address, then card nickname, and then after that, the same custom field button in that. And after the more button field, there will be note and attachment. You already know those  Now in the Wi-Fi manager. Now, this is a special something. Now something this is very special. Means for that, it will again have an Add button, but when we tap Add, it open a perfect dialogue. Okay? A perfect modern premium dialogue. Okay? And showing each and every Wi-Fi name present nearby. Means if you want, you can ask for the permission of the Wi-Fi. Okay, you just ask the permission, I will give it. Then you just discover all the Wi-Fi names, okay, with all the details. Then you just select on it, then you just ask for the password, and if the password is correct, then show all its information and save it, okay, with a Save button. And as I tap Save, now it will become a list. Okay? And again, the same, it will become list, and after that again, the Add plus button will be below it. But again, the same thing, long press, single tap. I already told you. But you have to design it perfect in the modern premium. However you want to design, design it perfectly, okay? Then API key manager. In that API key manager title, service/provider API key, API secret, token, API hash, API ID, endpoint or base URL, environment , then project or /account ID, then expiration date, then the permission/scopes. Then the same Add more button. When we tap on it, it will have the options that I have told you just above this. Means whatever the options or the field I have told you for the API key manager, you just choose the best what it should have. Other than that, you just keep all of them in Add more field button, okay? And after that, the same note attachment Then Bank Account Manager. Then the title, after that account holder name, then bank name, then account number, then account type, then IFC code, then branch, then customer ID/CIF number/CRN number. Okay. Then UPI ID. Okay, then net banking username, then net banking password. Then after that the same add more field button, and in that whatever options you want to add, you can add in that. Then add custom more button, and then after the add more field, then note, then attachment. Now, see. In the Identity Manager: title, full name, then mobile number, email address. Okay, these are the main things. Then the same thing, attachment and note. Okay, and in the plus more button, when we tap on it, in that it will have the options like driving license number, Aadhaar number, PAN number. Okay. And then again, add custom field button. Then SSH key manager. In that title, public key, private key, username, host, then again, add more field button. In that, whatever you want to add the options you can add, and after that the same. In that only, the custom field button, then after the add mode button, the same thing, note attachment. Now, the custom manager box. The same thing. The title or however you want to design it. Now design perfectly. Okay. Whatever you want to design, but design perfectly. And you already know that each will have the note attachment and add more field button, all will have. And with the same features and functionality. But you have to design it in the modern premium UI. Perfect. Okay. And before the custom manager box, just make a box for app development credential. In that, it will have the base64 key store, then key store password, then key alias, then key alias password. Okay. Then add more field something. Okay, then again the same thing. Add more field but the same dialogue and options, whatever you want to add, you can add it. The same note and then attachment. Okay. And after the custom manager box, I have already told that you have to add a plus box. And I already told you about the features and all the things. Now see, on each box, make sure you show the total number of entries they have. Okay? And however you want to design, design it perfectly And make sure each and every file, each and every input, each and everything are completely locally encrypted, 100%. They should be completely encrypted. Make sure of that. All must be 100% encrypted. Everything should be encrypted locally. Now, I have told you about that comment button. Now, in the setting, you just go and add a comment manager option. When I tap on it, it will open a dialog, asking the current comment feedback. If I mention the comments for the first time, it will open the setup dialog, means asking the rating you want to give. Just give and write the comment and set as in hidden lock. Next time, when I want to change the comment hidden system mechanism, then it will ask the previous one. Then we can add the new one. Just change into the new rating and comment password. Now, after that, in the setting, you can see that. First of all, what you do, you just make a separate pop card for the secret tab. In that, you add that comment manager. And after that, you just add backup. Means fully encrypted backup file. What it will do? It will make a fully encrypted backup file that will open the SAF and it will save there. Now, when it comes to restore, I will select that same file and I can restore it. But they will be 100% encrypted files. 100% encrypted. Fully locally encrypted files. And just like you can see already in our app, we have the backup and restore. Sorry, we already have export and import key or the token option for our previous app. We already did that. Exactly the same manner. In this, when we are backuping it, in that backup or the restoration, in that backup when we are making, it will ask whether you want to lock the backup file or not, means with the password, so that when we restore it, it will first ask that password. If it is right, then it will backup it. Then it will restore it, sorry. Now, because the backup file will include each and every attachment as well, so I think you have to make such a custom file backup now that can restore everything exactly, each and everything. Each and every box, each and every field, each and every data, each and every values. But all of them are fully encrypted, so that if someone opens that backup file, they could not get anything because it will be perfectly locally encrypted. So make sure the backup and restore should 100% work perfectly and 100% encrypted. Okay. Now see, in case of password manager, there in the password input bar, first of all, we already know that each and every input field already have the paste button in the right end. But in case of password manager, in that password field, along with that paste button in the right end, it will have a generate password button. Now, when I tap on it, it will open a perfect modern premium dialogue for generating the password. Now, see, I am giving you a screenshot of the image. There you could see how the password generator it would be.   Acc to me it should be like this but u design in modern premium ui acc to u ok    Based on your images and detailed requirements, here’s the complete UI/UX specification for a modern premium password generator dialog — fully designed with all features, interactions, and premium touches.
+
+---
+
+🎨 Dialog Layout (Premium Dark/Light Theme)
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│  🔐 GENERATE PASSWORD                                      │
+│                                                             │
+│  ┌──────────────────────────────────────────────────────┐   │
+│  │  aK7!mQ2#vP9@xL4                                    │   │
+│  │  [👁] [📋] [🔄]                                     │   │
+│  └──────────────────────────────────────────────────────┘   │
+│                                                             │
+│  Strength: ●●●●●○  Very Strong  (Entropy: ~94 bits)       │
+│                                                             │
+│  ▼ Basic Options                                            │
+│  ┌──────────────────────────────────────────────────────┐   │
+│  │ Password Type:  [Random ▼] [Memorable] [PIN] [Phrase]│   │
+│  │ Length:         4  [─────●──────────]  64  [−] [+] │   │
+│  │ Character Sets:  ☑ A–Z  ☑ a–z  ☑ 0–9  ☑ Symbols   │   │
+│  │                  ☐ Extended Symbols                  │   │
+│  └──────────────────────────────────────────────────────┘   │
+│                                                             │
+│  ▼ Advanced Options                                         │
+│  ┌──────────────────────────────────────────────────────┐   │
+│  │ Exclude Ambiguous:  ☑ O 0 I l 1                     │   │
+│  │ Exclude Similar:     ☐ (e.g., 5/S, 8/B)             │   │
+│  │ Custom Exclusions:   [________________]             │   │
+│  │                                                      │   │
+│  │ Rules:                                               │   │
+│  │ Min Uppercase: [1]  Min Lowercase: [1]              │   │
+│  │ Min Numbers:   [1]  Min Symbols:   [0]              │   │
+│  │ ☑ Avoid repeated characters                          │   │
+│  │ ☐ Avoid sequential characters (abc, 123)            │   │
+│  └──────────────────────────────────────────────────────┘   │
+│                                                             │
+│  ▼ Passphrase Options (if Memorable/Phrase selected)       │
+│  ┌──────────────────────────────────────────────────────┐   │
+│  │ Number of Words:  3  [−] [+]                        │   │
+│  │ Separator:         [Hyphen (-) ▼]                   │   │
+│  │                     _ Underscore                     │   │
+│  │                     . Period                        │   │
+│  │                     [Space]                         │   │
+│  │ ☑ Capitalize words                                  │   │
+│  │ ☑ Include numbers                                   │   │
+│  │ ☑ Include symbols                                   │   │
+│  └──────────────────────────────────────────────────────┘   │
+│                                                             │
+│  [  GENERATE PASSWORD  ]                                    │
+│                                                             │
+│  [Use Password]  [Save to Credentials]  [Copy & Close]    │
+└─────────────────────────────────────────────────────────────┘
+```
+
+---
+
+✅ Feature Breakdown (Full Implementation)
+
+1. Password Type (Top toggle group)
+
+· Random – fully randomized characters
+· Memorable – pronounceable syllables
+· PIN – numeric only (4–8 digits)
+· Passphrase – word-based with separators
+
+---
+
+2. Length Control
+
+· Slider with min 4 / max 64
+· − / + buttons for fine adjustment
+· Live numeric display next to slider
+
+---
+
+3. Character Options
+
+· Checkboxes for:
+  · Uppercase (A–Z)
+  · Lowercase (a–z)
+  · Numbers (0–9)
+  · Symbols (!@#$%^&*)
+  · Extended Symbols (optional: ~ | \ [ ] { } etc.)
+
+---
+
+4. Exclusions
+
+· Ambiguous characters – auto-block: O 0 I l 1
+· Similar characters – block S/5, B/8, G/6
+· Custom exclusion box – type any chars to exclude
+
+---
+
+5. Password Rules (Advanced)
+
+· Minimum count per type:
+  · Uppercase, Lowercase, Numbers, Symbols
+· Avoid repeated characters (aa, 111)
+· Avoid sequential characters (abcd, 1234)
+
+---
+
+6. Passphrase Options
+
+· Only visible when Memorable or Passphrase is selected
+· Number of words (2–10) with − / +
+· Separator dropdown:
+  · Hyphen (-)
+  · Underscore (_)
+  · Period (.)
+  · Space ( )
+· Capitalize words (toggle)
+· Include numbers (toggle)
+· Include symbols (toggle)
+
+---
+
+7. Strength & Entropy
+
+· Real-time strength bar with 5 levels:
+  · Weak (red)
+  · Fair (orange)
+  · Good (yellow)
+  · Strong (green)
+  · Very Strong (bright green)
+· Entropy estimate in bits (e.g., ~94 bits)
+
+---
+
+8. Live Preview
+
+· Large, monospace font
+· 👁 Show/Hide toggle
+· 📋 Copy to clipboard with feedback
+· 🔄 Regenerate without closing dialog
+
+---
+
+9. Generate Button
+
+· Prominent, full-width or centered
+· Triggers regeneration with current settings
+
+---
+
+10. Action Buttons
+
+· Use Password – fills into active field
+· Save to Credentials – saves securely (if integrated)
+· Copy & Close – copies and dismisses dialog
+
+---
+
+💎 Premium UI Touches
+
+Element Design Detail
+Header "GENERATE PASSWORD" in small caps, subtle gradient or icon
+Preview Box Glassmorphism or bordered card, with action icons on right
+Strength Bar Animated on generation, with tooltip on hover for entropy
+Sections Collapsible (▼ / ▶) to keep UI clean
+Typography Modern sans-serif (Inter, SF Pro)
+Spacing Generous padding, 16–24px grid
+Colors Neutral background + accent color for primary actions
+Icons Consistent outline style (Feather or Lucide)
+Hover/Active Smooth transitions, subtle shadows
+Keyboard shortcuts Ctrl+Enter to generate, Esc to close
+
+---
+
+🧠 Interaction Logic
+
+· Changing any setting auto-regenerates the password (optional toggle)
+· Exclusions and Rules apply immediately to preview
+· Passphrase section auto-hides when not relevant
+· Copy shows a toast/snackbar: "Copied!"
+· Save opens a sub-dialog or inline field to name the credential
+
+---
+
+📱 Responsive Behavior
+
+· On smaller screens:
+  · Collapse all sections by default
+  · Stack buttons vertically
+  · Use full-width inputs
+
+---
+
+🧪 Example Output
+
+Settings Result
+Random, 16 chars, all sets aK7!mQ2#vP9@xL4
+Memorable, 12 chars bravo-tango-9X
+PIN, 6 digits 483729
+Passphrase, 4 words, capitalized, underscore Sunny_Day_Coffee_42
+
+Please design all feature in modern premium ui and design and And make sure, please do not interfere with my existing app. You have to add the features. Don't interfere in the working on the login of my existing app, okay?  and for full new feature use modern premium icons ok
