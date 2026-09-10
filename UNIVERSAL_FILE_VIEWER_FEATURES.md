@@ -1,0 +1,61 @@
+# Universal File Viewer Features
+
+- Premium dark VoltShare viewer shell
+- File-name header with back navigation
+- Full-screen mode with system-bar hiding
+- Full-screen back gesture to restore the viewer shell
+- File information panel
+- MIME type, file size, extension, storage, access, and checksum details
+- Private-vault access gate before preview
+- Large-image sampled decoding
+- Pinch-to-zoom image viewing
+- Drag-to-pan image viewing
+- Double-tap image zoom
+- Image rotation controls
+- Image zoom reset
+- Image zoom controls
+- Video playback through a custom media surface
+- Audio playback through the same media surface
+- Tap-to-show and auto-hide media controls
+- Play and pause
+- Ten-second rewind
+- Ten-second forward
+- Seek slider
+- Current-time and total-duration labels
+- Mute and unmute
+- Playback speed selection
+- Video fit-to-view playback
+- Audio identity surface
+- Media full-screen mode
+- PDF page rendering
+- Previous-page and next-page navigation
+- PDF page counter
+- Pinch-to-zoom PDF pages
+- Drag-to-pan PDF pages
+- PDF double-tap zoom
+- PDF zoom reset
+- PDF zoom controls
+- PDF full-screen mode
+- UTF-8 text and source-code preview
+- Interactive text search
+- Match count
+- Previous-match and next-match navigation
+- Automatic match selection and scrolling
+- Selectable text
+- Copy-all text action
+- Monospace code presentation
+- Adjustable text size
+- Word-wrap toggle
+- Horizontal scrolling for long lines
+- Text full-screen mode
+- Chrome Incognito action for selected HTTP and HTTPS URLs
+- APK installer preview
+- XAPK and APKS installer preview
+- Android package installation handoff
+- Unknown-file metadata preview
+- Binary header hex preview
+- Generic-file read-only mode
+- Open-with chooser using the original MIME type
+- FileProvider read permission handoff
+- Render-failure states for unsupported or damaged files
+- Large-text preview protection

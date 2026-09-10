@@ -55,6 +55,8 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.rememberTransformableState
+import androidx.compose.foundation.gestures.transformable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -99,11 +101,22 @@ import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Fingerprint
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.FolderOpen
+import androidx.compose.material.icons.filled.FastForward
+import androidx.compose.material.icons.filled.Fullscreen
+import androidx.compose.material.icons.filled.FullscreenExit
 import androidx.compose.material.icons.filled.Image
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.LockOpen
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.NavigateBefore
+import androidx.compose.material.icons.filled.NavigateNext
+import androidx.compose.material.icons.filled.Pause
+import androidx.compose.material.icons.filled.PictureAsPdf
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Replay
+import androidx.compose.material.icons.filled.Replay10
+import androidx.compose.material.icons.filled.RotateRight
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.SelectAll
@@ -111,11 +124,17 @@ import androidx.compose.material.icons.filled.Sort
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Smartphone
+import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.StarBorder
 import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material.icons.filled.TextSnippet
 import androidx.compose.material.icons.filled.VideoLibrary
+import androidx.compose.material.icons.filled.VolumeOff
+import androidx.compose.material.icons.filled.VolumeUp
+import androidx.compose.material.icons.filled.WrapText
+import androidx.compose.material.icons.filled.ZoomIn
+import androidx.compose.material.icons.filled.ZoomOut
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -130,8 +149,11 @@ import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Slider
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.TopAppBar
@@ -143,7 +165,9 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -178,10 +202,14 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.core.graphics.drawable.toBitmap
+import androidx.core.content.FileProvider
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
 import androidx.fragment.app.FragmentActivity
 import androidx.documentfile.provider.DocumentFile
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.media3.common.MediaItem
+import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.PlayerView
 import kotlinx.coroutines.Dispatchers
@@ -4445,32 +4473,64 @@ private fun ChangeLockDialog(
 @OptIn(ExperimentalMaterial3Api::class)
 private fun FileViewerScreen(activity: MainActivity, vault: VaultRepository, file: VaultFile, onBack: () -> Unit) {
     val prepared = remember(file.id) { vault.prepareViewing(file) }
+    var fullscreen by remember(file.id) { mutableStateOf(false) }
+    var showInfo by remember(file.id) { mutableStateOf(false) }
+    val insetsController = remember(activity) {
+        WindowInsetsControllerCompat(activity.window, activity.window.decorView)
+    }
+    LaunchedEffect(fullscreen) {
+        if (fullscreen) {
+            insetsController.hide(WindowInsetsCompat.Type.systemBars())
+        } else {
+            insetsController.show(WindowInsetsCompat.Type.systemBars())
+        }
+    }
+    androidx.compose.runtime.DisposableEffect(Unit) {
+        onDispose {
+            insetsController.show(WindowInsetsCompat.Type.systemBars())
+        }
+    }
+    BackHandler(enabled = fullscreen) { fullscreen = false }
     Column(Modifier.fillMaxSize().background(VoltBlack)) {
-        TopAppBar(
-            title = { Text(file.name, maxLines = 1, color = Color.White) },
-            navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.Default.ArrowBack, "Back", tint = Color.White) } },
-            colors = TopAppBarDefaults.topAppBarColors(containerColor = VoltBlack),
-        )
+        if (!fullscreen) {
+            TopAppBar(
+                title = { Text(file.name, maxLines = 1, color = Color.White) },
+                navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.Default.ArrowBack, "Back", tint = Color.White) } },
+                actions = {
+                    IconButton(onClick = { showInfo = true }) {
+                        Icon(Icons.Default.Info, "File information", tint = VoltGreen)
+                    }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = VoltBlack),
+            )
+        }
         if (prepared == null) {
             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 Text("This file could not be opened.", color = VoltTextMuted)
             }
         } else {
             when {
-                isImage(file) -> ImageViewer(prepared!!)
-                isVideo(file) -> VideoViewer(prepared!!)
-                isAudio(file) -> AudioViewer(prepared!!)
-                isPdf(file) -> PdfViewer(prepared!!)
-                isText(file) -> TextViewer(prepared!!)
-                isInstallable(file) -> InstallerViewer(activity, prepared!!, file)
-                else -> GenericViewer(activity, prepared!!, file)
+                isImage(file) -> ImageViewer(prepared, fullscreen) { fullscreen = !fullscreen }
+                isVideo(file) -> VideoViewer(prepared, fullscreen) { fullscreen = !fullscreen }
+                isAudio(file) -> AudioViewer(prepared, fullscreen) { fullscreen = !fullscreen }
+                isPdf(file) -> PdfViewer(prepared, fullscreen) { fullscreen = !fullscreen }
+                isText(file) -> TextViewer(prepared, fullscreen) { fullscreen = !fullscreen }
+                isInstallable(file) -> InstallerViewer(activity, prepared, file, fullscreen) { fullscreen = !fullscreen }
+                else -> GenericViewer(activity, prepared, file, fullscreen) { fullscreen = !fullscreen }
             }
         }
+    }
+    if (showInfo) {
+        ViewerInfoDialog(
+            file = file,
+            prepared = prepared,
+            onDismiss = { showInfo = false },
+        )
     }
 }
 
 @Composable
-private fun ImageViewer(file: File) {
+private fun ImageViewer(file: File, fullscreen: Boolean, onToggleFullscreen: () -> Unit) {
     var bitmap by remember(file) { mutableStateOf<Bitmap?>(null) }
     LaunchedEffect(file) {
         bitmap = withContext(Dispatchers.IO) {
@@ -4479,102 +4539,386 @@ private fun ImageViewer(file: File) {
             BitmapFactory.decodeFile(
                 file.absolutePath,
                 BitmapFactory.Options().apply {
-                    inSampleSize = calculateSampleSize(bounds.outWidth, bounds.outHeight, 2048, 2048)
+                    inSampleSize = calculateSampleSize(bounds.outWidth, bounds.outHeight, 4096, 4096)
                 },
             )
         }
     }
-    Box(Modifier.fillMaxSize().background(Color.Black), contentAlignment = Alignment.Center) {
-        bitmap?.let {
-            Image(it.asImageBitmap(), contentDescription = null, modifier = Modifier.fillMaxWidth(), contentScale = ContentScale.Fit)
-        } ?: CircularProgressIndicator(color = VoltGreen, strokeWidth = 2.dp)
+    bitmap?.let {
+        ZoomableBitmapSurface(
+            bitmap = it,
+            contentDescription = "Image preview",
+            fullscreen = fullscreen,
+            onToggleFullscreen = onToggleFullscreen,
+            toolbar = { reset, zoomIn, rotate ->
+                IconButton(onClick = reset) {
+                    Icon(Icons.Default.Replay, "Reset zoom", tint = VoltGreen)
+                }
+                IconButton(onClick = zoomIn) {
+                    Icon(Icons.Default.ZoomIn, "Zoom image", tint = VoltGreen)
+                }
+                IconButton(onClick = rotate) {
+                    Icon(Icons.Default.RotateRight, "Rotate image", tint = VoltGreen)
+                }
+                Text(
+                    "Pinch to zoom · drag to pan",
+                    color = VoltTextMuted,
+                    fontSize = 11.sp,
+                    modifier = Modifier.weight(1f),
+                )
+            },
+        )
+    } ?: Box(Modifier.fillMaxSize().background(Color.Black), contentAlignment = Alignment.Center) {
+        CircularProgressIndicator(color = VoltGreen, strokeWidth = 2.dp)
     }
 }
 
 @Composable
-private fun VideoViewer(file: File) {
+private fun ZoomableBitmapSurface(
+    bitmap: Bitmap,
+    contentDescription: String,
+    fullscreen: Boolean,
+    onToggleFullscreen: () -> Unit,
+    toolbar: @Composable (reset: () -> Unit, zoomIn: () -> Unit, rotate: () -> Unit) -> Unit,
+) {
+    var scale by remember(bitmap) { mutableFloatStateOf(1f) }
+    var rotation by remember(bitmap) { mutableFloatStateOf(0f) }
+    var offset by remember(bitmap) { mutableStateOf(Offset.Zero) }
+    val transformState = rememberTransformableState { zoomChange, panChange, rotationChange ->
+        scale = (scale * zoomChange).coerceIn(1f, 7f)
+        offset += panChange
+        rotation += rotationChange
+    }
+    fun reset() {
+        scale = 1f
+        rotation = 0f
+        offset = Offset.Zero
+    }
+    Box(Modifier.fillMaxSize().background(Color.Black)) {
+        Image(
+            bitmap.asImageBitmap(),
+            contentDescription = contentDescription,
+            contentScale = ContentScale.Fit,
+            modifier = Modifier
+                .fillMaxSize()
+                .transformable(transformState)
+                .pointerInput(Unit) {
+                    detectTapGestures(
+                        onDoubleTap = {
+                            if (scale > 1.1f) reset() else scale = 2.5f
+                        },
+                    )
+                }
+                .graphicsLayer {
+                    scaleX = scale
+                    scaleY = scale
+                    translationX = offset.x
+                    translationY = offset.y
+                    rotationZ = rotation
+                },
+        )
+        Surface(
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .fillMaxWidth()
+                .padding(12.dp),
+            color = VoltSurfaceRaised.copy(alpha = 0.94f),
+            shape = RoundedCornerShape(22.dp),
+            border = BorderStroke(1.dp, VoltGreen.copy(alpha = 0.24f)),
+        ) {
+            Row(
+                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                toolbar(::reset, { scale = (scale + 0.5f).coerceAtMost(7f) }, { rotation += 90f })
+                IconButton(onClick = onToggleFullscreen) {
+                    Icon(
+                        if (fullscreen) Icons.Default.FullscreenExit else Icons.Default.Fullscreen,
+                        if (fullscreen) "Exit full screen" else "Full screen",
+                        tint = VoltGreen,
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun VideoViewer(file: File, fullscreen: Boolean, onToggleFullscreen: () -> Unit) {
+    MediaViewer(file, fullscreen, onToggleFullscreen, isAudio = false)
+}
+
+@Composable
+private fun AudioViewer(file: File, fullscreen: Boolean, onToggleFullscreen: () -> Unit) {
+    MediaViewer(file, fullscreen, onToggleFullscreen, isAudio = true)
+}
+
+@Composable
+private fun MediaViewer(
+    file: File,
+    fullscreen: Boolean,
+    onToggleFullscreen: () -> Unit,
+    isAudio: Boolean,
+) {
     val context = LocalContext.current
     val player = remember(file) {
         ExoPlayer.Builder(context).build().apply {
             setMediaItem(MediaItem.fromUri(android.net.Uri.fromFile(file)))
             prepare()
-            playWhenReady = true
+            if (!isAudio) playWhenReady = true
         }
     }
+    var isPlaying by remember(player) { mutableStateOf(player.isPlaying) }
+    var muted by remember(player) { mutableStateOf(false) }
+    var position by remember(player) { mutableLongStateOf(0L) }
+    var duration by remember(player) { mutableLongStateOf(0L) }
+    var showControls by remember(player) { mutableStateOf(true) }
+    var showSpeedMenu by remember(player) { mutableStateOf(false) }
+    val speeds = listOf(0.5f, 1f, 1.5f, 2f)
     androidx.compose.runtime.DisposableEffect(player) {
-        onDispose { player.release() }
+        val listener = object : Player.Listener {
+            override fun onIsPlayingChanged(playing: Boolean) {
+                isPlaying = playing
+            }
+        }
+        player.addListener(listener)
+        onDispose {
+            player.removeListener(listener)
+            player.release()
+        }
     }
-    AndroidView(
-        factory = {
-            PlayerView(it).apply {
-                this.player = player
-                useController = true
-                layoutParams = ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
+    LaunchedEffect(player, showControls, isPlaying) {
+        while (true) {
+            position = player.currentPosition.coerceAtLeast(0L)
+            duration = player.duration.takeIf { it > 0L } ?: 0L
+            isPlaying = player.isPlaying
+            if (showControls && isPlaying) {
+                delay(4500L)
+                showControls = false
+            } else {
+                delay(250L)
             }
         },
-        modifier = Modifier.fillMaxSize().background(Color.Black),
-    )
-}
-
-@Composable
-private fun AudioViewer(file: File) {
-    val context = LocalContext.current
-    val player = remember(file) {
-        ExoPlayer.Builder(context).build().apply {
-            setMediaItem(MediaItem.fromUri(android.net.Uri.fromFile(file)))
-            prepare()
+    }
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color.Black)
+            .pointerInput(showControls) {
+                detectTapGestures(onTap = { showControls = !showControls })
+            },
+    ) {
+        if (isAudio) {
+            Column(
+                modifier = Modifier.align(Alignment.Center).padding(32.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(132.dp)
+                        .background(VoltGreen.copy(alpha = 0.12f), CircleShape)
+                        .border(1.dp, VoltGreen.copy(alpha = 0.45f), CircleShape),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(Icons.Default.VideoLibrary, null, tint = VoltGreen, modifier = Modifier.size(54.dp))
+                }
+                Spacer(Modifier.height(18.dp))
+                Text(file.name, color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold, maxLines = 1)
+                Text("Audio playback", color = VoltTextMuted, fontSize = 12.sp)
+            }
+        } else {
+            AndroidView(
+                factory = {
+                    PlayerView(it).apply {
+                        this.player = player
+                        useController = false
+                        resizeMode = androidx.media3.ui.AspectRatioFrameLayout.RESIZE_MODE_FIT
+                        layoutParams = ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
+                    }
+                },
+                modifier = Modifier.fillMaxSize(),
+            )
         }
-    }
-    androidx.compose.runtime.DisposableEffect(player) {
-        onDispose { player.release() }
-    }
-    Column(Modifier.fillMaxSize().padding(24.dp), verticalArrangement = Arrangement.Center) {
-        Icon(Icons.Default.PlayArrow, null, tint = VoltGreen, modifier = Modifier.size(48.dp).align(Alignment.CenterHorizontally))
-        Spacer(Modifier.height(18.dp))
-        Text("Audio preview", color = Color.White, fontWeight = FontWeight.Bold, modifier = Modifier.align(Alignment.CenterHorizontally))
-        Spacer(Modifier.height(22.dp))
-        AndroidView(
-            factory = { PlayerView(it).apply { this.player = player; useController = true } },
-            modifier = Modifier.fillMaxWidth().height(72.dp),
-        )
-    }
-}
-
-@Composable
-private fun PdfViewer(file: File) {
-    var bitmap by remember(file) { mutableStateOf<android.graphics.Bitmap?>(null) }
-    var pageCount by remember(file) { mutableIntStateOf(0) }
-    LaunchedEffect(file) {
-        withContext(Dispatchers.IO) {
-            PdfRenderer(android.os.ParcelFileDescriptor.open(file, android.os.ParcelFileDescriptor.MODE_READ_ONLY)).use { renderer ->
-                pageCount = renderer.pageCount
-                if (renderer.pageCount > 0) {
-                    renderer.openPage(0).use { page ->
-                        val pageBitmap = android.graphics.Bitmap.createBitmap(page.width * 2, page.height * 2, android.graphics.Bitmap.Config.ARGB_8888)
-                        page.render(pageBitmap, null, null, PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY)
-                        bitmap = pageBitmap
+        if (showControls) {
+            Surface(
+                modifier = Modifier.align(Alignment.TopCenter).fillMaxWidth().padding(12.dp),
+                color = VoltSurfaceRaised.copy(alpha = 0.92f),
+                shape = RoundedCornerShape(20.dp),
+                border = BorderStroke(1.dp, VoltGreen.copy(alpha = 0.25f)),
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 7.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Icon(if (isAudio) Icons.Default.VolumeUp else Icons.Default.PlayArrow, null, tint = VoltGreen, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text(file.name, color = Color.White, maxLines = 1, modifier = Modifier.weight(1f))
+                    Box {
+                        IconButton(onClick = { showSpeedMenu = true }) {
+                            Icon(Icons.Default.Speed, "Playback speed", tint = VoltGreen)
+                        }
+                        DropdownMenu(expanded = showSpeedMenu, onDismissRequest = { showSpeedMenu = false }) {
+                            speeds.forEach { speed ->
+                                DropdownMenuItem(
+                                    text = { Text("${speed}×") },
+                                    onClick = {
+                                        player.setPlaybackSpeed(speed)
+                                        showSpeedMenu = false
+                                    },
+                                )
+                            }
+                        }
+                    }
+                    IconButton(onClick = onToggleFullscreen) {
+                        Icon(
+                            if (fullscreen) Icons.Default.FullscreenExit else Icons.Default.Fullscreen,
+                            if (fullscreen) "Exit full screen" else "Full screen",
+                            tint = VoltGreen,
+                        )
+                    }
+                }
+            }
+            Surface(
+                modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth().padding(12.dp),
+                color = VoltSurfaceRaised.copy(alpha = 0.95f),
+                shape = RoundedCornerShape(22.dp),
+                border = BorderStroke(1.dp, VoltGreen.copy(alpha = 0.25f)),
+            ) {
+                Column(Modifier.padding(horizontal = 13.dp, vertical = 8.dp)) {
+                    Slider(
+                        value = if (duration > 0L) position.toFloat().coerceIn(0f, duration.toFloat()) else 0f,
+                        onValueChange = { position = it.toLong() },
+                        onValueChangeFinished = { player.seekTo(position) },
+                        valueRange = 0f..duration.coerceAtLeast(1L).toFloat(),
+                        colors = androidx.compose.material3.SliderDefaults.colors(
+                            thumbColor = VoltGreen,
+                            activeTrackColor = VoltGreen,
+                            inactiveTrackColor = Color.White.copy(alpha = 0.16f),
+                        ),
+                    )
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(formatDuration(position), color = VoltTextMuted, fontSize = 11.sp)
+                        Spacer(Modifier.weight(1f))
+                        IconButton(onClick = { player.seekTo((position - 10_000L).coerceAtLeast(0L)) }) {
+                            Icon(Icons.Default.Replay10, "Back ten seconds", tint = Color.White)
+                        }
+                        IconButton(onClick = {
+                            if (player.isPlaying) player.pause() else player.play()
+                            showControls = true
+                        }) {
+                            Icon(if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow, if (isPlaying) "Pause" else "Play", tint = VoltGreen)
+                        }
+                        IconButton(onClick = {
+                            player.seekTo((position + 10_000L).coerceAtMost(duration))
+                        }) {
+                            Icon(Icons.Default.FastForward, "Forward ten seconds", tint = Color.White)
+                        }
+                        IconButton(onClick = {
+                            muted = !muted
+                            player.volume = if (muted) 0f else 1f
+                        }) {
+                            Icon(if (muted) Icons.Default.VolumeOff else Icons.Default.VolumeUp, "Mute", tint = Color.White)
+                        }
+                        Spacer(Modifier.weight(1f))
+                        Text(formatDuration(duration), color = VoltTextMuted, fontSize = 11.sp)
                     }
                 }
             }
         }
     }
-    Box(Modifier.fillMaxSize().background(Color(0xFF202020)), contentAlignment = Alignment.Center) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            bitmap?.let { Image(it.asImageBitmap(), "PDF preview", modifier = Modifier.fillMaxWidth().padding(18.dp), contentScale = ContentScale.Fit) }
-            Text("$pageCount page${if (pageCount == 1) "" else "s"} • showing first page", color = VoltTextMuted, fontSize = 12.sp)
+}
+
+@Composable
+private fun PdfViewer(file: File, fullscreen: Boolean, onToggleFullscreen: () -> Unit) {
+    var pageCount by remember(file) { mutableIntStateOf(0) }
+    var currentPage by remember(file) { mutableIntStateOf(0) }
+    var bitmap by remember(file) { mutableStateOf<Bitmap?>(null) }
+    LaunchedEffect(file) {
+        pageCount = withContext(Dispatchers.IO) {
+            runCatching {
+                PdfRenderer(ParcelFileDescriptor.open(file, ParcelFileDescriptor.MODE_READ_ONLY)).use { renderer ->
+                    renderer.pageCount
+                }
+            }.getOrDefault(-1)
         }
+    }
+    LaunchedEffect(file, currentPage, pageCount) {
+        if (pageCount <= 0) return@LaunchedEffect
+        bitmap = null
+        bitmap = withContext(Dispatchers.IO) {
+            runCatching {
+                PdfRenderer(ParcelFileDescriptor.open(file, ParcelFileDescriptor.MODE_READ_ONLY)).use { renderer ->
+                    renderer.openPage(currentPage.coerceIn(0, renderer.pageCount - 1)).use { page ->
+                        val scale = minOf(2f, 2400f / maxOf(page.width, page.height).toFloat())
+                        val pageBitmap = Bitmap.createBitmap(
+                            (page.width * scale).toInt().coerceAtLeast(1),
+                            (page.height * scale).toInt().coerceAtLeast(1),
+                            Bitmap.Config.ARGB_8888,
+                        )
+                        pageBitmap.eraseColor(android.graphics.Color.WHITE)
+                        page.render(pageBitmap, null, null, PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY)
+                        pageBitmap
+                    }
+                }
+            }.getOrNull()
+        }
+    }
+    if (pageCount < 0) {
+        Box(Modifier.fillMaxSize().background(Color(0xFF202020)), contentAlignment = Alignment.Center) {
+            Text("This PDF could not be rendered.", color = VoltTextMuted)
+        }
+    } else bitmap?.let {
+        ZoomableBitmapSurface(
+            bitmap = it,
+            contentDescription = "PDF page ${currentPage + 1}",
+            fullscreen = fullscreen,
+            onToggleFullscreen = onToggleFullscreen,
+            toolbar = { reset, zoomIn, _ ->
+                IconButton(onClick = { if (currentPage > 0) currentPage -= 1 }) {
+                    Icon(Icons.Default.NavigateBefore, "Previous page", tint = if (currentPage > 0) VoltGreen else VoltTextMuted)
+                }
+                Text(
+                    "${currentPage + 1} / $pageCount",
+                    color = Color.White,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.weight(1f),
+                )
+                IconButton(onClick = { if (currentPage < pageCount - 1) currentPage += 1 }) {
+                    Icon(Icons.Default.NavigateNext, "Next page", tint = if (currentPage < pageCount - 1) VoltGreen else VoltTextMuted)
+                }
+                IconButton(onClick = reset) {
+                    Icon(Icons.Default.Replay, "Reset page zoom", tint = VoltGreen)
+                }
+                IconButton(onClick = zoomIn) {
+                    Icon(Icons.Default.ZoomIn, "Zoom page", tint = VoltGreen)
+                }
+            },
+        )
+    } ?: Box(Modifier.fillMaxSize().background(Color(0xFF202020)), contentAlignment = Alignment.Center) {
+        CircularProgressIndicator(color = VoltGreen, strokeWidth = 2.dp)
     }
 }
 
 @Composable
-private fun TextViewer(file: File) {
+private fun TextViewer(file: File, fullscreen: Boolean, onToggleFullscreen: () -> Unit) {
     val clipboard = LocalClipboardManager.current
     val context = LocalContext.current
     var text by remember(file) { mutableStateOf<String?>(null) }
     var readError by remember(file) { mutableStateOf<String?>(null) }
+    var searchOpen by remember(file) { mutableStateOf(false) }
+    var searchQuery by remember(file) { mutableStateOf("") }
+    var searchIndex by remember(file) { mutableIntStateOf(0) }
+    var fontSize by remember(file) { mutableFloatStateOf(13f) }
+    var wrapText by remember(file) { mutableStateOf(true) }
+    LaunchedEffect(searchQuery, text) {
+        searchIndex = 0
+    }
     LaunchedEffect(file) {
         runCatching {
             withContext(Dispatchers.IO) {
+                check(file.length() <= MAX_TEXT_VIEW_BYTES) {
+                    "This text file is larger than the 8 MB interactive preview limit. Use Open with to view the complete file."
+                }
                 file.inputStream().bufferedReader(Charsets.UTF_8).use { it.readText() }
             }
         }.onSuccess { contents ->
@@ -4586,37 +4930,98 @@ private fun TextViewer(file: File) {
     Column(
         Modifier
             .fillMaxSize()
-            .background(Color(0xFF0A0A0A))
-            .padding(horizontal = 22.dp),
+            .background(Color(0xFF0A0A0A)),
     ) {
         Row(
-            modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp),
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text(
-                "Text preview",
-                color = VoltTextMuted,
-                fontSize = 12.sp,
-                fontWeight = FontWeight.Bold,
-            )
-            OutlinedButton(
-                onClick = {
-                    text?.let { contents ->
-                        clipboard.setText(AnnotatedString(contents))
-                        Toast.makeText(context, "Copied full text", Toast.LENGTH_SHORT).show()
+            Text("TEXT / CODE", color = VoltGreen, fontSize = 11.sp, fontWeight = FontWeight.Black, letterSpacing = 1.6.sp)
+            Row(
+                modifier = Modifier.weight(1f).horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.End,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                IconButton(onClick = { searchOpen = !searchOpen }) {
+                    Icon(Icons.Default.Search, "Search text", tint = VoltGreen)
+                }
+                IconButton(onClick = { fontSize = (fontSize - 1f).coerceAtLeast(9f) }) {
+                    Icon(Icons.Default.ZoomOut, "Decrease text size", tint = Color.White)
+                }
+                IconButton(onClick = { fontSize = (fontSize + 1f).coerceAtMost(24f) }) {
+                    Icon(Icons.Default.ZoomIn, "Increase text size", tint = Color.White)
+                }
+                IconButton(onClick = { wrapText = !wrapText }) {
+                    Icon(Icons.Default.WrapText, "Toggle word wrap", tint = if (wrapText) VoltGreen else VoltTextMuted)
+                }
+                IconButton(
+                    onClick = {
+                        text?.let { contents ->
+                            clipboard.setText(AnnotatedString(contents))
+                            Toast.makeText(context, "Copied full text", Toast.LENGTH_SHORT).show()
+                        }
+                    },
+                    enabled = text != null,
+                ) {
+                    Icon(Icons.Default.ContentCopy, "Copy all text", tint = VoltGreen)
+                }
+                IconButton(onClick = { openFileWith(context, file, "text/plain") }) {
+                    Icon(Icons.Default.Share, "Open text with another app", tint = VoltGreen)
+                }
+                IconButton(onClick = onToggleFullscreen) {
+                    Icon(
+                        if (fullscreen) Icons.Default.FullscreenExit else Icons.Default.Fullscreen,
+                        "Toggle full screen",
+                        tint = VoltGreen,
+                    )
+                }
+            }
+        }
+        if (searchOpen) {
+            OutlinedTextField(
+                value = searchQuery,
+                onValueChange = { searchQuery = it },
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp),
+                singleLine = true,
+                placeholder = { Text("Find in file", color = VoltTextMuted) },
+                leadingIcon = { Icon(Icons.Default.Search, null, tint = VoltGreen) },
+                trailingIcon = {
+                    if (searchQuery.isNotEmpty()) {
+                        IconButton(onClick = { searchQuery = "" }) { Icon(Icons.Default.Close, "Clear search", tint = VoltTextMuted) }
                     }
                 },
-                enabled = text != null,
-                modifier = Modifier.height(42.dp),
-                contentPadding = PaddingValues(horizontal = 14.dp),
-                shape = RoundedCornerShape(14.dp),
-                border = BorderStroke(1.dp, VoltGreen.copy(alpha = 0.55f)),
-                colors = ButtonDefaults.outlinedButtonColors(contentColor = VoltGreen),
-            ) {
-                Icon(Icons.Default.ContentCopy, "Copy all text", modifier = Modifier.size(16.dp))
-                Spacer(Modifier.width(7.dp))
-                Text("Copy all")
+                colors = androidx.compose.material3.OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = VoltGreen,
+                    unfocusedBorderColor = Color.White.copy(alpha = 0.15f),
+                    focusedTextColor = Color.White,
+                    unfocusedTextColor = Color.White,
+                    cursorColor = VoltGreen,
+                ),
+            )
+            if (searchQuery.isNotBlank() && text != null) {
+                val matches = findTextMatches(text!!, searchQuery)
+                val matchCount = matches.size
+                Text(
+                    if (matchCount == 0) "No matches" else "$matchCount match${if (matchCount == 1) "" else "es"}",
+                    color = if (matchCount == 0) Color(0xFFFF8A80) else VoltGreen,
+                    fontSize = 11.sp,
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 2.dp),
+                )
+                if (matchCount > 0) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp),
+                        horizontalArrangement = Arrangement.End,
+                    ) {
+                        IconButton(onClick = { searchIndex = (searchIndex - 1 + matchCount) % matchCount }) {
+                            Icon(Icons.Default.NavigateBefore, "Previous match", tint = VoltGreen)
+                        }
+                        Text("${searchIndex + 1} / $matchCount", color = VoltTextMuted, fontSize = 11.sp, modifier = Modifier.align(Alignment.CenterVertically))
+                        IconButton(onClick = { searchIndex = (searchIndex + 1) % matchCount }) {
+                            Icon(Icons.Default.NavigateNext, "Next match", tint = VoltGreen)
+                        }
+                    }
+                }
             }
         }
         when {
@@ -4640,21 +5045,36 @@ private fun TextViewer(file: File) {
                             setTextColor(android.graphics.Color.rgb(230, 245, 236))
                             setBackgroundColor(android.graphics.Color.rgb(10, 10, 10))
                             typeface = android.graphics.Typeface.MONOSPACE
-                            textSize = 13f
+                            textSize = fontSize
                             setLineSpacing(0f, 1.62f)
                             setPadding(0, 0, 0, (22 * resources.displayMetrics.density).toInt())
                             gravity = android.view.Gravity.TOP or android.view.Gravity.START
                             isVerticalScrollBarEnabled = true
+                            isFocusableInTouchMode = true
                             movementMethod = ScrollingMovementMethod.getInstance()
                             setTextIsSelectable(true)
+                            setHorizontallyScrolling(!wrapText)
                             setCustomSelectionActionModeCallback(
                                 createUrlSelectionActionModeCallback(viewContext, this),
                             )
                         }
                     },
                     update = { textView ->
+                        textView.textSize = fontSize
+                        textView.setHorizontallyScrolling(!wrapText)
                         if (textView.text.toString() != text!!) {
                             textView.text = text
+                        }
+                        val matches = findTextMatches(text!!, searchQuery)
+                        val matchStart = matches.getOrNull(searchIndex)
+                        matchStart?.let { start ->
+                            textView.post {
+                                textView.requestFocus()
+                                textView.setSelection(start, start + searchQuery.length)
+                                textView.layout?.let { layout ->
+                                    textView.scrollTo(0, layout.getLineTop(layout.getLineForOffset(start)))
+                                }
+                            }
                         }
                     },
                 )
@@ -4737,37 +5157,226 @@ private fun openInChromeIncognito(context: android.content.Context, url: String)
     }
 }
 
+private fun openFileWith(context: android.content.Context, file: File, mimeType: String) {
+    val uri = runCatching {
+        FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
+    }.getOrNull() ?: run {
+        Toast.makeText(context, "This file could not be shared", Toast.LENGTH_SHORT).show()
+        return
+    }
+    val intent = Intent(Intent.ACTION_VIEW).apply {
+        setDataAndType(uri, mimeType.ifBlank { "application/octet-stream" })
+        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+    }
+    runCatching {
+        context.startActivity(Intent.createChooser(intent, "Open with"))
+    }.onFailure {
+        Toast.makeText(context, "No compatible app was found", Toast.LENGTH_SHORT).show()
+    }
+}
+
+private const val MAX_TEXT_VIEW_BYTES = 8 * 1024 * 1024
+
+private fun findTextMatches(text: String, query: String): List<Int> {
+    if (query.isBlank()) return emptyList()
+    val matches = mutableListOf<Int>()
+    var cursor = 0
+    while (cursor <= text.length - query.length) {
+        val match = text.indexOf(query, startIndex = cursor, ignoreCase = true)
+        if (match < 0) break
+        matches += match
+        cursor = (match + query.length).coerceAtLeast(match + 1)
+    }
+    return matches
+}
+
 @Composable
-private fun InstallerViewer(activity: MainActivity, file: File, vaultFile: VaultFile) {
+private fun InstallerViewer(
+    activity: MainActivity,
+    file: File,
+    vaultFile: VaultFile,
+    fullscreen: Boolean,
+    onToggleFullscreen: () -> Unit,
+) {
     val installResult = remember { mutableStateOf<String?>(null) }
-    Column(Modifier.fillMaxSize().padding(24.dp), verticalArrangement = Arrangement.Center, horizontalAlignment = Alignment.CenterHorizontally) {
-        Box(Modifier.size(92.dp).background(VoltGreen.copy(alpha = 0.12f), CircleShape), contentAlignment = Alignment.Center) {
-            Icon(Icons.Default.Bolt, null, tint = VoltGreen, modifier = Modifier.size(42.dp))
+    Box(Modifier.fillMaxSize().background(VoltBlack)) {
+        Column(
+            Modifier.align(Alignment.Center).padding(24.dp),
+            verticalArrangement = Arrangement.Center,
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            Box(
+                Modifier.size(112.dp).background(VoltGreen.copy(alpha = 0.12f), CircleShape)
+                    .border(1.dp, VoltGreen.copy(alpha = 0.4f), CircleShape),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(Icons.Default.Bolt, null, tint = VoltGreen, modifier = Modifier.size(52.dp))
+            }
+            Spacer(Modifier.height(22.dp))
+            Text("INSTALLER PACKAGE", color = VoltGreen, fontSize = 11.sp, fontWeight = FontWeight.Black, letterSpacing = 1.8.sp)
+            Spacer(Modifier.height(8.dp))
+            Text(vaultFile.name, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 20.sp, textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+            Spacer(Modifier.height(8.dp))
+            Text(
+                "The package stays private until you approve the Android installation.",
+                color = VoltTextMuted,
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+            )
+            Spacer(Modifier.height(26.dp))
+            GlowButton("Install package", Icons.Default.ArrowDownward, onClick = {
+                activity.installPreparedPackage(file, vaultFile.name)
+                installResult.value = "Installation started"
+            })
+            installResult.value?.let { Text(it, color = VoltGreen, modifier = Modifier.padding(top = 16.dp)) }
         }
-        Spacer(Modifier.height(22.dp))
-        Text(vaultFile.name, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 20.sp)
-        Spacer(Modifier.height(8.dp))
-        Text("Installer package stays in your private vault until you choose to install it.", color = VoltTextMuted, textAlign = androidx.compose.ui.text.style.TextAlign.Center)
-        Spacer(Modifier.height(26.dp))
-        GlowButton("Install package", Icons.Default.ArrowDownward, onClick = {
-            activity.installPreparedPackage(file, vaultFile.name)
-            installResult.value = "Android installer opened"
-        })
-        installResult.value?.let { Text(it, color = VoltGreen, modifier = Modifier.padding(top = 16.dp)) }
+        IconButton(
+            onClick = onToggleFullscreen,
+            modifier = Modifier.align(Alignment.TopEnd).padding(12.dp),
+        ) {
+            Icon(
+                if (fullscreen) Icons.Default.FullscreenExit else Icons.Default.Fullscreen,
+                "Toggle full screen",
+                tint = VoltGreen,
+            )
+        }
     }
 }
 
 @Composable
-private fun GenericViewer(activity: MainActivity, file: File, vaultFile: VaultFile) {
-    Column(Modifier.fillMaxSize().padding(24.dp), verticalArrangement = Arrangement.Center, horizontalAlignment = Alignment.CenterHorizontally) {
-        Icon(Icons.Default.Description, null, tint = VoltGreen, modifier = Modifier.size(48.dp))
-        Spacer(Modifier.height(18.dp))
-        Text(vaultFile.name, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 19.sp)
-        Spacer(Modifier.height(8.dp))
-        Text("No specialized preview is available for this format yet.", color = VoltTextMuted, textAlign = androidx.compose.ui.text.style.TextAlign.Center)
-        Spacer(Modifier.height(20.dp))
-        Text("${formatSize(file.length())} stored privately", color = VoltTextMuted, fontSize = 12.sp)
+private fun GenericViewer(
+    activity: MainActivity,
+    file: File,
+    vaultFile: VaultFile,
+    fullscreen: Boolean,
+    onToggleFullscreen: () -> Unit,
+) {
+    val context = LocalContext.current
+    val mimeType = vaultFile.mimeType.ifBlank { "application/octet-stream" }
+    var header by remember(file) { mutableStateOf<ByteArray?>(null) }
+    LaunchedEffect(file) {
+        header = withContext(Dispatchers.IO) {
+            runCatching {
+                file.inputStream().use { input ->
+                    val bytes = ByteArray(32)
+                    val count = input.read(bytes)
+                    if (count <= 0) null else bytes.copyOf(count)
+                }
+            }.getOrNull()
+        }
     }
+    Box(Modifier.fillMaxSize().background(VoltBlack)) {
+        Column(
+            Modifier.fillMaxWidth().align(Alignment.Center).padding(24.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            Box(
+                Modifier.size(112.dp).background(VoltGreen.copy(alpha = 0.1f), CircleShape)
+                    .border(1.dp, VoltGreen.copy(alpha = 0.4f), CircleShape),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(Icons.Default.Description, null, tint = VoltGreen, modifier = Modifier.size(52.dp))
+            }
+            Spacer(Modifier.height(22.dp))
+            Text("UNIVERSAL FILE VIEWER", color = VoltGreen, fontSize = 11.sp, fontWeight = FontWeight.Black, letterSpacing = 1.8.sp)
+            Spacer(Modifier.height(8.dp))
+            Text(vaultFile.name, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 20.sp, textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+            Spacer(Modifier.height(18.dp))
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                color = VoltSurfaceRaised,
+                shape = RoundedCornerShape(22.dp),
+                border = BorderStroke(1.dp, Color.White.copy(alpha = 0.1f)),
+            ) {
+                Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    ViewerMetadataRow("Type", mimeType)
+                    ViewerMetadataRow("Size", formatReadableFileSize(file.length()))
+                    ViewerMetadataRow("Extension", vaultFile.name.substringAfterLast('.', "unknown").uppercase(Locale.US))
+                    ViewerMetadataRow("Storage", "Private VoltShare vault")
+                    ViewerMetadataRow("Access", "Read-only preview")
+                }
+            }
+            header?.let { bytes ->
+                Spacer(Modifier.height(12.dp))
+                Surface(
+                    modifier = Modifier.fillMaxWidth(),
+                    color = Color.Black.copy(alpha = 0.32f),
+                    shape = RoundedCornerShape(18.dp),
+                ) {
+                    Text(
+                        "Header preview\n${bytes.joinToString(" ") { byte -> "%02X".format(Locale.US, byte) }}",
+                        color = VoltTextMuted,
+                        fontFamily = FontFamily.Monospace,
+                        fontSize = 11.sp,
+                        modifier = Modifier.padding(16.dp),
+                    )
+                }
+            }
+            Spacer(Modifier.height(20.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                OutlinedButton(
+                    onClick = { openFileWith(context, file, mimeType) },
+                    shape = RoundedCornerShape(16.dp),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = VoltGreen),
+                    border = BorderStroke(1.dp, VoltGreen.copy(alpha = 0.55f)),
+                ) {
+                    Icon(Icons.Default.Share, "Open with", modifier = Modifier.size(17.dp))
+                    Spacer(Modifier.width(7.dp))
+                    Text("Open with")
+                }
+                IconButton(onClick = onToggleFullscreen) {
+                    Icon(
+                        if (fullscreen) Icons.Default.FullscreenExit else Icons.Default.Fullscreen,
+                        "Toggle full screen",
+                        tint = VoltGreen,
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ViewerMetadataRow(label: String, value: String) {
+    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+        Text(label, color = VoltTextMuted, fontSize = 12.sp)
+        Spacer(Modifier.width(12.dp))
+        Text(value, color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold, maxLines = 2)
+    }
+}
+
+@Composable
+private fun ViewerInfoDialog(
+    file: VaultFile,
+    prepared: File?,
+    onDismiss: () -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = VoltSurfaceRaised,
+        title = {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Default.Info, null, tint = VoltGreen, modifier = Modifier.size(21.dp))
+                Spacer(Modifier.width(9.dp))
+                Text("File information", color = Color.White)
+            }
+        },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text(file.name, color = Color.White, fontWeight = FontWeight.Bold, maxLines = 2)
+                ViewerMetadataRow("Type", file.mimeType.ifBlank { "Unknown" })
+                ViewerMetadataRow("Size", formatReadableFileSize(file.sizeBytes))
+                ViewerMetadataRow("Location", file.folderPath)
+                ViewerMetadataRow("Preview", if (prepared?.isFile == true) "Ready" else "Unavailable")
+                ViewerMetadataRow("Access", if (file.locked) "Lock protected" else "Unlocked")
+                file.contentHash?.let { ViewerMetadataRow("SHA-256", it.take(16) + "…") }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss, colors = ButtonDefaults.textButtonColors(contentColor = VoltGreen)) {
+                Text("Done")
+            }
+        },
+    )
 }
 
 @Composable
@@ -5603,6 +6212,13 @@ private fun isText(file: VaultFile): Boolean {
 private fun isInstallable(file: VaultFile) = file.name.isMediaExtension("apk", "xapk", "apks")
 private fun String.isMediaExtension(vararg extensions: String) = extensions.any { endsWith(".$it", ignoreCase = true) }
 private fun formatSize(bytes: Long): String = Formatter.formatFileSize(null, bytes)
+
+private fun formatDuration(milliseconds: Long): String {
+    val totalSeconds = (milliseconds.coerceAtLeast(0L) / 1000L)
+    val minutes = totalSeconds / 60L
+    val seconds = totalSeconds % 60L
+    return String.format(Locale.US, "%02d:%02d", minutes, seconds)
+}
 
 private fun formatReadableFileSize(bytes: Long): String {
     val safeBytes = bytes.coerceAtLeast(0L)
