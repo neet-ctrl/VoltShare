@@ -302,7 +302,7 @@ class PeerTransferManager(
         when (source) {
             is PendingShareSource.UriSource -> context.contentResolver.openInputStream(source.uri)
             is PendingShareSource.FileSource -> source.file.inputStream()
-            is PendingShareSource.VaultSource -> vault.openDecrypted(source.file)
+            is PendingShareSource.VaultSource -> vault.openStored(source.file)
         }
     }.getOrNull()
 

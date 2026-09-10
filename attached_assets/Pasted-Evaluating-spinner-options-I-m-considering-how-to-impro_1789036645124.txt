@@ -1,0 +1,43 @@
+Evaluating spinner options
+
+I’m considering how to improve the viewer performance. The user wants instant access, without any decryption delays, so the spinner feels unnecessary. I could eliminate it by using var prepared by remember(file.id) { mutableStateOf(vault.prepareViewing(file)) }, but it seems that approach might call the filesystem on the main thread, which isn't ideal. I need a better solution that keeps everything running smoothly for the user while ensuring a really fast response.
+
+The vault storage layer is now plain app-private storage and the old encrypted vault is scheduled for one-time removal on the next app start. I’m removing the last artificial preparation state from the viewer itself so opening a file immediately enters the real viewer instead of showing any vault-preparation screen.
+
+Continuing the task
+
+I need to keep moving forward on my current task. I should inspect the imports, checking if withContext is still being used elsewhere. A static validation is on my mind too. However, before diving into that, it’s worth considering a one-time reset implementation. I need to ensure PLAIN_STORAGE_READY_KEY is set to true only after delete, otherwise, if the process is killed early, it could repeat on the next restart without issues. Lastly, I might want to use viewCacheDir to remove references.
+
+Addressing caching concerns
+
+I'm looking into a potential issue with File(context.cacheDir, "view-cache").deleteRecursively(), which runs only once. There's a chance that old view cache could still have plaintext info. If the reset choice is made, it means both the old vault and the view cache will be deleted. That's good! However, there's a potential issue with an old KeyStore key remaining, but the user might not mind since they prefer no encryption. I'll keep that in mind!
+
+The code now has no vault encryption/decryption path: the one-time reset clears the old encrypted vault, and future imports, transfers, previews, thumbnails, and installs use plain files in the app-only sandbox. I’m doing the final static checks and recording one Android-runtime verification follow-up because this storage reset cannot be safely simulated without launching the app.
+
+Done. The vault is now plain app-private storage.
+
+What changed
+Removed file encryption from VaultRepository.
+Removed file decryption from previews and viewers.
+New imports, received files, generated files, and shared files are copied directly into:
+/data/data/app.voltshare/files/vault/
+
+Files use normal raw bytes with .data storage names.
+Opening a file now uses the stored file directly.
+Removed the decrypt-to-preview-cache flow.
+Removed the old “Preparing a private preview…” screen.
+Thumbnails and viewers no longer decrypt files.
+The old encrypted vault and preview cache will be deleted once on the next app launch, as you selected.
+After that first launch, the plain vault will persist normally and will not reset again.
+Updated the UI text so it no longer claims the files are encrypted.
+Normal Android file managers cannot browse /data/data/app.voltshare/files/ without root or special debug access. The files remain inside the app sandbox and are not exposed through shared storage, Downloads, or media storage.
+
+The lock PIN/password is still stored as a one-way authentication hash so the lock can verify your input, but your vault file contents are no longer encrypted.
+
+Static validation passes with git diff --check. I did not run a local Gradle build. A follow-up task was proposed to verify the one-time reset and instant opening on a real Android runtime.
+
+So just tell all the ways so that anyone which have access to my file but not access to my app, then what are the ways they could get my files? What are the other ways? And next thing, everything will be 100% instantly when I will tap on a file. Will it open instantly now without taking any type of time?
+
+You've reached your daily free quota limit. It will reset at 12:00 AM UTC.
+
+    
