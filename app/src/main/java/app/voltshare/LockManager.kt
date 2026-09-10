@@ -18,6 +18,18 @@ class LockManager(context: Context) {
 
     fun isConfigured(): Boolean = prefs.contains(KEY_HASH)
 
+    fun isEnabled(): Boolean = prefs.getBoolean(KEY_ENABLED, true)
+
+    fun setEnabled(enabled: Boolean) {
+        prefs.edit().putBoolean(KEY_ENABLED, enabled).apply()
+    }
+
+    fun isBiometricEnabled(): Boolean = prefs.getBoolean(KEY_BIOMETRIC_ENABLED, true)
+
+    fun setBiometricEnabled(enabled: Boolean) {
+        prefs.edit().putBoolean(KEY_BIOMETRIC_ENABLED, enabled).apply()
+    }
+
     fun type(): LockType = runCatching {
         LockType.valueOf(prefs.getString(KEY_TYPE, LockType.PIN.name) ?: LockType.PIN.name)
     }.getOrDefault(LockType.PIN)
@@ -29,6 +41,7 @@ class LockManager(context: Context) {
             .putString(KEY_TYPE, type.name)
             .putString(KEY_SALT, Base64.encodeToString(salt, Base64.NO_WRAP))
             .putString(KEY_HASH, hash(secret, salt))
+            .putBoolean(KEY_ENABLED, true)
             .apply()
         return true
     }
@@ -58,5 +71,7 @@ class LockManager(context: Context) {
         private const val KEY_TYPE = "type"
         private const val KEY_SALT = "salt"
         private const val KEY_HASH = "hash"
+        private const val KEY_ENABLED = "enabled"
+        private const val KEY_BIOMETRIC_ENABLED = "biometric-enabled"
     }
 }

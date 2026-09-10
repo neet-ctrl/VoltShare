@@ -105,6 +105,7 @@ import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Smartphone
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.StarBorder
+import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material.icons.filled.TextSnippet
 import androidx.compose.material.icons.filled.VideoLibrary
 import androidx.compose.material3.Button
@@ -240,6 +241,12 @@ class MainActivity : FragmentActivity() {
         pendingIncomingShareState = null
     }
 
+    fun canUseBiometric(): Boolean {
+        val authenticators = BiometricManager.Authenticators.BIOMETRIC_STRONG or
+            BiometricManager.Authenticators.DEVICE_CREDENTIAL
+        return BiometricManager.from(this).canAuthenticate(authenticators) == BiometricManager.BIOMETRIC_SUCCESS
+    }
+
     fun authenticateWithBiometric(onSuccess: () -> Unit) {
         val authenticators = BiometricManager.Authenticators.BIOMETRIC_STRONG or
             BiometricManager.Authenticators.DEVICE_CREDENTIAL
@@ -363,6 +370,14 @@ private enum class FileFilter(val label: String) {
     RECEIVED("Received"),
 }
 
+private sealed class SecurityAction {
+    object ChangeMethod : SecurityAction()
+    data class SetBiometric(val enabled: Boolean) : SecurityAction()
+    data class SetLock(val enabled: Boolean) : SecurityAction()
+    data class SetFileLockDefault(val enabled: Boolean) : SecurityAction()
+    object LockNow : SecurityAction()
+}
+
 @Composable
 private fun VoltShareApp(
     activity: MainActivity,
@@ -371,7 +386,10 @@ private fun VoltShareApp(
     transfer: PeerTransferManager,
 ) {
     var configured by remember { mutableStateOf(lockManager.isConfigured()) }
-    var unlocked by remember { mutableStateOf(!configured) }
+    var lockEnabled by remember { mutableStateOf(lockManager.isEnabled()) }
+    var biometricEnabled by remember { mutableStateOf(lockManager.isBiometricEnabled()) }
+    var fileLockDefault by remember { mutableStateOf(vault.isFileLockDefault()) }
+    var unlocked by remember { mutableStateOf(!configured || !lockEnabled) }
     var tab by remember { mutableStateOf(AppTab.VAULT) }
     var viewerFile by remember { mutableStateOf<VaultFile?>(null) }
     var files by remember { mutableStateOf(vault.listFiles()) }
@@ -390,6 +408,8 @@ private fun VoltShareApp(
     var showDeleteFolderConfirmation by remember { mutableStateOf<String?>(null) }
     var showMoveSelected by remember { mutableStateOf(false) }
     var lastBackPressAt by remember { mutableStateOf(0L) }
+    var securityAction by remember { mutableStateOf<SecurityAction?>(null) }
+    var showChangeLock by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
     val incomingShare = activity.pendingIncomingShare
 
@@ -502,6 +522,7 @@ private fun VoltShareApp(
     if (!unlocked) {
         UnlockScreen(
             lockManager = lockManager,
+            biometricEnabled = biometricEnabled && activity.canUseBiometric(),
             onUnlock = { unlocked = true },
             onBiometric = { activity.authenticateWithBiometric { unlocked = true } },
         )
@@ -531,6 +552,70 @@ private fun VoltShareApp(
                     } else {
                         viewerFile = target
                     }
+                    true
+                } else {
+                    false
+                }
+            },
+        )
+    }
+
+    securityAction?.let { action ->
+        LockVerificationDialog(
+            title = when (action) {
+                SecurityAction.ChangeMethod -> "Verify before changing your lock"
+                is SecurityAction.SetBiometric -> if (action.enabled) "Verify to enable biometric unlock" else "Verify to disable biometric unlock"
+                is SecurityAction.SetLock -> if (action.enabled) "Verify to enable the vault lock" else "Verify to disable the vault lock"
+                is SecurityAction.SetFileLockDefault -> if (action.enabled) "Verify to lock new files by default" else "Verify to leave new files unlocked"
+                SecurityAction.LockNow -> "Verify before locking the vault"
+            },
+            type = lockManager.type(),
+            onDismiss = { securityAction = null },
+            onConfirm = { secret ->
+                if (!lockManager.verify(secret)) {
+                    false
+                } else {
+                    when (action) {
+                        SecurityAction.ChangeMethod -> {
+                            securityAction = null
+                            showChangeLock = true
+                        }
+                        is SecurityAction.SetBiometric -> {
+                            lockManager.setBiometricEnabled(action.enabled)
+                            biometricEnabled = action.enabled
+                            securityAction = null
+                        }
+                        is SecurityAction.SetLock -> {
+                            lockManager.setEnabled(action.enabled)
+                            lockEnabled = action.enabled
+                            unlocked = true
+                            securityAction = null
+                        }
+                        is SecurityAction.SetFileLockDefault -> {
+                            vault.setFileLockDefault(action.enabled)
+                            fileLockDefault = action.enabled
+                            securityAction = null
+                        }
+                        SecurityAction.LockNow -> {
+                            securityAction = null
+                            unlocked = false
+                        }
+                    }
+                    true
+                }
+            },
+        )
+    }
+
+    if (showChangeLock) {
+        ChangeLockDialog(
+            currentType = lockManager.type(),
+            onDismiss = { showChangeLock = false },
+            onChanged = { type, secret ->
+                if (lockManager.configure(type, secret)) {
+                    lockEnabled = true
+                    unlocked = true
+                    showChangeLock = false
                 }
             },
         )
@@ -848,7 +933,15 @@ private fun VoltShareApp(
 
                 AppTab.SECURITY -> SecurityHome(
                     lockType = lockManager.type(),
-                    onLockNow = { unlocked = false },
+                    lockEnabled = lockEnabled,
+                    biometricEnabled = biometricEnabled,
+                    fileLockDefault = fileLockDefault,
+                    biometricAvailable = activity.canUseBiometric(),
+                    onRequestChangeMethod = { securityAction = SecurityAction.ChangeMethod },
+                    onRequestBiometric = { enabled -> securityAction = SecurityAction.SetBiometric(enabled) },
+                    onRequestLock = { enabled -> securityAction = SecurityAction.SetLock(enabled) },
+                    onRequestFileLockDefault = { enabled -> securityAction = SecurityAction.SetFileLockDefault(enabled) },
+                    onLockNow = { if (lockEnabled) securityAction = SecurityAction.LockNow },
                 )
             }
         }
@@ -869,8 +962,30 @@ private fun SetupLockScreen(onComplete: () -> Unit) {
     LockScaffold(
         eyebrow = "PRIVATE BY DESIGN",
         title = "Build your vault",
-        description = "Every file is encrypted inside VoltShare’s app-private folder. Choose how you want to open the vault.",
+        description = "Every file is encrypted inside VoltShare’s app-private folder. Choose the gate that feels right for you.",
     ) {
+        GlassCard(modifier = Modifier.fillMaxWidth(), accent = VoltGreen, padding = 18.dp) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(
+                    modifier = Modifier
+                        .size(44.dp)
+                        .background(VoltGreen.copy(alpha = 0.13f), CircleShape)
+                        .border(1.dp, VoltGreen.copy(alpha = 0.38f), CircleShape),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(Icons.Default.Security, null, tint = VoltGreen, modifier = Modifier.size(22.dp))
+                }
+                Spacer(Modifier.width(13.dp))
+                Column {
+                    Text("ONE DEVICE. ONE PRIVATE GATE.", color = VoltGreen, fontSize = 10.sp, fontWeight = FontWeight.Black, letterSpacing = 1.1.sp)
+                    Spacer(Modifier.height(4.dp))
+                    Text("Your secret stays on this phone.", color = Color.White, fontWeight = FontWeight.Bold)
+                }
+            }
+        }
+        Spacer(Modifier.height(16.dp))
+        Text("Choose your lock method", color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+        Spacer(Modifier.height(10.dp))
         FloatingSegmentedControl(
             items = LockType.entries.map { it.label },
             selectedIndex = selected.ordinal,
@@ -932,6 +1047,7 @@ private fun SetupLockScreen(onComplete: () -> Unit) {
 @Composable
 private fun UnlockScreen(
     lockManager: LockManager,
+    biometricEnabled: Boolean,
     onUnlock: () -> Unit,
     onBiometric: () -> Unit,
 ) {
@@ -939,39 +1055,72 @@ private fun UnlockScreen(
     var pattern by remember { mutableStateOf<List<Int>>(emptyList()) }
     var error by remember { mutableStateOf(false) }
     LockScaffold(
-        eyebrow = "VAULT LOCKED",
+        eyebrow = "SECURITY CORE / LOCKED",
         title = "Welcome back",
-        description = "Your private files are still here. Unlock to continue.",
+        description = "Your private files are still here. Authenticate to enter your encrypted space.",
     ) {
         Box(
             modifier = Modifier
-                .size(88.dp)
-                .shadow(20.dp, CircleShape, ambientColor = VoltGreen.copy(alpha = 0.25f), spotColor = VoltGreen.copy(alpha = 0.18f))
-                .background(VoltGreen.copy(alpha = 0.1f), CircleShape)
+                .size(104.dp)
+                .shadow(28.dp, CircleShape, ambientColor = VoltGreen.copy(alpha = 0.28f), spotColor = VoltGreen.copy(alpha = 0.42f))
+                .background(
+                    Brush.radialGradient(listOf(VoltGreen.copy(alpha = 0.28f), VoltGreen.copy(alpha = 0.04f), Color.Transparent)),
+                    CircleShape,
+                )
+                .border(1.dp, VoltGreen.copy(alpha = 0.52f), CircleShape)
                 .align(Alignment.CenterHorizontally),
             contentAlignment = Alignment.Center,
         ) {
-            Icon(Icons.Default.Lock, null, tint = VoltGreen, modifier = Modifier.size(34.dp))
+            Box(
+                modifier = Modifier
+                    .size(74.dp)
+                    .background(Color.Black.copy(alpha = 0.42f), CircleShape)
+                    .border(1.dp, Color.White.copy(alpha = 0.14f), CircleShape),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(Icons.Default.Lock, null, tint = VoltGreen, modifier = Modifier.size(32.dp))
+            }
         }
-        Spacer(Modifier.height(28.dp))
-        if (lockManager.type() == LockType.PATTERN) {
-            PatternPad(pattern, onChange = {
-                pattern = it
-                error = false
-            })
-        } else {
-            SecureField(
-                value = secret,
-                label = "Enter ${lockManager.type().label.lowercase()}",
-                keyboardType = if (lockManager.type() == LockType.PIN) KeyboardType.NumberPassword else KeyboardType.Password,
-                onValueChange = {
-                    secret = it
-                    error = false
-                },
-            )
+        Spacer(Modifier.height(17.dp))
+        Text(
+            "${lockManager.type().label.uppercase()} GATE",
+            color = VoltGreen,
+            fontSize = 10.sp,
+            fontWeight = FontWeight.Black,
+            letterSpacing = 2.sp,
+            modifier = Modifier.align(Alignment.CenterHorizontally),
+        )
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 23.dp)
+                .background(Color.White.copy(alpha = 0.035f), RoundedCornerShape(26.dp))
+                .border(1.dp, Color.White.copy(alpha = 0.1f), RoundedCornerShape(26.dp))
+                .padding(18.dp),
+        ) {
+            Column {
+                Text("ENTER YOUR ${lockManager.type().label.uppercase()}", color = VoltTextMuted, fontSize = 10.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.2.sp)
+                Spacer(Modifier.height(13.dp))
+                if (lockManager.type() == LockType.PATTERN) {
+                    PatternPad(pattern, onChange = {
+                        pattern = it
+                        error = false
+                    })
+                } else {
+                    SecureField(
+                        value = secret,
+                        label = "Enter ${lockManager.type().label.lowercase()}",
+                        keyboardType = if (lockManager.type() == LockType.PIN) KeyboardType.NumberPassword else KeyboardType.Password,
+                        onValueChange = {
+                            secret = it
+                            error = false
+                        },
+                    )
+                }
+            }
         }
         AnimatedVisibility(error) {
-            Text("That code does not unlock this vault.", color = Color(0xFFFF6B6B), modifier = Modifier.padding(top = 12.dp))
+            Text("That code does not unlock this vault.", color = Color(0xFFFF8A80), fontSize = 12.sp, modifier = Modifier.padding(top = 12.dp))
         }
         Spacer(Modifier.height(20.dp))
         GlowButton(
@@ -982,18 +1131,30 @@ private fun UnlockScreen(
                 if (lockManager.verify(attempt)) onUnlock() else error = true
             },
         )
-        Spacer(Modifier.height(12.dp))
-        OutlinedButton(
-            onClick = onBiometric,
-            modifier = Modifier.fillMaxWidth().height(54.dp).shadow(10.dp, RoundedCornerShape(20.dp), spotColor = VoltGreen.copy(alpha = 0.16f)),
-            shape = RoundedCornerShape(20.dp),
-            border = BorderStroke(1.dp, Color.White.copy(alpha = 0.16f)),
-            colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White),
-        ) {
-            Icon(Icons.Default.Fingerprint, null, modifier = Modifier.size(20.dp))
-            Spacer(Modifier.width(10.dp))
-            Text("Use fingerprint / device unlock")
+        if (biometricEnabled) {
+            Spacer(Modifier.height(12.dp))
+            OutlinedButton(
+                onClick = onBiometric,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(54.dp)
+                    .shadow(12.dp, RoundedCornerShape(20.dp), spotColor = VoltGreen.copy(alpha = 0.2f)),
+                shape = RoundedCornerShape(20.dp),
+                border = BorderStroke(1.dp, VoltGreen.copy(alpha = 0.35f)),
+                colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White),
+            ) {
+                Icon(Icons.Default.Fingerprint, null, tint = VoltGreen, modifier = Modifier.size(20.dp))
+                Spacer(Modifier.width(10.dp))
+                Text("Use biometric / device unlock", fontWeight = FontWeight.Bold)
+            }
         }
+        Spacer(Modifier.height(14.dp))
+        Text(
+            "Encrypted locally • no network required",
+            color = VoltTextMuted,
+            fontSize = 11.sp,
+            modifier = Modifier.align(Alignment.CenterHorizontally),
+        )
     }
 }
 
@@ -1004,24 +1165,55 @@ private fun LockScaffold(
     description: String,
     content: @Composable ColumnScope.() -> Unit,
 ) {
-    Surface(color = VoltBlack, modifier = Modifier.fillMaxSize()) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(
+                Brush.verticalGradient(
+                    listOf(Color(0xFF06120D), VoltBlack, VoltBlack),
+                ),
+            ),
+    ) {
+        Box(
+            modifier = Modifier
+                .align(Alignment.TopEnd)
+                .offset(x = 96.dp, y = (-62).dp)
+                .size(250.dp)
+                .background(VoltGreen.copy(alpha = 0.07f), CircleShape)
+                .border(1.dp, VoltGreen.copy(alpha = 0.12f), CircleShape),
+        )
+        Box(
+            modifier = Modifier
+                .align(Alignment.BottomStart)
+                .offset(x = (-90).dp, y = 76.dp)
+                .size(220.dp)
+                .background(VoltTeal.copy(alpha = 0.08f), CircleShape),
+        )
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .verticalScroll(rememberScrollState())
-                .padding(horizontal = 24.dp, vertical = 48.dp),
+                .padding(horizontal = 24.dp, vertical = 46.dp),
             verticalArrangement = Arrangement.Top,
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(Icons.Default.Bolt, null, tint = VoltGreen, modifier = Modifier.size(18.dp))
-                Spacer(Modifier.width(8.dp))
-                Text(eyebrow, color = VoltGreen, fontSize = 12.sp, fontWeight = FontWeight.Bold, letterSpacing = 2.sp)
+                Box(
+                    modifier = Modifier
+                        .size(30.dp)
+                        .background(VoltGreen.copy(alpha = 0.12f), CircleShape)
+                        .border(1.dp, VoltGreen.copy(alpha = 0.38f), CircleShape),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(Icons.Default.Bolt, null, tint = VoltGreen, modifier = Modifier.size(16.dp))
+                }
+                Spacer(Modifier.width(9.dp))
+                Text(eyebrow, color = VoltGreen, fontSize = 11.sp, fontWeight = FontWeight.Black, letterSpacing = 1.8.sp)
             }
-            Spacer(Modifier.height(14.dp))
+            Spacer(Modifier.height(15.dp))
             Text(title, style = MaterialTheme.typography.headlineLarge, color = Color.White)
-            Spacer(Modifier.height(12.dp))
+            Spacer(Modifier.height(10.dp))
             Text(description, color = VoltTextMuted, lineHeight = 22.sp)
-            Spacer(Modifier.height(32.dp))
+            Spacer(Modifier.height(26.dp))
             Column(content = content)
         }
     }
@@ -3164,53 +3356,534 @@ private fun InstalledAppsDialog(
 }
 
 @Composable
-private fun SecurityHome(lockType: LockType, onLockNow: () -> Unit) {
-    var fileLockDefault by remember { mutableStateOf(true) }
+private fun SecurityHome(
+    lockType: LockType,
+    lockEnabled: Boolean,
+    biometricEnabled: Boolean,
+    fileLockDefault: Boolean,
+    biometricAvailable: Boolean,
+    onRequestChangeMethod: () -> Unit,
+    onRequestBiometric: (Boolean) -> Unit,
+    onRequestLock: (Boolean) -> Unit,
+    onRequestFileLockDefault: (Boolean) -> Unit,
+    onLockNow: () -> Unit,
+) {
     LazyColumn(
         modifier = Modifier.fillMaxSize().background(VoltBlack),
         contentPadding = PaddingValues(horizontal = 20.dp, vertical = 22.dp),
         verticalArrangement = Arrangement.spacedBy(18.dp),
     ) {
         item {
-            Text("SECURITY LAYER", color = VoltGreen, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 3.sp)
-            Spacer(Modifier.height(8.dp))
-            Text("Control your boundary", style = MaterialTheme.typography.headlineMedium, color = Color.White)
-            Spacer(Modifier.height(8.dp))
-            Text("Your vault is encrypted at rest and invisible to normal file browsers.", color = VoltTextMuted, lineHeight = 21.sp)
+            LockSecurityHero(
+                lockType = lockType,
+                lockEnabled = lockEnabled,
+                biometricEnabled = biometricEnabled && biometricAvailable,
+            )
         }
         item {
-            GlassCard(modifier = Modifier.fillMaxWidth(), accent = VoltGreen) {
+            GlassCard(modifier = Modifier.fillMaxWidth(), accent = if (lockEnabled) VoltGreen else VoltTeal, padding = 18.dp) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Default.Lock, null, tint = VoltGreen, modifier = Modifier.size(26.dp))
-                    Spacer(Modifier.width(14.dp))
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text("App lock", color = Color.White, fontWeight = FontWeight.Bold)
-                        Text("${lockType.label} + fingerprint available", color = VoltTextMuted, fontSize = 12.sp)
+                    Box(
+                        modifier = Modifier
+                            .size(48.dp)
+                            .background(
+                                if (lockEnabled) VoltGreen.copy(alpha = 0.14f) else VoltTeal.copy(alpha = 0.14f),
+                                CircleShape,
+                            ),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(
+                            if (lockEnabled) Icons.Default.Lock else Icons.Default.LockOpen,
+                            null,
+                            tint = if (lockEnabled) VoltGreen else VoltTeal,
+                            modifier = Modifier.size(23.dp),
+                        )
                     }
-                    Icon(Icons.Default.Check, null, tint = VoltGreen)
-                }
-                Divider(color = Color.White.copy(alpha = 0.08f), modifier = Modifier.padding(vertical = 18.dp))
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Default.Security, null, tint = VoltGreen, modifier = Modifier.size(26.dp))
-                    Spacer(Modifier.width(14.dp))
+                    Spacer(Modifier.width(13.dp))
                     Column(modifier = Modifier.weight(1f)) {
-                        Text("Lock each file", color = Color.White, fontWeight = FontWeight.Bold)
-                        Text("Require your vault lock before viewing", color = VoltTextMuted, fontSize = 12.sp)
+                        Text("Vault lock", color = Color.White, fontWeight = FontWeight.Bold)
+                        Text(
+                            if (lockEnabled) "Protection is active whenever VoltShare opens" else "Protection is paused until you turn it back on",
+                            color = VoltTextMuted,
+                            fontSize = 12.sp,
+                            lineHeight = 17.sp,
+                        )
                     }
                     PremiumSwitch(
-                        checked = fileLockDefault,
-                        onCheckedChange = { fileLockDefault = it },
+                        checked = lockEnabled,
+                        onCheckedChange = onRequestLock,
                     )
                 }
             }
         }
         item {
-            GlowButton("Lock vault now", Icons.Default.Lock, onLockNow)
+            GlassCard(modifier = Modifier.fillMaxWidth(), accent = VoltTeal, padding = 18.dp) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(
+                        modifier = Modifier
+                            .size(44.dp)
+                            .background(VoltTeal.copy(alpha = 0.13f), RoundedCornerShape(15.dp)),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(Icons.Default.SwapHoriz, null, tint = Color(0xFF65D8C8), modifier = Modifier.size(22.dp))
+                    }
+                    Spacer(Modifier.width(13.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("Unlock method", color = Color.White, fontWeight = FontWeight.Bold)
+                        Text("${lockType.label} is your current vault key", color = VoltTextMuted, fontSize = 12.sp)
+                    }
+                    TextButton(
+                        onClick = onRequestChangeMethod,
+                        colors = ButtonDefaults.textButtonColors(contentColor = VoltGreen),
+                    ) {
+                        Text("Change", fontWeight = FontWeight.Bold)
+                    }
+                }
+                Divider(color = Color.White.copy(alpha = 0.08f), modifier = Modifier.padding(vertical = 16.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(
+                        modifier = Modifier
+                            .size(44.dp)
+                            .background(VoltGreen.copy(alpha = 0.11f), RoundedCornerShape(15.dp)),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(Icons.Default.Security, null, tint = VoltGreen, modifier = Modifier.size(22.dp))
+                    }
+                    Spacer(Modifier.width(13.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("Lock individual files", color = Color.White, fontWeight = FontWeight.Bold)
+                        Text("Add a second verification gate to sensitive previews", color = VoltTextMuted, fontSize = 12.sp)
+                    }
+                    PremiumSwitch(
+                        checked = fileLockDefault,
+                        onCheckedChange = onRequestFileLockDefault,
+                    )
+                }
+            }
         }
         item {
-            Text("Security note", color = VoltTextMuted, fontSize = 12.sp)
-            Spacer(Modifier.height(5.dp))
-            Text("VoltShare never uploads your vault. Local discovery and transfers are initiated only when you tap Share.", color = Color.White.copy(alpha = 0.72f), fontSize = 13.sp, lineHeight = 19.sp)
+            GlassCard(modifier = Modifier.fillMaxWidth(), accent = if (biometricAvailable) VoltGreen else VoltTextMuted, padding = 18.dp) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(
+                        modifier = Modifier
+                            .size(44.dp)
+                            .background(
+                                if (biometricAvailable) VoltGreen.copy(alpha = 0.12f) else Color.White.copy(alpha = 0.07f),
+                                RoundedCornerShape(15.dp),
+                            ),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(
+                            Icons.Default.Fingerprint,
+                            null,
+                            tint = if (biometricAvailable) VoltGreen else VoltTextMuted,
+                            modifier = Modifier.size(24.dp),
+                        )
+                    }
+                    Spacer(Modifier.width(13.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("Biometric unlock", color = Color.White, fontWeight = FontWeight.Bold)
+                        Text(
+                            if (biometricAvailable) "Use fingerprint or device unlock at the vault gate" else "No compatible biometric or device credential is available",
+                            color = VoltTextMuted,
+                            fontSize = 12.sp,
+                            lineHeight = 17.sp,
+                        )
+                    }
+                    PremiumSwitch(
+                        checked = biometricEnabled && biometricAvailable,
+                        enabled = biometricAvailable,
+                        onCheckedChange = onRequestBiometric,
+                    )
+                }
+            }
+        }
+        item {
+            if (lockEnabled) {
+                GlowButton(
+                    text = "Lock vault now",
+                    icon = Icons.Default.Lock,
+                    onClick = onLockNow,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            } else {
+                OutlinedButton(
+                    onClick = {},
+                    enabled = false,
+                    modifier = Modifier.fillMaxWidth().height(54.dp),
+                    shape = RoundedCornerShape(20.dp),
+                    border = BorderStroke(1.dp, Color.White.copy(alpha = 0.1f)),
+                ) {
+                    Icon(Icons.Default.LockOpen, null, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text("Enable vault lock above to lock now")
+                }
+            }
+        }
+        item {
+            GlassCard(modifier = Modifier.fillMaxWidth(), accent = VoltGreen, padding = 18.dp) {
+                Row(verticalAlignment = Alignment.Top) {
+                    Icon(Icons.Default.Bolt, null, tint = VoltGreen, modifier = Modifier.size(20.dp))
+                    Spacer(Modifier.width(11.dp))
+                    Column {
+                        Text("Private by design", color = Color.White, fontWeight = FontWeight.Bold)
+                        Spacer(Modifier.height(5.dp))
+                        Text(
+                            "Your lock secret is reduced to a salted device-local hash. VoltShare never uploads it, and every security change asks for the current lock first.",
+                            color = VoltTextMuted,
+                            fontSize = 12.sp,
+                            lineHeight = 18.sp,
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun LockSecurityHero(
+    lockType: LockType,
+    lockEnabled: Boolean,
+    biometricEnabled: Boolean,
+) {
+    val transition = rememberInfiniteTransition(label = "security-hero")
+    val pulse by transition.animateFloat(
+        initialValue = 0.88f,
+        targetValue = 1.12f,
+        animationSpec = infiniteRepeatable(tween(2200), RepeatMode.Reverse),
+        label = "security-pulse",
+    )
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(218.dp)
+            .shadow(24.dp, RoundedCornerShape(30.dp), spotColor = VoltGreen.copy(alpha = 0.26f))
+            .background(
+                Brush.linearGradient(
+                    listOf(
+                        VoltGreen.copy(alpha = 0.18f),
+                        VoltTeal.copy(alpha = 0.13f),
+                        VoltSurfaceRaised,
+                    ),
+                ),
+                RoundedCornerShape(30.dp),
+            )
+            .border(1.dp, Color.White.copy(alpha = 0.12f), RoundedCornerShape(30.dp))
+            .padding(20.dp),
+    ) {
+        Box(
+            modifier = Modifier
+                .align(Alignment.TopEnd)
+                .size((132.dp * pulse))
+                .border(1.dp, VoltGreen.copy(alpha = 0.13f), CircleShape),
+        )
+        Box(
+            modifier = Modifier
+                .align(Alignment.BottomEnd)
+                .size(84.dp)
+                .background(VoltTeal.copy(alpha = 0.08f), CircleShape),
+        )
+        Column(modifier = Modifier.fillMaxSize()) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Default.Security, null, tint = VoltGreen, modifier = Modifier.size(16.dp))
+                Spacer(Modifier.width(8.dp))
+                Text("SECURITY CORE", color = VoltGreen, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 2.2.sp)
+            }
+            Spacer(Modifier.height(16.dp))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(
+                    modifier = Modifier
+                        .size(74.dp)
+                        .shadow(20.dp, CircleShape, spotColor = VoltGreen.copy(alpha = 0.5f))
+                        .background(VoltGreen.copy(alpha = if (lockEnabled) 0.18f else 0.08f), CircleShape)
+                        .border(1.dp, VoltGreen.copy(alpha = 0.55f), CircleShape),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        if (lockEnabled) Icons.Default.Lock else Icons.Default.LockOpen,
+                        null,
+                        tint = if (lockEnabled) VoltGreen else VoltTextMuted,
+                        modifier = Modifier.size(32.dp),
+                    )
+                }
+                Spacer(Modifier.width(17.dp))
+                Column {
+                    Text(
+                        if (lockEnabled) "Vault protected" else "Protection paused",
+                        color = Color.White,
+                        fontSize = 22.sp,
+                        fontWeight = FontWeight.Black,
+                    )
+                    Spacer(Modifier.height(5.dp))
+                    Text(
+                        if (biometricEnabled) "${lockType.label} + biometric ready" else "${lockType.label} only",
+                        color = VoltTextMuted,
+                        fontSize = 12.sp,
+                    )
+                }
+            }
+            Spacer(Modifier.weight(1f))
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                LockStatusChip(if (lockEnabled) "ACTIVE" else "PAUSED", lockEnabled)
+                LockStatusChip(if (biometricEnabled) "BIOMETRIC ON" else "BIOMETRIC OFF", biometricEnabled)
+            }
+        }
+    }
+}
+
+@Composable
+private fun LockStatusChip(label: String, active: Boolean) {
+    Surface(
+        color = if (active) VoltGreen.copy(alpha = 0.14f) else Color.White.copy(alpha = 0.07f),
+        shape = RoundedCornerShape(50),
+        border = BorderStroke(1.dp, if (active) VoltGreen.copy(alpha = 0.38f) else Color.White.copy(alpha = 0.12f)),
+    ) {
+        Text(
+            label,
+            color = if (active) VoltGreen else VoltTextMuted,
+            fontSize = 9.sp,
+            fontWeight = FontWeight.Black,
+            letterSpacing = 0.8.sp,
+            modifier = Modifier.padding(horizontal = 11.dp, vertical = 7.dp),
+        )
+    }
+}
+
+@Composable
+private fun LockVerificationDialog(
+    title: String,
+    type: LockType,
+    onDismiss: () -> Unit,
+    onConfirm: (String) -> Boolean,
+) {
+    var secret by remember { mutableStateOf("") }
+    var pattern by remember { mutableStateOf<List<Int>>(emptyList()) }
+    var error by remember { mutableStateOf(false) }
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false),
+    ) {
+        Surface(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 18.dp),
+            shape = RoundedCornerShape(30.dp),
+            color = VoltSurfaceRaised,
+            border = BorderStroke(1.dp, VoltGreen.copy(alpha = 0.32f)),
+            shadowElevation = 28.dp,
+        ) {
+            Column(Modifier.padding(22.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(
+                        modifier = Modifier
+                            .size(52.dp)
+                            .shadow(14.dp, CircleShape, spotColor = VoltGreen.copy(alpha = 0.35f))
+                            .background(VoltGreen.copy(alpha = 0.13f), CircleShape),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(Icons.Default.Security, null, tint = VoltGreen, modifier = Modifier.size(25.dp))
+                    }
+                    Spacer(Modifier.width(14.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("AUTHENTICATE", color = VoltGreen, fontSize = 10.sp, fontWeight = FontWeight.Black, letterSpacing = 1.8.sp)
+                        Spacer(Modifier.height(4.dp))
+                        Text(title, color = Color.White, fontSize = 19.sp, fontWeight = FontWeight.Black)
+                    }
+                    IconButton(onClick = onDismiss) {
+                        Icon(Icons.Default.Close, "Close", tint = VoltTextMuted)
+                    }
+                }
+                Spacer(Modifier.height(12.dp))
+                Text(
+                    "Use your current ${type.label.lowercase()} to authorize this security change.",
+                    color = VoltTextMuted,
+                    fontSize = 13.sp,
+                    lineHeight = 19.sp,
+                )
+                Spacer(Modifier.height(18.dp))
+                if (type == LockType.PATTERN) {
+                    PatternPad(pattern, onChange = {
+                        pattern = it
+                        error = false
+                    })
+                } else {
+                    SecureField(
+                        value = secret,
+                        label = "Current ${type.label.lowercase()}",
+                        keyboardType = if (type == LockType.PIN) KeyboardType.NumberPassword else KeyboardType.Password,
+                        onValueChange = {
+                            secret = it
+                            error = false
+                        },
+                    )
+                }
+                AnimatedVisibility(error) {
+                    Text(
+                        "That is not your current lock.",
+                        color = Color(0xFFFF8A80),
+                        fontSize = 12.sp,
+                        modifier = Modifier.padding(top = 10.dp),
+                    )
+                }
+                Spacer(Modifier.height(18.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
+                    TextButton(
+                        onClick = onDismiss,
+                        modifier = Modifier.weight(1f),
+                        colors = ButtonDefaults.textButtonColors(contentColor = VoltTextMuted),
+                    ) { Text("Cancel") }
+                    Button(
+                        onClick = {
+                            val attempt = if (type == LockType.PATTERN) pattern.joinToString("-") else secret
+                            if (!onConfirm(attempt)) error = true
+                        },
+                        enabled = if (type == LockType.PATTERN) pattern.size >= 4 else secret.length >= 4,
+                        modifier = Modifier.weight(1.25f).height(48.dp),
+                        shape = RoundedCornerShape(16.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = VoltGreen, contentColor = Color.Black),
+                    ) {
+                        Icon(Icons.Default.Check, null, modifier = Modifier.size(17.dp))
+                        Spacer(Modifier.width(7.dp))
+                        Text("Verify", fontWeight = FontWeight.Bold)
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ChangeLockDialog(
+    currentType: LockType,
+    onDismiss: () -> Unit,
+    onChanged: (LockType, String) -> Unit,
+) {
+    var selected by remember { mutableStateOf(currentType) }
+    var secret by remember { mutableStateOf("") }
+    var confirm by remember { mutableStateOf("") }
+    var pattern by remember { mutableStateOf<List<Int>>(emptyList()) }
+    var confirmPattern by remember { mutableStateOf<List<Int>>(emptyList()) }
+    var error by remember { mutableStateOf("") }
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false),
+    ) {
+        Surface(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 18.dp),
+            shape = RoundedCornerShape(30.dp),
+            color = VoltSurfaceRaised,
+            border = BorderStroke(1.dp, VoltGreen.copy(alpha = 0.32f)),
+            shadowElevation = 28.dp,
+        ) {
+            Column(Modifier.padding(22.dp).verticalScroll(rememberScrollState())) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(
+                        modifier = Modifier
+                            .size(52.dp)
+                            .shadow(14.dp, CircleShape, spotColor = VoltGreen.copy(alpha = 0.35f))
+                            .background(VoltGreen.copy(alpha = 0.13f), CircleShape),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(Icons.Default.Lock, null, tint = VoltGreen, modifier = Modifier.size(25.dp))
+                    }
+                    Spacer(Modifier.width(14.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("REKEY VAULT", color = VoltGreen, fontSize = 10.sp, fontWeight = FontWeight.Black, letterSpacing = 1.8.sp)
+                        Spacer(Modifier.height(4.dp))
+                        Text("Choose a new lock", color = Color.White, fontSize = 21.sp, fontWeight = FontWeight.Black)
+                    }
+                    IconButton(onClick = onDismiss) {
+                        Icon(Icons.Default.Close, "Close", tint = VoltTextMuted)
+                    }
+                }
+                Spacer(Modifier.height(10.dp))
+                Text(
+                    "Your current lock was verified. Pick the new way you want to protect the vault.",
+                    color = VoltTextMuted,
+                    fontSize = 13.sp,
+                    lineHeight = 19.sp,
+                )
+                Spacer(Modifier.height(18.dp))
+                FloatingSegmentedControl(
+                    items = LockType.entries.map { it.label },
+                    selectedIndex = selected.ordinal,
+                    onSelected = {
+                        selected = LockType.entries[it]
+                        secret = ""
+                        confirm = ""
+                        pattern = emptyList()
+                        confirmPattern = emptyList()
+                        error = ""
+                    },
+                )
+                Spacer(Modifier.height(18.dp))
+                if (selected == LockType.PATTERN) {
+                    Text("New pattern · connect at least 4 nodes", color = VoltTextMuted, fontSize = 12.sp)
+                    Spacer(Modifier.height(8.dp))
+                    PatternPad(pattern, onChange = {
+                        pattern = it
+                        error = ""
+                    })
+                    Spacer(Modifier.height(12.dp))
+                    Text("Repeat the pattern", color = VoltTextMuted, fontSize = 12.sp)
+                    Spacer(Modifier.height(8.dp))
+                    PatternPad(confirmPattern, onChange = {
+                        confirmPattern = it
+                        error = ""
+                    })
+                } else {
+                    SecureField(
+                        value = secret,
+                        label = "New ${selected.label.lowercase()}",
+                        keyboardType = if (selected == LockType.PIN) KeyboardType.NumberPassword else KeyboardType.Password,
+                        onValueChange = {
+                            secret = it
+                            error = ""
+                        },
+                    )
+                    Spacer(Modifier.height(13.dp))
+                    SecureField(
+                        value = confirm,
+                        label = "Repeat ${selected.label.lowercase()}",
+                        keyboardType = if (selected == LockType.PIN) KeyboardType.NumberPassword else KeyboardType.Password,
+                        onValueChange = {
+                            confirm = it
+                            error = ""
+                        },
+                    )
+                }
+                AnimatedVisibility(error.isNotEmpty()) {
+                    Text(error, color = Color(0xFFFF8A80), fontSize = 12.sp, modifier = Modifier.padding(top = 10.dp))
+                }
+                Spacer(Modifier.height(18.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
+                    TextButton(
+                        onClick = onDismiss,
+                        modifier = Modifier.weight(1f),
+                        colors = ButtonDefaults.textButtonColors(contentColor = VoltTextMuted),
+                    ) { Text("Cancel") }
+                    Button(
+                        onClick = {
+                            error = when {
+                                selected == LockType.PATTERN && pattern.size < 4 -> "Use at least 4 connected nodes."
+                                selected == LockType.PATTERN && pattern != confirmPattern -> "The two patterns do not match."
+                                selected != LockType.PATTERN && secret.length < 4 -> "Use at least 4 characters."
+                                selected != LockType.PATTERN && secret != confirm -> "The two entries do not match."
+                                else -> ""
+                            }
+                            if (error.isEmpty()) {
+                                onChanged(selected, if (selected == LockType.PATTERN) pattern.joinToString("-") else secret)
+                            }
+                        },
+                        modifier = Modifier.weight(1.25f).height(48.dp),
+                        shape = RoundedCornerShape(16.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = VoltGreen, contentColor = Color.Black),
+                    ) {
+                        Icon(Icons.Default.Check, null, modifier = Modifier.size(17.dp))
+                        Spacer(Modifier.width(7.dp))
+                        Text("Save lock", fontWeight = FontWeight.Bold)
+                    }
+                }
+            }
         }
     }
 }
@@ -3607,34 +4280,17 @@ private fun FileActionRow(
 }
 
 @Composable
-private fun SecretDialog(title: String, type: LockType, onDismiss: () -> Unit, onConfirm: (String) -> Unit) {
-    var secret by remember { mutableStateOf("") }
-    var pattern by remember { mutableStateOf<List<Int>>(emptyList()) }
-    androidx.compose.material3.AlertDialog(
-        onDismissRequest = onDismiss,
-        containerColor = VoltSurfaceRaised,
-        title = { Text(title, color = Color.White) },
-        text = {
-            if (type == LockType.PATTERN) {
-                PatternPad(pattern, onChange = { pattern = it })
-            } else {
-                SecureField(
-                    value = secret,
-                    label = "Enter ${type.label.lowercase()}",
-                    keyboardType = if (type == LockType.PIN) KeyboardType.NumberPassword else KeyboardType.Password,
-                    onValueChange = { secret = it },
-                )
-            }
-        },
-        confirmButton = {
-            TextButton(
-                onClick = { onConfirm(if (type == LockType.PATTERN) pattern.joinToString("-") else secret) },
-                colors = ButtonDefaults.textButtonColors(contentColor = VoltGreen),
-            ) { Text("Unlock") }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss, colors = ButtonDefaults.textButtonColors(contentColor = VoltTextMuted)) { Text("Cancel") }
-        },
+private fun SecretDialog(
+    title: String,
+    type: LockType,
+    onDismiss: () -> Unit,
+    onConfirm: (String) -> Boolean,
+) {
+    LockVerificationDialog(
+        title = title,
+        type = type,
+        onDismiss = onDismiss,
+        onConfirm = onConfirm,
     )
 }
 
@@ -3647,6 +4303,13 @@ private fun PatternPad(pattern: List<Int>, onChange: (List<Int>) -> Unit) {
     val currentOnChange by rememberUpdatedState(onChange)
     var activeLineEnd by remember { mutableStateOf<Offset?>(null) }
     var isDrawing by remember { mutableStateOf(false) }
+    val transition = rememberInfiniteTransition(label = "pattern-pulse")
+    val pulse by transition.animateFloat(
+        initialValue = 0.88f,
+        targetValue = 1.12f,
+        animationSpec = infiniteRepeatable(tween(1100), RepeatMode.Reverse),
+        label = "pattern-pulse-scale",
+    )
 
     Box(
         modifier = Modifier
@@ -3657,6 +4320,14 @@ private fun PatternPad(pattern: List<Int>, onChange: (List<Int>) -> Unit) {
         Canvas(
             modifier = Modifier
                 .fillMaxSize()
+                .shadow(18.dp, RoundedCornerShape(28.dp), spotColor = VoltGreen.copy(alpha = 0.22f))
+                .background(
+                    Brush.radialGradient(
+                        listOf(VoltGreen.copy(alpha = 0.12f), Color.White.copy(alpha = 0.025f), Color.Transparent),
+                    ),
+                    RoundedCornerShape(28.dp),
+                )
+                .border(1.dp, VoltGreen.copy(alpha = 0.24f), RoundedCornerShape(28.dp))
                 .pointerInput(Unit) {
                     detectDragGestures(
                         onDragStart = { position ->
@@ -3698,6 +4369,12 @@ private fun PatternPad(pattern: List<Int>, onChange: (List<Int>) -> Unit) {
             val selectedCenters = currentPattern.mapNotNull { centers.getOrNull(it) }
             selectedCenters.zipWithNext().forEach { (start, end) ->
                 drawLine(
+                    color = VoltGreen.copy(alpha = 0.18f),
+                    start = start,
+                    end = end,
+                    strokeWidth = with(density) { 18.dp.toPx() },
+                )
+                drawLine(
                     color = VoltGreen,
                     start = start,
                     end = end,
@@ -3709,14 +4386,19 @@ private fun PatternPad(pattern: List<Int>, onChange: (List<Int>) -> Unit) {
                     color = VoltGreen.copy(alpha = 0.6f),
                     start = selectedCenters.last(),
                     end = activeLineEnd!!,
-                    strokeWidth = with(density) { 5.dp.toPx() },
+                    strokeWidth = with(density) { 6.dp.toPx() },
                 )
             }
             centers.forEachIndexed { index, center ->
                 val selected = index in currentPattern
                 if (selected) {
                     drawCircle(
-                        color = VoltGreen.copy(alpha = 0.18f),
+                        color = VoltGreen.copy(alpha = 0.12f),
+                        radius = with(density) { 43.dp.toPx() } * pulse,
+                        center = center,
+                    )
+                    drawCircle(
+                        color = VoltGreen.copy(alpha = 0.22f),
                         radius = with(density) { 34.dp.toPx() },
                         center = center,
                     )
@@ -3733,6 +4415,11 @@ private fun PatternPad(pattern: List<Int>, onChange: (List<Int>) -> Unit) {
                         radius = nodeRadius,
                         center = center,
                         style = androidx.compose.ui.graphics.drawscope.Stroke(with(density) { 1.dp.toPx() }),
+                    )
+                    drawCircle(
+                        color = VoltGreen.copy(alpha = 0.24f),
+                        radius = with(density) { 5.dp.toPx() },
+                        center = center,
                     )
                 }
             }
@@ -3789,7 +4476,10 @@ private fun SecureField(value: String, label: String, keyboardType: KeyboardType
         keyboardOptions = KeyboardOptions(keyboardType = keyboardType),
         visualTransformation = PasswordVisualTransformation(),
         shape = RoundedCornerShape(18.dp),
+        leadingIcon = { Icon(Icons.Default.Lock, null, tint = VoltGreen, modifier = Modifier.size(19.dp)) },
         colors = androidx.compose.material3.OutlinedTextFieldDefaults.colors(
+            focusedContainerColor = Color.Black.copy(alpha = 0.26f),
+            unfocusedContainerColor = Color.Black.copy(alpha = 0.2f),
             focusedBorderColor = VoltGreen,
             focusedLabelColor = VoltGreen,
             cursorColor = VoltGreen,
@@ -3804,17 +4494,31 @@ private fun SecureField(value: String, label: String, keyboardType: KeyboardType
 @Composable
 private fun FloatingSegmentedControl(items: List<String>, selectedIndex: Int, onSelected: (Int) -> Unit) {
     Row(
-        modifier = Modifier.fillMaxWidth().background(VoltSurface, RoundedCornerShape(18.dp)).padding(5.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(Color.White.copy(alpha = 0.045f), RoundedCornerShape(20.dp))
+            .border(1.dp, Color.White.copy(alpha = 0.1f), RoundedCornerShape(20.dp))
+            .padding(5.dp),
         horizontalArrangement = Arrangement.spacedBy(4.dp),
     ) {
         items.forEachIndexed { index, item ->
             val selected = index == selectedIndex
             Surface(
-                modifier = Modifier.weight(1f).clickable { onSelected(index) },
-                shape = RoundedCornerShape(14.dp),
+                modifier = Modifier
+                    .weight(1f)
+                    .shadow(if (selected) 10.dp else 0.dp, RoundedCornerShape(15.dp), spotColor = VoltGreen.copy(alpha = 0.4f))
+                    .clickable { onSelected(index) },
+                shape = RoundedCornerShape(15.dp),
                 color = if (selected) VoltGreen else Color.Transparent,
+                border = if (selected) BorderStroke(1.dp, Color.White.copy(alpha = 0.28f)) else null,
             ) {
-                Text(item, color = if (selected) Color.Black else VoltTextMuted, fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal, modifier = Modifier.padding(vertical = 12.dp), textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+                Text(
+                    item,
+                    color = if (selected) Color.Black else VoltTextMuted,
+                    fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
+                    modifier = Modifier.padding(vertical = 12.dp),
+                    textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                )
             }
         }
     }
@@ -3843,6 +4547,7 @@ private fun GlowButton(text: String, icon: ImageVector, onClick: () -> Unit, mod
 private fun PremiumSwitch(
     checked: Boolean,
     onCheckedChange: (Boolean) -> Unit,
+    enabled: Boolean = true,
 ) {
     val thumbOffset by androidx.compose.animation.core.animateDpAsState(
         targetValue = if (checked) 27.dp else 4.dp,
@@ -3854,9 +4559,10 @@ private fun PremiumSwitch(
             .width(58.dp)
             .height(34.dp)
             .clip(RoundedCornerShape(18.dp))
+            .graphicsLayer { alpha = if (enabled) 1f else 0.42f }
             .background(if (checked) VoltGreen.copy(alpha = 0.22f) else Color.White.copy(alpha = 0.10f))
             .border(1.dp, if (checked) VoltGreen.copy(alpha = 0.72f) else Color.White.copy(alpha = 0.16f), RoundedCornerShape(18.dp))
-            .clickable { onCheckedChange(!checked) }
+            .clickable(enabled = enabled) { onCheckedChange(!checked) }
             .padding(3.dp),
         contentAlignment = Alignment.CenterStart,
     ) {

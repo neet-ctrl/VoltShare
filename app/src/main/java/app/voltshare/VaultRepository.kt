@@ -57,6 +57,12 @@ class VaultRepository(private val context: Context) {
     private val viewCacheDir = File(context.cacheDir, "view-cache").apply { mkdirs() }
     private val preferences = context.getSharedPreferences("voltshare-vault", Context.MODE_PRIVATE)
 
+    fun isFileLockDefault(): Boolean = preferences.getBoolean(FILE_LOCK_DEFAULT_KEY, true)
+
+    fun setFileLockDefault(enabled: Boolean) {
+        preferences.edit().putBoolean(FILE_LOCK_DEFAULT_KEY, enabled).apply()
+    }
+
     fun listFiles(): List<VaultFile> {
         if (!metadataFile.exists()) return emptyList()
         return runCatching {
@@ -111,7 +117,7 @@ class VaultRepository(private val context: Context) {
                 name = displayName,
                 mimeType = mimeType,
                 sizeBytes = encoded?.sizeBytes ?: 0L,
-                locked = false,
+                locked = isFileLockDefault(),
                 folderPath = targetFolder,
                 createdAt = now,
                 order = now,
@@ -177,7 +183,7 @@ class VaultRepository(private val context: Context) {
                 name = name.sanitizeName(),
                 mimeType = mimeType,
                 sizeBytes = size,
-                locked = false,
+                locked = isFileLockDefault(),
                 folderPath = targetFolder,
                 createdAt = now,
                 order = now,
@@ -415,7 +421,7 @@ class VaultRepository(private val context: Context) {
                 name = displayName.sanitizeName(),
                 mimeType = mimeType,
                 sizeBytes = encoded.sizeBytes,
-                locked = false,
+                locked = isFileLockDefault(),
                 folderPath = targetFolder,
                 createdAt = now,
                 order = now,
@@ -582,6 +588,7 @@ class VaultRepository(private val context: Context) {
         private const val KEY_ALIAS = "voltshare-vault-key"
         private const val TRANSFORMATION = "AES/GCM/NoPadding"
         private const val PRIMARY_FOLDER_KEY = "primary-folder"
+        private const val FILE_LOCK_DEFAULT_KEY = "file-lock-default"
     }
 
     private val foldersFile: File
