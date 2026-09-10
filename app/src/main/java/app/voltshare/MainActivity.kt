@@ -16,8 +16,13 @@ import android.os.ParcelFileDescriptor
 import android.provider.Settings
 import android.provider.OpenableColumns
 import android.text.format.Formatter
+import android.text.method.ScrollingMovementMethod
+import android.view.ActionMode
+import android.view.Menu
+import android.view.MenuItem
 import android.view.ViewGroup
 import android.widget.ImageView
+import android.widget.TextView
 import android.widget.Toast
 import android.media.MediaMetadataRetriever
 import androidx.activity.compose.BackHandler
@@ -166,7 +171,6 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
-import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -4407,24 +4411,108 @@ private fun TextViewer(file: File) {
                 }
             }
             else -> {
-                SelectionContainer {
-                    Column(
-                        Modifier
-                            .fillMaxSize()
-                            .verticalScroll(rememberScrollState())
-                            .padding(bottom = 22.dp),
-                    ) {
-                        Text(
-                            text!!,
-                            color = Color(0xFFE6F5EC),
-                            fontFamily = FontFamily.Monospace,
-                            fontSize = 13.sp,
-                            lineHeight = 21.sp,
-                        )
-                    }
-                }
+                AndroidView(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(bottom = 22.dp),
+                    factory = { viewContext ->
+                        TextView(viewContext).apply {
+                            setTextColor(android.graphics.Color.rgb(230, 245, 236))
+                            setBackgroundColor(android.graphics.Color.rgb(10, 10, 10))
+                            typeface = android.graphics.Typeface.MONOSPACE
+                            textSize = 13f
+                            setLineSpacing(0f, 1.62f)
+                            setPadding(0, 0, 0, (22 * resources.displayMetrics.density).toInt())
+                            gravity = android.view.Gravity.TOP or android.view.Gravity.START
+                            isVerticalScrollBarEnabled = true
+                            movementMethod = ScrollingMovementMethod.getInstance()
+                            setTextIsSelectable(true)
+                            setCustomSelectionActionModeCallback(
+                                createUrlSelectionActionModeCallback(viewContext, this),
+                            )
+                        }
+                    },
+                    update = { textView ->
+                        if (textView.text.toString() != text!!) {
+                            textView.text = text
+                        }
+                    },
+                )
             }
         }
+    }
+}
+
+private const val ChromeStablePackage = "com.android.chrome"
+private const val ChromeIncognitoExtra =
+    "com.google.android.apps.chrome.EXTRA_OPEN_NEW_INCOGNITO_TAB"
+private const val OpenInChromeIncognitoActionId = 0x564f4c54
+
+private fun createUrlSelectionActionModeCallback(
+    context: android.content.Context,
+    textView: TextView,
+): ActionMode.Callback =
+    object : ActionMode.Callback {
+        override fun onCreateActionMode(mode: ActionMode, menu: Menu): Boolean {
+            ensureIncognitoMenuItem(menu, textView)
+            return true
+        }
+
+        override fun onPrepareActionMode(mode: ActionMode, menu: Menu): Boolean {
+            ensureIncognitoMenuItem(menu, textView)
+            return true
+        }
+
+        override fun onActionItemClicked(mode: ActionMode, item: MenuItem): Boolean {
+            if (item.itemId != OpenInChromeIncognitoActionId) return false
+
+            val url = textView.selectedHttpUrl() ?: return false
+            openInChromeIncognito(context, url)
+            mode.finish()
+            return true
+        }
+
+        override fun onDestroyActionMode(mode: ActionMode) = Unit
+    }
+
+private fun ensureIncognitoMenuItem(menu: Menu, textView: TextView) {
+    val item = menu.findItem(OpenInChromeIncognitoActionId)
+        ?: menu.add(Menu.NONE, OpenInChromeIncognitoActionId, Menu.NONE, "Open in Chrome Incognito").apply {
+            setShowAsAction(MenuItem.SHOW_AS_ACTION_IF_ROOM)
+        }
+    item.isVisible = textView.selectedHttpUrl() != null
+}
+
+private fun TextView.selectedHttpUrl(): String? {
+    val start = selectionStart
+    val end = selectionEnd
+    if (start < 0 || end <= start || end > text.length) return null
+
+    val selected = text.subSequence(start, end).toString()
+    if (selected.isEmpty() || selected != selected.trim()) return null
+    if (selected.any { it.isWhitespace() || it.isISOControl() }) return null
+
+    val uri = runCatching { Uri.parse(selected) }.getOrNull() ?: return null
+    val scheme = uri.scheme?.lowercase() ?: return null
+    if (scheme != "http" && scheme != "https") return null
+    if (uri.host.isNullOrBlank()) return null
+    return selected
+}
+
+private fun openInChromeIncognito(context: android.content.Context, url: String) {
+    val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url)).apply {
+        setPackage(ChromeStablePackage)
+        putExtra(ChromeIncognitoExtra, true)
+        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+    }
+    if (intent.resolveActivity(context.packageManager) == null) {
+        Toast.makeText(context, "Google Chrome is not installed", Toast.LENGTH_SHORT).show()
+        return
+    }
+    runCatching {
+        context.startActivity(intent)
+    }.onFailure {
+        Toast.makeText(context, "Could not open Google Chrome", Toast.LENGTH_SHORT).show()
     }
 }
 
