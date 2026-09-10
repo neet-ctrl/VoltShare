@@ -2,3 +2,4 @@
 - [Android export and Incognito quirks](android-export-incognito-quirks.md) — Chrome and Android content providers need explicit launch/write modes for reliable behavior.
 - [Universal backup diagnostics](universal-backup-diagnostics.md) — export and restore failures need immediate full-log copy; wrong-password retry stays a separate user flow.
 - [Large universal backups](universal-backup-streaming.md) — new user-selected backups use an authenticated streaming container; legacy JSON backups remain restorable.
+- [2FA build inputs](twofa-build-inputs.md) — local Android compilation needs the private config supplied by CI; encrypted repository copies are not enough.
