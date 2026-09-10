@@ -81,12 +81,18 @@ class VaultRepository(private val context: Context) {
             buildList {
                 for (index in 0 until array.length()) {
                     val item = array.getJSONObject(index)
+                    val id = item.getString("id")
+                    val metadataSize = item.optLong("sizeBytes", 0L).coerceAtLeast(0L)
+                    val storedSize = File(vaultDir, "$id.data")
+                        .takeIf { it.isFile }
+                        ?.length()
+                        ?.takeIf { it >= 0L }
                     add(
                         VaultFile(
-                            id = item.getString("id"),
+                            id = id,
                             name = item.getString("name"),
                             mimeType = item.optString("mimeType", "application/octet-stream"),
-                            sizeBytes = item.optLong("sizeBytes", 0),
+                            sizeBytes = storedSize ?: metadataSize,
                             locked = item.optBoolean("locked", false),
                             folderPath = item.optString("folderPath", "/").ifBlank { "/" },
                             createdAt = item.optLong("createdAt", 0L).takeIf { it > 0 } ?: System.currentTimeMillis(),

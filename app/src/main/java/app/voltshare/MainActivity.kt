@@ -192,6 +192,7 @@ import kotlinx.coroutines.withContext
 import java.io.BufferedOutputStream
 import java.io.File
 import java.io.FileOutputStream
+import java.util.Locale
 import java.util.UUID
 import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
@@ -4826,7 +4827,7 @@ private fun FileActionDialog(
                                 letterSpacing = 1.1.sp,
                             )
                             Text(
-                                formatSize(file.sizeBytes),
+                                formatReadableFileSize(file.sizeBytes),
                                 color = Color.White,
                                 fontSize = 13.sp,
                                 fontWeight = FontWeight.Bold,
@@ -5415,6 +5416,22 @@ private fun isText(file: VaultFile): Boolean {
 private fun isInstallable(file: VaultFile) = file.name.isMediaExtension("apk", "xapk", "apks")
 private fun String.isMediaExtension(vararg extensions: String) = extensions.any { endsWith(".$it", ignoreCase = true) }
 private fun formatSize(bytes: Long): String = Formatter.formatFileSize(null, bytes)
+
+private fun formatReadableFileSize(bytes: Long): String {
+    val safeBytes = bytes.coerceAtLeast(0L)
+    val kilobyte = 1024.0
+    val megabyte = kilobyte * 1024.0
+    val gigabyte = megabyte * 1024.0
+    val (value, unit) = when {
+        safeBytes >= gigabyte -> safeBytes.toDouble() / gigabyte to "GB"
+        safeBytes >= megabyte -> safeBytes.toDouble() / megabyte to "MB"
+        else -> safeBytes.toDouble() / kilobyte to "KB"
+    }
+    val formatted = String.format(Locale.US, "%.2f", value)
+        .trimEnd('0')
+        .trimEnd('.')
+    return "$formatted $unit"
+}
 
 private fun formatTransferSpeed(bytesPerSecond: Long): String =
     if (bytesPerSecond > 0L) "${formatSize(bytesPerSecond)}/s" else "Calculating…"
