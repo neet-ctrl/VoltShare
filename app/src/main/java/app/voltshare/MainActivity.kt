@@ -4826,7 +4826,7 @@ private fun FileActionDialog(
                                 letterSpacing = 1.1.sp,
                             )
                             Text(
-                                "${formatSize(file.sizeBytes)}  •  ${file.sizeBytes} bytes",
+                                formatSize(file.sizeBytes),
                                 color = Color.White,
                                 fontSize = 13.sp,
                                 fontWeight = FontWeight.Bold,
