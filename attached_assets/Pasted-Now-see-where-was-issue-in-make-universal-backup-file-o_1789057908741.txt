@@ -1,0 +1,28 @@
+Now see where was issue in make universal backup file ok 2FAS universal backup export failure URI: content://com.android.externalstorage.documents/document/primary%3ABackup%7BPortfolio%26Keyboard%26Vocalize%7D%2F2fas-universal-backup%20(2).universal
+
+java.lang.OutOfMemoryError: Failed to allocate a 51731856 byte allocation with 23954096 free bytes and 22MB until OOM, target footprint 268435456, growth limit 268435456 at java.lang.StringFactory.newStringFromChars(StringFactory.java:124) at java.lang.StringFactory.newStringFromBytes(StringFactory.java:109) at java.lang.StringFactory.newStringFromBytes(StringFactory.java:79) at android.util.Base64.encodeToString(Base64.java:459) at com.twofasapp.data.services.domain.UniversalBackupCodec.encode(r8-map-id-52be27b44939c998593bb190fbb97f9e9494c346fc9d9fb3b57191a0ac07007c:41) at com.twofasapp.feature.home.ui.settings.UniversalBackupViewModel$export$1.invokeSuspend(r8-map-id-52be27b44939c998593bb190fbb97f9e9494c346fc9d9fb3b57191a0ac07007c:141) at fk.a.resumeWith(r8-map-id-52be27b44939c998593bb190fbb97f9e9494c346fc9d9fb3b57191a0ac07007c:9) at yk.r1.f(r8-map-id-52be27b44939c998593bb190fbb97f9e9494c346fc9d9fb3b57191a0ac07007c:27) at yk.a.resumeWith(r8-map-id-52be27b44939c998593bb190fbb97f9e9494c346fc9d9fb3b57191a0ac07007c:23) at fk.a.resumeWith(r8-map-id-52be27b44939c998593bb190fbb97f9e9494c346fc9d9fb3b57191a0ac07007c:32) at yk.r1.f(r8-map-id-52be27b44939c998593bb190fbb97f9e9494c346fc9d9fb3b57191a0ac07007c:27) at yk.a.resumeWith(r8-map-id-52be27b44939c998593bb190fbb97f9e9494c346fc9d9fb3b57191a0ac07007c:23) at fk.a.resumeWith(r8-map-id-52be27b44939c998593bb190fbb97f9e9494c346fc9d9fb3b57191a0ac07007c:32) at yk.h0.run(r8-map-id-52be27b44939c998593bb190fbb97f9e9494c346fc9d9fb3b57191a0ac07007c:115) at j0.h.run(r8-map-id-52be27b44939c998593bb190fbb97f9e9494c346fc9d9fb3b57191a0ac07007c:1295) at fl.j.run(r8-map-id-52be27b44939c998593bb190fbb97f9e9494c346fc9d9fb3b57191a0ac07007c:3) at fl.a.run(r8-map-id-52be27b44939c998593bb190fbb97f9e9494c346fc9d9fb3b57191a0ac07007c:88)
+
+Investigating export issues
+
+I need to investigate and fix what looks like an out-of-memory (OOM) issue with the 2FAS universal backup file export. The user requested to see where the problem lies, and it seems like I need to implement a fix. I'll need to read the relevant memory since we have it loaded.
+
+I wonder if I should load React for this. The Android app might not have the specific skills needed, so I'll inspect the code. I know that the UniversalBackupCodec is encoding Base64 bytes to a String, which is likely causing the OOM error. It seems I should consider designing a streaming export instead. I also need to understand the format and its consumers, so I’ll check the relevant files, like the data service codec, ViewModel, and repository. I'll use rg then read more deeply.
+
+The failure is clear from the stack trace: the export path converts a roughly 39 MB encrypted payload into a Base64 String all at once. That creates several simultaneous large allocations and exceeds Android’s 256 MB heap limit. I’m tracing the envelope format and restore path now so I can replace the export with a memory-safe streaming approach without breaking compatibility.
+
+Inspecting secrets export
+
+I need to proceed with my task. It looks like I might need to use apply_patch, but before that, I should inspect the SecretsRepository export. Checking it out in JSON format along with the file bytes seems like a good plan. That way, I can understand what's in there before making any changes, ensuring I'm taking the right steps. It's always good to double-check these things!
+
+Inspecting exports and Drive
+
+I need to continue by inspecting the remainder of the export and checking what's in Google Drive. It feels like it's important to thoroughly review everything to make sure I’m not missing anything vital. I want to ensure that all necessary information is accounted for, as it’s easy to overlook something when there’s so much to manage. I'll keep focused on this task for the best results.
+
+The root cause is broader than the single Base64.encodeToString line: the manual export currently builds the same large payload repeatedly—Base64 text, JSON text, UTF-8 bytes, and then a validation copy. I’m changing only the manual file writer to stream the envelope and Base64 in small chunks, while leaving the existing file format and restore compatibility intact.
+
+Deciding on patch application
+
+I need to ensure I'm using the correct method for applying a patch. It looks like I should only be using the "apply_patch" function for this task. I want to confirm that I'm following the right approach and won't complicate things by trying to use unnecessary methods. Keeping it simple should help me get a clean application without any issues. Let's focus on that method!
+
+The streaming writer is now in place and preserves the existing v1 JSON/Base64 format. I also caught and corrected an important compatibility detail during implementation: the token backup must remain Base64-encoded inside the envelope, while only the large secrets payload is streamed. I’m doing a source-only final audit now; I will not run a local Gradle build.
+

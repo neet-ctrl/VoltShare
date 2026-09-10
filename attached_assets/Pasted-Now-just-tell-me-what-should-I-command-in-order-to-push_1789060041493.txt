@@ -1,0 +1,89 @@
+Now just tell me what should I command in order to push, okay? I just want to push that 2FA folder to its repo separately. And again, pushing our current app without the 2FA folder. Just tell all the command how to push them perfectly. Full command ok mke from 2FA folder only Content of 2FA folder are push to neet-ctrl/2FA and from workspace push everything to neet-ctrl/VoltShare but exclude entire 2FA folder so give perfect command for them 1st by github cli login and GitHub repo that I've told, they are already built, okay? And they already have the source code. Just they have to push the new updated one. Okay but dont have give just u push yourself as i already login cli ok
+
+Free
+Sep 10, 2026, 9:20 PM
+Run these commands from the workspace root. They will:
+
+Push only the 2FA/ folder contents to neet-ctrl/2FA.
+Remove 2FA/ from the current VoltShare repository snapshot while keeping the local folder.
+Push the remaining workspace to neet-ctrl/VoltShare.
+Keep 2FA/ ignored from future VoltShare commits.
+# Go to the workspace root
+cd /home/runner/workspace
+# Confirm GitHub CLI authentication
+gh auth status
+# If not logged in, run this:
+# gh auth login
+# Let Git use your GitHub CLI authentication
+gh auth setup-git
+# Confirm both repositories exist
+gh repo view neet-ctrl/2FA
+gh repo view neet-ctrl/VoltShare
+# Make sure there are no unexpected uncommitted changes
+git status --short
+1. Push only the 2FA/ folder to neet-ctrl/2FA
+This creates a temporary branch containing the contents of 2FA/ as the root of the separate repository.
+
+# Configure the separate 2FA remote
+if git remote get-url twofa >/dev/null 2>&1; then
+  git remote set-url twofa https://github.com/neet-ctrl/2FA.git
+else
+  git remote add twofa https://github.com/neet-ctrl/2FA.git
+fi
+# Get the default branch name of the separate repository
+TWOFA_BRANCH=$(gh repo view neet-ctrl/2FA --json defaultBranchRef --jq '.defaultBranchRef.name')
+# Remove an old temporary branch if one exists
+git branch -D publish-2fa 2>/dev/null || true
+# Create a history containing only the 2FA folder
+git subtree split --prefix=2FA -b publish-2fa
+# Fetch the existing 2FA repository branch if it exists
+git fetch twofa "$TWOFA_BRANCH" 2>/dev/null || true
+# Push safely when an existing remote branch was found
+if git show-ref --verify --quiet "refs/remotes/twofa/$TWOFA_BRANCH"; then
+  TWOFA_REMOTE_SHA=$(git rev-parse "refs/remotes/twofa/$TWOFA_BRANCH")
+  git push \
+    --force-with-lease="refs/heads/$TWOFA_BRANCH:$TWOFA_REMOTE_SHA" \
+    twofa \
+    "publish-2fa:$TWOFA_BRANCH"
+else
+  # Use a normal first push if the repository branch is empty
+  git push twofa "publish-2fa:$TWOFA_BRANCH"
+fi
+# Delete only the temporary local branch
+git branch -D publish-2fa
+Verify that the separate repository contains the app:
+
+gh repo view neet-ctrl/2FA --web
+2. Push VoltShare without the 2FA/ folder
+This removes 2FA/ from the VoltShare repository’s current tree but preserves the local folder on disk.
+
+cd /home/runner/workspace
+# Make sure the VoltShare remote is correct
+git remote set-url origin https://github.com/neet-ctrl/VoltShare.git
+# Remove 2FA from Git tracking but keep the local 2FA folder
+git rm -r --cached --ignore-unmatch 2FA
+# Prevent 2FA from being added to VoltShare again
+touch .gitignore
+grep -qxF '/2FA/' .gitignore || printf '\n/2FA/\n' >> .gitignore
+# Stage the ignore rule
+git add .gitignore
+# Review the staged changes.
+# Expected: deletions only under 2FA/ plus .gitignore.
+git diff --cached --name-status
+git diff --cached --stat
+If the staged output is correct, commit and push:
+
+git commit -m "Move 2FA app to separate repository"
+git push origin main
+Final verification:
+
+# The 2FA folder should still exist locally
+test -d 2FA && echo "Local 2FA folder preserved"
+# The current VoltShare tree should no longer contain 2FA
+git ls-tree -d HEAD 2FA
+# Confirm the working tree is clean
+git status --short
+The git ls-tree command should produce no output for 2FA, while test -d 2FA should print:
+
+Local 2FA folder preserved
+These commands remove 2FA/ from the latest VoltShare repository state. Older VoltShare commits may still contain it in their history
