@@ -74,6 +74,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.ArrowDownward
+import androidx.compose.material.icons.filled.ArrowForward
 import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.Check
@@ -96,6 +97,7 @@ import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.SelectAll
+import androidx.compose.material.icons.filled.Sort
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Smartphone
@@ -1096,6 +1098,8 @@ private fun FilesHome(
     var searchQuery by remember { mutableStateOf("") }
     var reorderMode by remember { mutableStateOf(false) }
     var activeFilter by remember { mutableStateOf(FileFilter.ALL) }
+    var sortMode by remember { mutableStateOf(VaultSort.CUSTOM) }
+    var showSortDialog by remember { mutableStateOf(false) }
     val searching = searchQuery.trim().isNotEmpty()
     val filteredFiles = files.filter { file ->
         activeFilter == FileFilter.ALL ||
@@ -1112,7 +1116,7 @@ private fun FilesHome(
                 it.folderPath == currentFolder
             }
         },
-        VaultSort.CUSTOM,
+        if (reorderMode) VaultSort.CUSTOM else sortMode,
     )
     val visibleFolders = if (searching) {
         folders.filter { folder ->
@@ -1150,11 +1154,65 @@ private fun FilesHome(
     } else {
         filteredFiles.count { it.folderPath == currentFolder || it.folderPath.startsWith("$currentFolder/") }
     }
+    if (showSortDialog) {
+        SortDialog(
+            selected = sortMode,
+            onDismiss = { showSortDialog = false },
+            onSelected = {
+                sortMode = it
+                showSortDialog = false
+            },
+        )
+    }
     LazyColumn(
         modifier = Modifier.fillMaxSize().background(VoltBlack),
-        contentPadding = PaddingValues(horizontal = 20.dp, vertical = 22.dp),
-        verticalArrangement = Arrangement.spacedBy(18.dp),
+        contentPadding = PaddingValues(horizontal = 18.dp, vertical = 20.dp),
+        verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
+        item {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        "PRIVATE LIBRARY",
+                        color = VoltGreen,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        letterSpacing = 2.2.sp,
+                    )
+                    Spacer(Modifier.height(7.dp))
+                    Text(
+                        if (currentFolder == "/") "Your files" else currentFolder.substringAfterLast('/'),
+                        color = Color.White,
+                        style = MaterialTheme.typography.headlineMedium,
+                    )
+                    Text(
+                        "Encrypted, organized, and only visible to you",
+                        color = VoltTextMuted,
+                        fontSize = 12.sp,
+                    )
+                }
+                Box(
+                    modifier = Modifier
+                        .size(48.dp)
+                        .shadow(16.dp, CircleShape, spotColor = VoltGreen.copy(alpha = 0.2f))
+                        .background(VoltGreen.copy(alpha = 0.12f), CircleShape),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(Icons.Default.Security, "Encrypted private library", tint = VoltGreen, modifier = Modifier.size(23.dp))
+                }
+            }
+        }
+        item {
+            FilesLibrarySummary(
+                files = files,
+                folderCount = folders.count { it != "/" },
+                visibleCount = nestedFileCount,
+            )
+        }
         if (!reorderMode) item {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -1177,30 +1235,71 @@ private fun FilesHome(
         }
         if (!reorderMode) {
             item {
-                OutlinedTextField(
-                    value = searchQuery,
-                    onValueChange = { searchQuery = it },
-                    placeholder = { Text("Search files and folders", color = VoltTextMuted) },
-                    leadingIcon = { Icon(Icons.Default.Search, null, tint = VoltGreen) },
-                    trailingIcon = {
-                        if (searchQuery.isNotEmpty()) {
-                            IconButton(onClick = { searchQuery = "" }) {
-                                Icon(Icons.Default.Close, "Clear search", tint = VoltTextMuted)
-                            }
-                        }
-                    },
+                Surface(
                     modifier = Modifier.fillMaxWidth(),
-                    singleLine = true,
-                    shape = RoundedCornerShape(18.dp),
-                    colors = androidx.compose.material3.OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = VoltGreen,
-                        focusedLabelColor = VoltGreen,
-                        cursorColor = VoltGreen,
-                        unfocusedBorderColor = Color.White.copy(alpha = 0.16f),
-                        focusedTextColor = Color.White,
-                        unfocusedTextColor = Color.White,
-                    ),
-                )
+                    color = VoltSurfaceRaised,
+                    shape = RoundedCornerShape(22.dp),
+                    border = BorderStroke(1.dp, Color.White.copy(alpha = 0.08f)),
+                    shadowElevation = 10.dp,
+                ) {
+                    Row(
+                        modifier = Modifier.padding(start = 5.dp, end = 7.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        OutlinedTextField(
+                            value = searchQuery,
+                            onValueChange = { searchQuery = it },
+                            placeholder = { Text("Search files and folders", color = VoltTextMuted) },
+                            leadingIcon = { Icon(Icons.Default.Search, null, tint = VoltGreen) },
+                            trailingIcon = {
+                                if (searchQuery.isNotEmpty()) {
+                                    IconButton(onClick = { searchQuery = "" }) {
+                                        Icon(Icons.Default.Close, "Clear search", tint = VoltTextMuted)
+                                    }
+                                }
+                            },
+                            modifier = Modifier.weight(1f),
+                            singleLine = true,
+                            colors = androidx.compose.material3.OutlinedTextFieldDefaults.colors(
+                                focusedBorderColor = Color.Transparent,
+                                unfocusedBorderColor = Color.Transparent,
+                                focusedTextColor = Color.White,
+                                unfocusedTextColor = Color.White,
+                                cursorColor = VoltGreen,
+                            ),
+                        )
+                        IconButton(onClick = { showSortDialog = true }) {
+                            Icon(Icons.Default.Sort, "Sort files", tint = VoltGreen)
+                        }
+                    }
+                }
+            }
+            item {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Column {
+                        Text(
+                            if (searching) "Search results" else "Browse files",
+                            color = Color.White,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 17.sp,
+                        )
+                        Text(
+                            if (searching) "${visibleFiles.size} matching items" else sortMode.label,
+                            color = VoltTextMuted,
+                            fontSize = 11.sp,
+                        )
+                    }
+                    Text(
+                        "${visibleFiles.size} items",
+                        color = VoltGreen,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold,
+                    )
+                }
             }
         }
         item {
@@ -1221,7 +1320,7 @@ private fun FilesHome(
                 },
             )
         }
-        if (searching || !reorderMode) {
+        if (searching || (!reorderMode && visibleFolders.isNotEmpty())) {
             item {
                 Text(
                     if (searching) "Matching folders" else "Folders",
@@ -1253,26 +1352,26 @@ private fun FilesHome(
                 )
             }
         }
-        if (!reorderMode) {
+        if (!reorderMode && visibleFiles.isEmpty()) {
             item {
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
-                    Text(if (searching) "Search results" else "Files", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 18.sp)
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text("${visibleFiles.size} items", color = VoltTextMuted, fontSize = 12.sp)
-                    }
-                }
-            }
-        }
-        if (visibleFiles.isEmpty() && !reorderMode) {
-            item {
-                Text(
-                    if (searching) "No matching files in this filter" else "No ${activeFilter.label.lowercase()} files in this folder",
-                    color = VoltTextMuted,
-                    fontSize = 13.sp,
-                    modifier = Modifier.padding(vertical = 18.dp),
+                FilesEmptyState(
+                    searching = searching,
+                    filter = activeFilter,
+                    onImport = onImport,
+                    onClearSearch = { searchQuery = "" },
                 )
             }
         } else {
+            if (!reorderMode && visibleFolders.isNotEmpty()) {
+                item {
+                    Text(
+                        "Files",
+                        color = Color.White,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 17.sp,
+                    )
+                }
+            }
             items(visibleFiles, key = { it.id }) { file ->
                 FileRow(
                     file = file,
@@ -1306,6 +1405,148 @@ private fun FilesHome(
                     onClear = onClearSelection,
                 )
             }
+        }
+        item {
+            Text(
+                "Your files stay encrypted inside VoltShare’s private storage.",
+                color = VoltTextMuted.copy(alpha = 0.72f),
+                fontSize = 11.sp,
+                modifier = Modifier.padding(top = 4.dp, bottom = 12.dp),
+            )
+        }
+    }
+}
+
+@Composable
+private fun FilesLibrarySummary(
+    files: List<VaultFile>,
+    folderCount: Int,
+    visibleCount: Int,
+) {
+    val totalBytes = files.sumOf { it.sizeBytes }
+    GlassCard(
+        modifier = Modifier.fillMaxWidth(),
+        accent = VoltGreen,
+        padding = 18.dp,
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween,
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    "PROTECTED LIBRARY",
+                    color = VoltTextMuted,
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = 1.7.sp,
+                )
+                Spacer(Modifier.height(7.dp))
+                Text(
+                    "${files.size} protected file${if (files.size == 1) "" else "s"}",
+                    color = Color.White,
+                    fontSize = 20.sp,
+                    fontWeight = FontWeight.Black,
+                )
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    "${formatSize(totalBytes)} encrypted on this device",
+                    color = VoltTextMuted,
+                    fontSize = 12.sp,
+                )
+            }
+            Box(
+                modifier = Modifier
+                    .size(58.dp)
+                    .background(VoltGreen.copy(alpha = 0.12f), CircleShape),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(Icons.Default.Security, null, tint = VoltGreen, modifier = Modifier.size(27.dp))
+            }
+        }
+        Spacer(Modifier.height(16.dp))
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(Color.Black.copy(alpha = 0.18f), RoundedCornerShape(16.dp))
+                .padding(horizontal = 12.dp, vertical = 10.dp),
+            horizontalArrangement = Arrangement.SpaceEvenly,
+        ) {
+            LibraryStat("${visibleCount}", "in view")
+            LibraryStat("$folderCount", "folders")
+            LibraryStat(files.count { it.locked }.toString(), "locked")
+        }
+    }
+}
+
+@Composable
+private fun LibraryStat(value: String, label: String) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Text(value, color = VoltGreen, fontWeight = FontWeight.Black, fontSize = 15.sp)
+        Spacer(Modifier.height(2.dp))
+        Text(label, color = VoltTextMuted, fontSize = 10.sp)
+    }
+}
+
+@Composable
+private fun FilesEmptyState(
+    searching: Boolean,
+    filter: FileFilter,
+    onImport: () -> Unit,
+    onClearSearch: () -> Unit,
+) {
+    GlassCard(
+        modifier = Modifier.fillMaxWidth(),
+        accent = VoltTeal,
+        padding = 24.dp,
+    ) {
+        Box(
+            modifier = Modifier
+                .size(64.dp)
+                .background(VoltGreen.copy(alpha = 0.12f), CircleShape),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                if (searching) Icons.Default.Search else Icons.Default.FolderOpen,
+                null,
+                tint = VoltGreen,
+                modifier = Modifier.size(30.dp),
+            )
+        }
+        Spacer(Modifier.height(16.dp))
+        Text(
+            when {
+                searching -> "Nothing matched your search"
+                filter != FileFilter.ALL -> "No ${filter.label.lowercase()} files here"
+                else -> "This folder is empty"
+            },
+            color = Color.White,
+            fontSize = 19.sp,
+            fontWeight = FontWeight.Black,
+        )
+        Spacer(Modifier.height(7.dp))
+        Text(
+            if (searching) {
+                "Try another name or clear the search to browse your library."
+            } else {
+                "Import a file here and it will be encrypted before it enters the vault."
+            },
+            color = VoltTextMuted,
+            lineHeight = 20.sp,
+        )
+        Spacer(Modifier.height(17.dp))
+        TextButton(
+            onClick = if (searching) onClearSearch else onImport,
+            colors = ButtonDefaults.textButtonColors(contentColor = VoltGreen),
+        ) {
+            Text(if (searching) "Clear search" else "Import a file", fontWeight = FontWeight.Bold)
+            Spacer(Modifier.width(5.dp))
+            Icon(
+                if (searching) Icons.Default.Close else Icons.Default.ArrowUpward,
+                null,
+                modifier = Modifier.size(16.dp),
+            )
         }
     }
 }
@@ -1405,18 +1646,46 @@ private fun FolderCard(
     GlassCard(
         modifier = Modifier.fillMaxWidth().clickable(onClick = onOpen),
         accent = if (path == primaryFolder) VoltGreen else VoltTeal,
-        padding = 14.dp,
+        padding = 16.dp,
     ) {
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
             Box(
-                modifier = Modifier.size(44.dp).background(VoltGreen.copy(alpha = 0.1f), RoundedCornerShape(14.dp)),
+                modifier = Modifier
+                    .size(52.dp)
+                    .background(
+                        if (path == primaryFolder) VoltGreen.copy(alpha = 0.16f) else VoltTeal.copy(alpha = 0.14f),
+                        RoundedCornerShape(17.dp),
+                    ),
                 contentAlignment = Alignment.Center,
             ) {
-                Icon(Icons.Default.Folder, "Open folder", tint = VoltGreen, modifier = Modifier.size(23.dp))
+                Icon(
+                    Icons.Default.Folder,
+                    "Open folder",
+                    tint = if (path == primaryFolder) VoltGreen else Color(0xFF65D8C8),
+                    modifier = Modifier.size(27.dp),
+                )
             }
-            Spacer(Modifier.width(12.dp))
+            Spacer(Modifier.width(14.dp))
             Column(modifier = Modifier.weight(1f)) {
-                Text(path.substringAfterLast('/'), color = Color.White, fontWeight = FontWeight.Bold, maxLines = 1)
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        path.substringAfterLast('/'),
+                        color = Color.White,
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 1,
+                        modifier = Modifier.weight(1f, fill = false),
+                    )
+                    if (path == primaryFolder) {
+                        Spacer(Modifier.width(7.dp))
+                        Text(
+                            "PRIMARY",
+                            color = VoltGreen,
+                            fontSize = 8.sp,
+                            fontWeight = FontWeight.Black,
+                            letterSpacing = 0.8.sp,
+                        )
+                    }
+                }
                 Text(
                     "$folderCount folder${if (folderCount == 1) "" else "s"} • $fileCount file${if (fileCount == 1) "" else "s"}",
                     color = VoltTextMuted,
@@ -1431,8 +1700,13 @@ private fun FolderCard(
                     tint = if (path == primaryFolder) VoltGreen else VoltTextMuted,
                 )
             }
-            IconButton(onClick = onDelete) {
-                Icon(Icons.Default.Delete, "Delete folder", tint = Color(0xFFFF8A80))
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                IconButton(onClick = onOpen) {
+                    Icon(Icons.Default.ArrowForward, "Open folder", tint = Color.White.copy(alpha = 0.75f))
+                }
+                IconButton(onClick = onDelete) {
+                    Icon(Icons.Default.Delete, "Delete folder", tint = Color(0xFFFF8A80))
+                }
             }
         }
     }
@@ -1451,19 +1725,37 @@ private fun SelectionBar(
         color = VoltSurfaceRaised,
         shape = RoundedCornerShape(22.dp),
         border = BorderStroke(1.dp, VoltGreen.copy(alpha = 0.35f)),
-        shadowElevation = 12.dp,
+        shadowElevation = 18.dp,
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Icon(Icons.Default.SelectAll, null, tint = VoltGreen, modifier = Modifier.size(20.dp))
-            Spacer(Modifier.width(7.dp))
-            Text("$selectedCount selected", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 12.sp, modifier = Modifier.weight(1f))
-            IconButton(onClick = onShare) { Icon(Icons.Default.Share, "Share selected", tint = VoltGreen) }
-            IconButton(onClick = onMove) { Icon(Icons.Default.DriveFileMove, "Move selected", tint = VoltTextMuted) }
-            IconButton(onClick = onDelete) { Icon(Icons.Default.Delete, "Delete selected", tint = Color(0xFFFF8A80)) }
-            IconButton(onClick = onClear) { Icon(Icons.Default.Close, "Clear selection", tint = VoltTextMuted) }
+            Box(
+                modifier = Modifier
+                    .size(34.dp)
+                    .background(VoltGreen.copy(alpha = 0.14f), CircleShape),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(Icons.Default.SelectAll, null, tint = VoltGreen, modifier = Modifier.size(19.dp))
+            }
+            Spacer(Modifier.width(9.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text("$selectedCount selected", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                Text("Bulk actions", color = VoltTextMuted, fontSize = 10.sp)
+            }
+            IconButton(onClick = onShare) {
+                Icon(Icons.Default.Share, "Share selected", tint = VoltGreen)
+            }
+            IconButton(onClick = onMove) {
+                Icon(Icons.Default.DriveFileMove, "Move selected", tint = VoltTextMuted)
+            }
+            IconButton(onClick = onDelete) {
+                Icon(Icons.Default.Delete, "Delete selected", tint = Color(0xFFFF8A80))
+            }
+            IconButton(onClick = onClear) {
+                Icon(Icons.Default.Close, "Clear selection", tint = VoltTextMuted)
+            }
         }
     }
 }
@@ -1537,6 +1829,7 @@ private fun FileRow(
     val icon = fileIcon(file)
     var dragDistance by remember(file.id) { mutableStateOf(0f) }
     var isDragging by remember(file.id) { mutableStateOf(false) }
+    val accent = if (file.locked) Color(0xFF9B7CFF) else VoltGreen
     GlassCard(
         modifier = Modifier
             .fillMaxWidth()
@@ -1555,29 +1848,54 @@ private fun FileRow(
                     },
                 )
             },
-        accent = if (file.locked) Color(0xFF7C4DFF) else VoltGreen,
-        padding = 16.dp,
+        accent = accent,
+        padding = 14.dp,
     ) {
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
             if (vault != null) {
                 FileThumbnail(vault, file)
             } else {
                 Box(
-                    modifier = Modifier.size(52.dp).background(VoltGreen.copy(alpha = 0.09f), RoundedCornerShape(16.dp)),
+                    modifier = Modifier.size(58.dp).background(accent.copy(alpha = 0.11f), RoundedCornerShape(18.dp)),
                     contentAlignment = Alignment.Center,
                 ) {
-                    Icon(icon, null, tint = VoltGreen, modifier = Modifier.size(24.dp))
+                    Icon(icon, null, tint = accent, modifier = Modifier.size(25.dp))
                 }
             }
-            Spacer(Modifier.width(14.dp))
+            Spacer(Modifier.width(13.dp))
             Column(modifier = Modifier.weight(1f)) {
-                Text(file.name, color = Color.White, fontWeight = FontWeight.SemiBold, maxLines = 1)
-                Spacer(Modifier.height(4.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        file.name,
+                        color = Color.White,
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 1,
+                        modifier = Modifier.weight(1f, fill = false),
+                    )
+                    if (file.locked) {
+                        Spacer(Modifier.width(6.dp))
+                        Icon(Icons.Default.Lock, "Locked file", tint = accent, modifier = Modifier.size(14.dp))
+                    }
+                }
+                Spacer(Modifier.height(5.dp))
                 Text(
-                    "${file.transferDirection.label} • ${formatSize(file.sizeBytes)}",
-                    color = VoltTextMuted,
-                    fontSize = 12.sp,
+                    if (file.folderPath == "/") "Private root" else file.folderPath,
+                    color = VoltTextMuted.copy(alpha = 0.8f),
+                    fontSize = 10.sp,
+                    maxLines = 1,
                 )
+                Spacer(Modifier.height(5.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        file.transferDirection.label.uppercase(),
+                        color = accent,
+                        fontSize = 9.sp,
+                        fontWeight = FontWeight.Black,
+                        letterSpacing = 0.7.sp,
+                    )
+                    Text("  •  ", color = VoltTextMuted.copy(alpha = 0.5f), fontSize = 10.sp)
+                    Text(formatSize(file.sizeBytes), color = VoltTextMuted, fontSize = 11.sp)
+                }
             }
             if (reorderMode && allowReorder) {
                 Icon(
@@ -1630,8 +1948,8 @@ private fun FileRow(
                 IconButton(onClick = { onToggleLock(file) }) {
                     Icon(
                         if (file.locked) Icons.Default.Star else Icons.Default.StarBorder,
-                        "Pin ${file.name}",
-                        tint = if (file.locked) VoltGreen else VoltTextMuted,
+                        if (file.locked) "Unlock ${file.name}" else "Lock ${file.name}",
+                        tint = if (file.locked) accent else VoltTextMuted,
                     )
                 }
                 IconButton(onClick = onDelete) {
