@@ -411,6 +411,7 @@ private fun VoltShareApp(
     var lastBackPressAt by remember { mutableStateOf(0L) }
     var securityAction by remember { mutableStateOf<SecurityAction?>(null) }
     var showChangeLock by remember { mutableStateOf(false) }
+    val transferStatus by transfer.status.collectAsStateWithLifecycle()
     val scope = rememberCoroutineScope()
     val incomingShare = activity.pendingIncomingShare
 
@@ -453,6 +454,14 @@ private fun VoltShareApp(
                 files = vault.listFiles()
                 folders = vault.listFolders()
             }
+        }
+    }
+
+    LaunchedEffect(lockEnabled) {
+        if (!lockEnabled) {
+            biometricEnabled = false
+            fileLockDefault = false
+            files = withContext(Dispatchers.IO) { vault.disableAllFileLocks() }
         }
     }
 
@@ -589,12 +598,27 @@ private fun VoltShareApp(
                         is SecurityAction.SetLock -> {
                             lockManager.setEnabled(action.enabled)
                             lockEnabled = action.enabled
+                            if (!action.enabled) {
+                                biometricEnabled = false
+                                fileLockDefault = false
+                                fileToUnlock = null
+                                scope.launch {
+                                    files = withContext(Dispatchers.IO) { vault.disableAllFileLocks() }
+                                }
+                            }
                             unlocked = true
                             securityAction = null
                         }
                         is SecurityAction.SetFileLockDefault -> {
-                            vault.setFileLockDefault(action.enabled)
-                            fileLockDefault = action.enabled
+                            if (action.enabled && lockEnabled) {
+                                vault.setFileLockDefault(true)
+                                fileLockDefault = true
+                            } else {
+                                fileLockDefault = false
+                                scope.launch {
+                                    files = withContext(Dispatchers.IO) { vault.disableAllFileLocks() }
+                                }
+                            }
                             securityAction = null
                         }
                         SecurityAction.LockNow -> {
@@ -655,8 +679,10 @@ private fun VoltShareApp(
                 fileToRename = target
             },
             onToggleLock = {
-                vault.toggleLocked(target)
-                files = vault.listFiles()
+                if (lockEnabled) {
+                    vault.toggleLocked(target)
+                    files = vault.listFiles()
+                }
                 fileActionTarget = null
             },
             onDelete = {
@@ -768,7 +794,7 @@ private fun VoltShareApp(
     }
 
     fun openVaultFile(file: VaultFile) {
-        if (file.locked) {
+        if (lockEnabled && file.locked) {
             fileToUnlock = file
         } else if (isInstallable(file)) {
             activity.installVaultPackage(vault, file)
@@ -819,7 +845,7 @@ private fun VoltShareApp(
                         openVaultFile(file)
                     },
                     onToggleLock = {
-                        vault.toggleLocked(it)
+                        if (lockEnabled) vault.toggleLocked(it)
                         files = vault.listFiles()
                     },
                     vault = vault,
@@ -852,7 +878,7 @@ private fun VoltShareApp(
                         }
                     },
                     onToggleLock = {
-                        vault.toggleLocked(it)
+                        if (lockEnabled) vault.toggleLocked(it)
                         files = vault.listFiles()
                     },
                     onReorder = { file, direction ->
@@ -937,6 +963,7 @@ private fun VoltShareApp(
                     lockEnabled = lockEnabled,
                     biometricEnabled = biometricEnabled,
                     fileLockDefault = fileLockDefault,
+                    transferStatus = transferStatus,
                     biometricAvailable = activity.canUseBiometric(),
                     onRequestChangeMethod = { securityAction = SecurityAction.ChangeMethod },
                     onRequestBiometric = { enabled -> securityAction = SecurityAction.SetBiometric(enabled) },
@@ -2695,6 +2722,7 @@ private fun ShareHome(
                         color = VoltGreen,
                         trackColor = Color.White.copy(alpha = 0.1f),
                     )
+                    TransferMetrics(status)
                     if (status.errorLog != null) {
                         Spacer(Modifier.height(12.dp))
                         OutlinedButton(
@@ -2908,7 +2936,7 @@ private fun TransferStatusCard(
     title: String,
     status: TransferStatus,
     visible: Boolean,
-    onShowError: () -> Unit,
+    onShowError: (() -> Unit)?,
 ) {
     if (!visible) return
     GlassCard(modifier = Modifier.fillMaxWidth(), accent = VoltGreen, padding = 18.dp) {
@@ -2938,7 +2966,8 @@ private fun TransferStatusCard(
             color = VoltGreen,
             trackColor = Color.White.copy(alpha = 0.1f),
         )
-        if (status.errorLog != null) {
+        TransferMetrics(status)
+        if (status.errorLog != null && onShowError != null) {
             Spacer(Modifier.height(12.dp))
             OutlinedButton(
                 onClick = onShowError,
@@ -2951,6 +2980,60 @@ private fun TransferStatusCard(
                 Spacer(Modifier.width(8.dp))
                 Text("View detailed error report")
             }
+        }
+    }
+}
+
+@Composable
+private fun TransferMetrics(status: TransferStatus) {
+    Spacer(Modifier.height(12.dp))
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        TransferMetric(
+            label = "PROGRESS",
+            value = "${(status.progress.coerceIn(0f, 1f) * 100f).toInt()}%",
+            modifier = Modifier.weight(1f),
+        )
+        TransferMetric(
+            label = "SPEED",
+            value = formatTransferSpeed(status.speedBytesPerSecond),
+            modifier = Modifier.weight(1f),
+        )
+        TransferMetric(
+            label = "REMAINING",
+            value = formatTransferEta(status.etaSeconds),
+            modifier = Modifier.weight(1f),
+        )
+    }
+    status.currentFile?.let { currentFile ->
+        Spacer(Modifier.height(10.dp))
+        Text(
+            "Current file · $currentFile",
+            color = VoltTextMuted,
+            fontSize = 11.sp,
+            maxLines = 1,
+        )
+    }
+}
+
+@Composable
+private fun TransferMetric(
+    label: String,
+    value: String,
+    modifier: Modifier = Modifier,
+) {
+    Surface(
+        modifier = modifier,
+        color = Color.White.copy(alpha = 0.045f),
+        shape = RoundedCornerShape(14.dp),
+        border = BorderStroke(1.dp, Color.White.copy(alpha = 0.07f)),
+    ) {
+        Column(Modifier.padding(horizontal = 10.dp, vertical = 9.dp)) {
+            Text(label, color = VoltTextMuted, fontSize = 9.sp, fontWeight = FontWeight.Black, letterSpacing = 0.7.sp)
+            Spacer(Modifier.height(3.dp))
+            Text(value, color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold, maxLines = 1)
         }
     }
 }
@@ -3382,6 +3465,7 @@ private fun SecurityHome(
     lockEnabled: Boolean,
     biometricEnabled: Boolean,
     fileLockDefault: Boolean,
+    transferStatus: TransferStatus,
     biometricAvailable: Boolean,
     onRequestChangeMethod: () -> Unit,
     onRequestBiometric: (Boolean) -> Unit,
@@ -3398,7 +3482,16 @@ private fun SecurityHome(
             LockSecurityHero(
                 lockType = lockType,
                 lockEnabled = lockEnabled,
-                biometricEnabled = biometricEnabled && biometricAvailable,
+                biometricEnabled = biometricEnabled && lockEnabled && biometricAvailable,
+                fileLockDefault = fileLockDefault,
+            )
+        }
+        item {
+            TransferStatusCard(
+                title = "Share activity",
+                status = transferStatus,
+                visible = transferStatus.transferring || transferStatus.progress > 0f || transferStatus.errorLog != null,
+                onShowError = null,
             )
         }
         item {
@@ -3455,6 +3548,7 @@ private fun SecurityHome(
                     }
                     TextButton(
                         onClick = onRequestChangeMethod,
+                        enabled = lockEnabled,
                         colors = ButtonDefaults.textButtonColors(contentColor = VoltGreen),
                     ) {
                         Text("Change", fontWeight = FontWeight.Bold)
@@ -3473,11 +3567,16 @@ private fun SecurityHome(
                     Spacer(Modifier.width(13.dp))
                     Column(modifier = Modifier.weight(1f)) {
                         Text("Lock individual files", color = Color.White, fontWeight = FontWeight.Bold)
-                        Text("Add a second verification gate to sensitive previews", color = VoltTextMuted, fontSize = 12.sp)
+                        Text(
+                            if (lockEnabled) "Add a second verification gate to sensitive previews" else "Enable the vault lock to use file-level locks",
+                            color = VoltTextMuted,
+                            fontSize = 12.sp,
+                        )
                     }
                     PremiumSwitch(
-                        checked = fileLockDefault,
-                        onCheckedChange = onRequestFileLockDefault,
+                        checked = lockEnabled && fileLockDefault,
+                        enabled = lockEnabled,
+                        onCheckedChange = { if (lockEnabled) onRequestFileLockDefault(it) },
                     )
                 }
             }
@@ -3512,9 +3611,9 @@ private fun SecurityHome(
                         )
                     }
                     PremiumSwitch(
-                        checked = biometricEnabled && biometricAvailable,
-                        enabled = biometricAvailable,
-                        onCheckedChange = onRequestBiometric,
+                        checked = lockEnabled && biometricEnabled && biometricAvailable,
+                        enabled = lockEnabled && biometricAvailable,
+                        onCheckedChange = { if (lockEnabled) onRequestBiometric(it) },
                     )
                 }
             }
@@ -3567,6 +3666,7 @@ private fun LockSecurityHero(
     lockType: LockType,
     lockEnabled: Boolean,
     biometricEnabled: Boolean,
+    fileLockDefault: Boolean,
 ) {
     val transition = rememberInfiniteTransition(label = "security-hero")
     val pulse by transition.animateFloat(
@@ -3648,6 +3748,10 @@ private fun LockSecurityHero(
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 LockStatusChip(if (lockEnabled) "ACTIVE" else "PAUSED", lockEnabled)
                 LockStatusChip(if (biometricEnabled) "BIOMETRIC ON" else "BIOMETRIC OFF", biometricEnabled)
+                LockStatusChip(
+                    if (lockEnabled && fileLockDefault) "FILE LOCKS ON" else "FILE LOCKS OFF",
+                    lockEnabled && fileLockDefault,
+                )
             }
         }
     }
@@ -4827,3 +4931,19 @@ private fun isText(file: VaultFile) = file.mimeType.startsWith("text") || file.n
 private fun isInstallable(file: VaultFile) = file.name.isMediaExtension("apk", "xapk", "apks")
 private fun String.isMediaExtension(vararg extensions: String) = extensions.any { endsWith(".$it", ignoreCase = true) }
 private fun formatSize(bytes: Long): String = Formatter.formatFileSize(null, bytes)
+
+private fun formatTransferSpeed(bytesPerSecond: Long): String =
+    if (bytesPerSecond > 0L) "${formatSize(bytesPerSecond)}/s" else "Calculating…"
+
+private fun formatTransferEta(seconds: Long?): String {
+    if (seconds == null) return "Calculating…"
+    if (seconds <= 0L) return "Complete"
+    val hours = seconds / 3600L
+    val minutes = (seconds % 3600L) / 60L
+    val remainingSeconds = seconds % 60L
+    return when {
+        hours > 0L -> "${hours}h ${minutes}m"
+        minutes > 0L -> "${minutes}m ${remainingSeconds}s"
+        else -> "${remainingSeconds}s"
+    }
+}

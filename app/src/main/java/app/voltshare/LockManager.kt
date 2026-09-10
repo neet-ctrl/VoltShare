@@ -21,7 +21,10 @@ class LockManager(context: Context) {
     fun isEnabled(): Boolean = prefs.getBoolean(KEY_ENABLED, true)
 
     fun setEnabled(enabled: Boolean) {
-        prefs.edit().putBoolean(KEY_ENABLED, enabled).apply()
+        prefs.edit()
+            .putBoolean(KEY_ENABLED, enabled)
+            .putBoolean(KEY_BIOMETRIC_ENABLED, if (enabled) isBiometricEnabled() else false)
+            .apply()
     }
 
     fun isBiometricEnabled(): Boolean = prefs.getBoolean(KEY_BIOMETRIC_ENABLED, true)

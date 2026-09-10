@@ -64,6 +64,18 @@ class VaultRepository(private val context: Context) {
         preferences.edit().putBoolean(FILE_LOCK_DEFAULT_KEY, enabled).apply()
     }
 
+    fun disableAllFileLocks(): List<VaultFile> {
+        preferences.edit().putBoolean(FILE_LOCK_DEFAULT_KEY, false).apply()
+        val currentFiles = listFiles()
+        val unlockedFiles = currentFiles.map { file ->
+            if (file.locked) file.copy(locked = false) else file
+        }
+        if (unlockedFiles != currentFiles) {
+            writeFiles(unlockedFiles)
+        }
+        return unlockedFiles
+    }
+
     fun listFiles(): List<VaultFile> {
         if (!metadataFile.exists()) return emptyList()
         return runCatching {
@@ -162,11 +174,12 @@ class VaultRepository(private val context: Context) {
         size: Long,
         expectedSha256: String? = null,
         folderPath: String = primaryFolder(),
+        onProgress: (Long) -> Unit = {},
     ): VaultFile? {
         val id = UUID.randomUUID().toString()
         val storedTempFile = File(vaultDir, "$id.data.tmp")
         return runCatching {
-            val digest = copyExact(input, storedTempFile, size)
+            val digest = copyExact(input, storedTempFile, size, onProgress)
             check(expectedSha256 == null || digest.equals(expectedSha256, ignoreCase = true)) { "Transfer checksum mismatch" }
             val existing = findFileByHash(digest)
             if (existing != null) {
@@ -479,7 +492,12 @@ class VaultRepository(private val context: Context) {
         return StoredFile(count, digest.digest().joinToString("") { "%02x".format(it) })
     }
 
-    private fun copyExact(input: InputStream, destination: File, expectedSize: Long): String {
+    private fun copyExact(
+        input: InputStream,
+        destination: File,
+        expectedSize: Long,
+        onProgress: (Long) -> Unit = {},
+    ): String {
         val digest = MessageDigest.getInstance("SHA-256")
         var count = 0L
         FileOutputStream(destination).use { output ->
@@ -490,6 +508,7 @@ class VaultRepository(private val context: Context) {
                 output.write(buffer, 0, read)
                 digest.update(buffer, 0, read)
                 count += read
+                onProgress(count)
             }
         }
         check(count == expectedSize) { "Transfer size mismatch" }

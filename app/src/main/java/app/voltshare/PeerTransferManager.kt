@@ -54,6 +54,8 @@ data class TransferStatus(
     val currentFile: String? = null,
     val bytesTransferred: Long = 0L,
     val totalBytes: Long = 0L,
+    val speedBytesPerSecond: Long = 0L,
+    val etaSeconds: Long? = null,
     val errorLog: String? = null,
 )
 
@@ -73,6 +75,7 @@ class PeerTransferManager(
     private var server: ServerSocket? = null
     private var registrationListener: NsdManager.RegistrationListener? = null
     private var discoveryListener: NsdManager.DiscoveryListener? = null
+    private var transferStartedAtNanos = 0L
 
     fun startHosting() {
         if (server != null) return
@@ -168,6 +171,7 @@ class PeerTransferManager(
                 if (file.sizeBytes > 0L) file else file.copy(sizeBytes = sourceSize(file.source) ?: 0L)
             }
             val totalBytes = preparedFiles.sumOf { it.sizeBytes }.coerceAtLeast(1L)
+            transferStartedAtNanos = System.nanoTime()
             var completedBytes = 0L
             var completedFiles = 0
             val errors = mutableListOf<String>()
@@ -199,6 +203,8 @@ class PeerTransferManager(
                             currentFile = file.name,
                             bytesTransferred = completedBytes,
                             totalBytes = totalBytes,
+                            speedBytesPerSecond = transferSpeed(completedBytes),
+                            etaSeconds = transferEta(completedBytes, totalBytes),
                             hosting = server != null,
                             errorLog = errors.joinToString("\n\n"),
                         ),
@@ -220,6 +226,8 @@ class PeerTransferManager(
                     totalFiles = preparedFiles.size,
                     bytesTransferred = completedBytes,
                     totalBytes = totalBytes,
+                    speedBytesPerSecond = transferSpeed(completedBytes),
+                    etaSeconds = transferEta(completedBytes, totalBytes),
                     errorLog = errors.takeIf { it.isNotEmpty() }?.joinToString("\n\n"),
                 ),
             )
@@ -289,6 +297,8 @@ class PeerTransferManager(
                                     currentFile = file.name,
                                     bytesTransferred = overallBytes,
                                     totalBytes = totalBytes,
+                                    speedBytesPerSecond = transferSpeed(overallBytes),
+                                    etaSeconds = transferEta(overallBytes, totalBytes),
                                 ),
                             )
                         }
@@ -351,6 +361,21 @@ class PeerTransferManager(
         }
     }
 
+    private fun transferSpeed(bytesTransferred: Long): Long {
+        val elapsedNanos = (System.nanoTime() - transferStartedAtNanos).coerceAtLeast(1L)
+        return ((bytesTransferred.toDouble() / elapsedNanos.toDouble()) * 1_000_000_000.0)
+            .toLong()
+            .coerceAtLeast(0L)
+    }
+
+    private fun transferEta(bytesTransferred: Long, totalBytes: Long): Long? {
+        if (bytesTransferred >= totalBytes) return 0L
+        val speed = transferSpeed(bytesTransferred)
+        return speed.takeIf { it > 0L }?.let { bytesPerSecond ->
+            ((totalBytes - bytesTransferred) + bytesPerSecond - 1L) / bytesPerSecond
+        }
+    }
+
     private fun buildTechnicalError(title: String, error: Throwable): String {
         return buildString {
             appendLine("VoltShare technical error")
@@ -384,14 +409,56 @@ class PeerTransferManager(
             val checksum = input.readUTF()
             val folderPath = input.readUTF()
             check(size in 0..MAX_FILE_SIZE_BYTES) { "Invalid transfer size" }
-            _status.value = TransferStatus("Receiving $name", active = true, hosting = server != null, transferring = true)
-            check(vault.importIncoming(name, mime, input, size, checksum, folderPath) != null) {
+            transferStartedAtNanos = System.nanoTime()
+            _status.value = TransferStatus(
+                label = "Receiving $name",
+                active = true,
+                hosting = server != null,
+                transferring = true,
+                totalFiles = 1,
+                currentFile = name,
+                totalBytes = size,
+            )
+            check(
+                vault.importIncoming(
+                    name = name,
+                    mimeType = mime,
+                    input = input,
+                    size = size,
+                    expectedSha256 = checksum,
+                    folderPath = folderPath,
+                    onProgress = { received ->
+                        val speed = transferSpeed(received)
+                        _status.value = TransferStatus(
+                            label = "Receiving $name",
+                            progress = (received.toFloat() / size.coerceAtLeast(1L)).coerceIn(0f, 1f),
+                            active = true,
+                            hosting = server != null,
+                            transferring = true,
+                            completedFiles = 0,
+                            totalFiles = 1,
+                            currentFile = name,
+                            bytesTransferred = received,
+                            totalBytes = size,
+                            speedBytesPerSecond = speed,
+                            etaSeconds = transferEta(received, size),
+                        )
+                    },
+                ) != null
+            ) {
                 "Received file did not verify"
             }
             _vaultRevision.update { it + 1 }
             _status.value = TransferStatus(
-                "Received and verified $name in your private vault",
-                1f,
+                label = "Received and verified $name in your private vault",
+                progress = 1f,
+                completedFiles = 1,
+                totalFiles = 1,
+                currentFile = name,
+                bytesTransferred = size,
+                totalBytes = size,
+                speedBytesPerSecond = transferSpeed(size),
+                etaSeconds = 0L,
                 hosting = server != null,
                 transferring = false,
             )
