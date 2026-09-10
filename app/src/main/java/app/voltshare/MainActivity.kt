@@ -708,7 +708,7 @@ private fun VoltShareApp(
     }
 
     LaunchedEffect(screenshotEnabled) {
-        activity.setScreenshotProtection(!screenshotEnabled)
+        activity.setScreenshotProtection(screenshotEnabled)
     }
 
     LaunchedEffect(screenshotUnlockUntil) {
