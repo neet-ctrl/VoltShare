@@ -16,8 +16,13 @@ import android.os.ParcelFileDescriptor
 import android.provider.Settings
 import android.provider.OpenableColumns
 import android.text.format.Formatter
+import android.text.method.ScrollingMovementMethod
+import android.view.ActionMode
+import android.view.Menu
+import android.view.MenuItem
 import android.view.ViewGroup
 import android.widget.ImageView
+import android.widget.TextView
 import android.widget.Toast
 import android.media.MediaMetadataRetriever
 import androidx.activity.compose.BackHandler
@@ -4343,14 +4348,171 @@ private fun PdfViewer(file: File) {
 
 @Composable
 private fun TextViewer(file: File) {
-    var text by remember(file) { mutableStateOf("Loading private text…") }
+    val clipboard = LocalClipboardManager.current
+    val context = LocalContext.current
+    var text by remember(file) { mutableStateOf<String?>(null) }
+    var readError by remember(file) { mutableStateOf<String?>(null) }
     LaunchedEffect(file) {
-        text = withContext(Dispatchers.IO) {
-            file.inputStream().bufferedReader().use { it.readText().take(200_000) }
+        runCatching {
+            withContext(Dispatchers.IO) {
+                file.inputStream().bufferedReader(Charsets.UTF_8).use { it.readText() }
+            }
+        }.onSuccess { contents ->
+            text = contents
+        }.onFailure {
+            readError = "This text file could not be read."
         }
     }
-    androidx.compose.foundation.layout.Column(Modifier.fillMaxSize().background(Color(0xFF0A0A0A)).verticalScroll(rememberScrollState()).padding(22.dp)) {
-        Text(text, color = Color(0xFFE6F5EC), fontFamily = FontFamily.Monospace, fontSize = 13.sp, lineHeight = 21.sp)
+    Column(
+        Modifier
+            .fillMaxSize()
+            .background(Color(0xFF0A0A0A))
+            .padding(horizontal = 22.dp),
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                "Text preview",
+                color = VoltTextMuted,
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Bold,
+            )
+            OutlinedButton(
+                onClick = {
+                    text?.let { contents ->
+                        clipboard.setText(AnnotatedString(contents))
+                        Toast.makeText(context, "Copied full text", Toast.LENGTH_SHORT).show()
+                    }
+                },
+                enabled = text != null,
+                modifier = Modifier.height(42.dp),
+                contentPadding = PaddingValues(horizontal = 14.dp),
+                shape = RoundedCornerShape(14.dp),
+                border = BorderStroke(1.dp, VoltGreen.copy(alpha = 0.55f)),
+                colors = ButtonDefaults.outlinedButtonColors(contentColor = VoltGreen),
+            ) {
+                Icon(Icons.Default.ContentCopy, "Copy all text", modifier = Modifier.size(16.dp))
+                Spacer(Modifier.width(7.dp))
+                Text("Copy all")
+            }
+        }
+        when {
+            readError != null -> {
+                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    Text(readError!!, color = VoltTextMuted)
+                }
+            }
+            text == null -> {
+                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    CircularProgressIndicator(color = VoltGreen, strokeWidth = 2.dp)
+                }
+            }
+            else -> {
+                AndroidView(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(bottom = 22.dp),
+                    factory = { viewContext ->
+                        TextView(viewContext).apply {
+                            setTextColor(android.graphics.Color.rgb(230, 245, 236))
+                            setBackgroundColor(android.graphics.Color.rgb(10, 10, 10))
+                            typeface = android.graphics.Typeface.MONOSPACE
+                            textSize = 13f
+                            setLineSpacing(0f, 1.62f)
+                            setPadding(0, 0, 0, (22 * resources.displayMetrics.density).toInt())
+                            gravity = android.view.Gravity.TOP or android.view.Gravity.START
+                            isVerticalScrollBarEnabled = true
+                            movementMethod = ScrollingMovementMethod.getInstance()
+                            setTextIsSelectable(true)
+                            setCustomSelectionActionModeCallback(
+                                createUrlSelectionActionModeCallback(viewContext, this),
+                            )
+                        }
+                    },
+                    update = { textView ->
+                        if (textView.text.toString() != text!!) {
+                            textView.text = text
+                        }
+                    },
+                )
+            }
+        }
+    }
+}
+
+private const val ChromeStablePackage = "com.android.chrome"
+private const val ChromeIncognitoExtra =
+    "com.google.android.apps.chrome.EXTRA_OPEN_NEW_INCOGNITO_TAB"
+private const val OpenInChromeIncognitoActionId = 0x564f4c54
+
+private fun createUrlSelectionActionModeCallback(
+    context: android.content.Context,
+    textView: TextView,
+): ActionMode.Callback =
+    object : ActionMode.Callback {
+        override fun onCreateActionMode(mode: ActionMode, menu: Menu): Boolean {
+            ensureIncognitoMenuItem(menu, textView)
+            return true
+        }
+
+        override fun onPrepareActionMode(mode: ActionMode, menu: Menu): Boolean {
+            ensureIncognitoMenuItem(menu, textView)
+            return true
+        }
+
+        override fun onActionItemClicked(mode: ActionMode, item: MenuItem): Boolean {
+            if (item.itemId != OpenInChromeIncognitoActionId) return false
+
+            val url = textView.selectedHttpUrl() ?: return false
+            openInChromeIncognito(context, url)
+            mode.finish()
+            return true
+        }
+
+        override fun onDestroyActionMode(mode: ActionMode) = Unit
+    }
+
+private fun ensureIncognitoMenuItem(menu: Menu, textView: TextView) {
+    val item = menu.findItem(OpenInChromeIncognitoActionId)
+        ?: menu.add(Menu.NONE, OpenInChromeIncognitoActionId, Menu.NONE, "Open in Chrome Incognito").apply {
+            setShowAsAction(MenuItem.SHOW_AS_ACTION_IF_ROOM)
+        }
+    item.isVisible = textView.selectedHttpUrl() != null
+}
+
+private fun TextView.selectedHttpUrl(): String? {
+    val start = selectionStart
+    val end = selectionEnd
+    if (start < 0 || end <= start || end > text.length) return null
+
+    val selected = text.subSequence(start, end).toString()
+    if (selected.isEmpty() || selected != selected.trim()) return null
+    if (selected.any { it.isWhitespace() || it.isISOControl() }) return null
+
+    val uri = runCatching { Uri.parse(selected) }.getOrNull() ?: return null
+    val scheme = uri.scheme?.lowercase() ?: return null
+    if (scheme != "http" && scheme != "https") return null
+    if (uri.host.isNullOrBlank()) return null
+    return selected
+}
+
+private fun openInChromeIncognito(context: android.content.Context, url: String) {
+    val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url)).apply {
+        setPackage(ChromeStablePackage)
+        putExtra(ChromeIncognitoExtra, true)
+        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+    }
+    if (intent.resolveActivity(context.packageManager) == null) {
+        Toast.makeText(context, "Google Chrome is not installed", Toast.LENGTH_SHORT).show()
+        return
+    }
+    runCatching {
+        context.startActivity(intent)
+    }.onFailure {
+        Toast.makeText(context, "Could not open Google Chrome", Toast.LENGTH_SHORT).show()
     }
 }
 
@@ -5130,7 +5292,32 @@ private fun isImage(file: VaultFile) = file.mimeType.startsWith("image") || file
 private fun isVideo(file: VaultFile) = file.mimeType.startsWith("video") || file.name.isMediaExtension("mp4", "mkv", "webm", "mov", "avi")
 private fun isAudio(file: VaultFile) = file.mimeType.startsWith("audio") || file.name.isMediaExtension("mp3", "wav", "m4a", "flac", "aac", "ogg")
 private fun isPdf(file: VaultFile) = file.mimeType == "application/pdf" || file.name.endsWith(".pdf", true)
-private fun isText(file: VaultFile) = file.mimeType.startsWith("text") || file.name.isMediaExtension("txt", "md", "json", "xml", "csv", "log", "kt", "java", "js", "ts", "html", "css")
+private fun isText(file: VaultFile): Boolean {
+    val mimeType = file.mimeType.lowercase()
+    return mimeType.startsWith("text/") ||
+        mimeType in setOf(
+            "application/json",
+            "application/javascript",
+            "application/ld+json",
+            "application/xml",
+            "application/rtf",
+            "application/sql",
+            "application/x-javascript",
+            "application/x-sh",
+            "application/x-yaml",
+            "application/yaml",
+            "image/svg+xml",
+        ) ||
+        file.name.isMediaExtension(
+            "txt", "text", "md", "markdown", "json", "jsonl", "ndjson", "xml", "xsl", "xslt",
+            "csv", "tsv", "log", "kt", "kts", "java", "js", "jsx", "mjs", "ts", "tsx",
+            "html", "htm", "css", "scss", "sass", "less", "svg", "yaml", "yml", "toml",
+            "ini", "conf", "config", "properties", "env", "sql", "sh", "bash", "zsh",
+            "fish", "gradle", "groovy", "diff", "patch", "srt", "vtt", "tex", "graphql",
+            "gql", "c", "h", "cc", "cpp", "cxx", "hpp", "cs", "swift", "go", "rs", "py",
+            "rb", "php", "vue", "webmanifest",
+        )
+}
 private fun isInstallable(file: VaultFile) = file.name.isMediaExtension("apk", "xapk", "apks")
 private fun String.isMediaExtension(vararg extensions: String) = extensions.any { endsWith(".$it", ignoreCase = true) }
 private fun formatSize(bytes: Long): String = Formatter.formatFileSize(null, bytes)
