@@ -1,0 +1,39 @@
+The implementation now follows your choice: no VoltShare encryption. I’ve also updated the project-facing security language so it no longer promises encryption. I’m doing the final consistency pass now, including stale encryption claims, handoff cleanup paths, manifest wiring, and the available build checks.
+
+The final static pass is clean: no stale VoltShare encryption promises remain in the project docs, the destructive reset is gone, and the cleanup paths cover successful handoff, failed launch, cancellation/abandonment by expiry, and process restart cleanup. The only verification blocker is that this environment has no Java runtime, so I’m recording the paired-APK/device validation as the one remaining reliability check rather than pretending it passed.
+
+Implemented the requested direction with no VoltShare encryption.
+
+Changes completed
+Removed the destructive startup reset from VaultRepository.
+
+Existing vault files and metadata are no longer deleted during startup.
+Startup now only ensures the vault directory exists.
+Corrected security documentation.
+
+README, project instructions, and integration docs now clearly state:
+VoltShare storage is app-private.
+VoltShare vault files are not encrypted at rest.
+App/file locks control access through VoltShare.
+2FA’s own encrypted attachment storage is still documented as encrypted.
+Added universal-backup cleanup coordination.
+
+2FA now creates a secure acknowledgement callback for each temporary backup.
+VoltShare copies the incoming backup into its own pending-share cache before acknowledging.
+2FA deletes the original temporary backup after acknowledgement.
+Failed launches and export failures delete the file immediately.
+A 15-minute expiry cleanup handles cancellation, abandonment, app termination, and stale files.
+VoltShare’s copied pending-share file is removed through the existing transfer completion/removal cleanup paths.
+Corrected documentation inaccuracies about the release workflow.
+
+Verification completed
+Contract identifiers still match between both apps.
+Manifest receiver/provider wiring is present.
+No stale VoltShare encryption claims remain in the active project documentation.
+git diff --check passes.
+No unrelated tracked files were changed.
+Remaining limitation
+I could not run the Android Gradle build because this environment has no Java runtime:
+
+JAVA_HOME is not set and no 'java' command could be found
+A paired signed-APK/device validation task was proposed to confirm the final Android runtime behavior, signature permission, FileProvider grant, acknowledgement callback, cancellation cleanup, and restore flow.
