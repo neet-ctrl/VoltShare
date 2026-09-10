@@ -50,12 +50,10 @@ class VaultRepository(private val context: Context) {
     private val metadataFile = File(vaultDir, "index.json")
 
     init {
-        if (!preferences.getBoolean(PLAIN_STORAGE_READY_KEY, false)) {
-            vaultDir.deleteRecursively()
-            File(context.cacheDir, "view-cache").deleteRecursively()
-            vaultDir.mkdirs()
-            preferences.edit().putBoolean(PLAIN_STORAGE_READY_KEY, true).apply()
-        }
+        // VoltShare deliberately uses app-private, unencrypted storage.
+        // Never clear the vault during startup: upgrades must preserve existing
+        // files and metadata, even when an older format is present.
+        vaultDir.mkdirs()
     }
 
     fun isFileLockDefault(): Boolean = preferences.getBoolean(FILE_LOCK_DEFAULT_KEY, true)
@@ -548,7 +546,6 @@ class VaultRepository(private val context: Context) {
     }
 
     companion object {
-        private const val PLAIN_STORAGE_READY_KEY = "plain-storage-ready"
         private const val PRIMARY_FOLDER_KEY = "primary-folder"
         private const val FILE_LOCK_DEFAULT_KEY = "file-lock-default"
     }

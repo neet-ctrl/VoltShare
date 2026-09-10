@@ -35,8 +35,7 @@ VoltShare now provides:
 - File-level lock protection. Locked files cannot be selected or streamed.
 - Provider-side rejection of write modes, inserts, updates, and deletes.
 
-The current VoltShare vault files remain in VoltShare's private app storage.
-The companion app receives streams only; it never receives a filesystem path.
+The current VoltShare vault files remain in VoltShare's private app storage. VoltShare storage is intentionally unencrypted at rest; the app lock and file-level lock gate access through VoltShare. The companion receives streams only and never receives a filesystem path.
 
 ## Required signing setup
 
@@ -299,6 +298,9 @@ URIs itself; it should use only the URIs returned by the picker.
 - Provider operations are read-only.
 - The result grants read access only; no write or delete operation is exposed.
 - The companion app copies into its own private storage immediately.
+- This provider gate is not encryption at rest. Do not describe VoltShare's
+  vault as encrypted unless encryption is added in a future, separately
+  migrated format.
 
 The companion app should avoid logging returned URIs, file contents, or
 private file names in production logs.

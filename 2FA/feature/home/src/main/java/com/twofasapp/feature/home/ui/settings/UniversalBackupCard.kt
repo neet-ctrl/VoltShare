@@ -5,6 +5,9 @@ import android.content.ClipData
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import android.app.PendingIntent
+import android.os.Handler
+import android.os.Looper
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
@@ -28,6 +31,7 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.core.content.FileProvider
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.twofasapp.VoltShareHandoffReceiver
 import com.twofasapp.designsystem.TwIcons
 import com.twofasapp.designsystem.TwTheme
 import com.twofasapp.designsystem.common.TwButton
@@ -40,6 +44,8 @@ import java.io.File
 
 private const val VOLTSHARE_PACKAGE = "app.voltshare"
 private const val VOLTSHARE_PICK_ACTION = "app.voltshare.action.PICK_VAULT_FILES"
+private const val VOLTSHARE_HANDOFF_ACK_EXTRA = "com.twofasapp.extra.VOLTSHARE_HANDOFF_ACK"
+private const val VOLTSHARE_HANDOFF_TIMEOUT_MS = 15 * 60 * 1000L
 
 @Composable
 internal fun UniversalBackupCard(
@@ -52,8 +58,13 @@ internal fun UniversalBackupCard(
     var pendingImportUri by remember { mutableStateOf<Uri?>(null) }
     var pendingVoltShareUri by remember { mutableStateOf<Uri?>(null) }
     var pendingVoltShareFile by remember { mutableStateOf<File?>(null) }
+    var pendingVoltShareAck by remember { mutableStateOf<PendingIntent?>(null) }
     var showPasswordDialog by remember { mutableStateOf(false) }
     var showSourceDialog by remember { mutableStateOf<UniversalBackupSource?>(null) }
+
+    LaunchedEffect(Unit) {
+        cleanupExpiredVoltShareBackups(context)
+    }
 
     val exportLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.CreateDocument("application/octet-stream"),
@@ -90,8 +101,12 @@ internal fun UniversalBackupCard(
                     if (voltShareUri != null) {
                         pendingVoltShareUri = null
                         pendingVoltShareFile = null
-                        if (!context.openUniversalBackupInVoltShare(voltShareUri)) {
+                        val handoffAck = pendingVoltShareAck
+                        pendingVoltShareAck = null
+                        if (!context.openUniversalBackupInVoltShare(voltShareUri, handoffAck)) {
                             voltShareFile?.delete()
+                        } else {
+                            scheduleVoltShareBackupCleanup(voltShareFile)
                         }
                     } else {
                         context.toastShort("Universal backup saved")
@@ -102,6 +117,7 @@ internal fun UniversalBackupCard(
                     pendingVoltShareFile?.delete()
                     pendingVoltShareUri = null
                     pendingVoltShareFile = null
+                    pendingVoltShareAck = null
                     context.toastShort("Universal backup failed")
                 }
 
@@ -229,7 +245,7 @@ internal fun UniversalBackupCard(
                             if (operation == UniversalBackupOperation.EXPORT_TO_VOLTSHARE) {
                                 val file = File(
                                     context.cacheDir,
-                                    "2fas-universal-backup-${System.currentTimeMillis()}.universal",
+                                    "${VoltShareHandoffReceiver.UNIVERSAL_BACKUP_PREFIX}${System.currentTimeMillis()}${VoltShareHandoffReceiver.UNIVERSAL_BACKUP_SUFFIX}",
                                 )
                                 runCatching {
                                     val uri = FileProvider.getUriForFile(
@@ -237,13 +253,28 @@ internal fun UniversalBackupCard(
                                         context.packageName,
                                         file,
                                     )
+                                    val acknowledgement = PendingIntent.getBroadcast(
+                                        context,
+                                        file.name.hashCode(),
+                                        Intent(context, VoltShareHandoffReceiver::class.java).apply {
+                                            action = VoltShareHandoffReceiver.ACTION_HANDOFF_ACK
+                                            putExtra(
+                                                VoltShareHandoffReceiver.EXTRA_CACHE_FILE_NAME,
+                                                file.name,
+                                            )
+                                        },
+                                        PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+                                    )
                                     pendingVoltShareFile = file
                                     pendingVoltShareUri = uri
+                                    pendingVoltShareAck = acknowledgement
+                                    scheduleVoltShareBackupCleanup(file)
                                     viewModel.export(uri, password)
                                 }.onFailure {
                                     file.delete()
                                     pendingVoltShareFile = null
                                     pendingVoltShareUri = null
+                                    pendingVoltShareAck = null
                                     context.toastShort("Unable to prepare the VoltShare backup")
                                 }
                             } else {
@@ -348,12 +379,16 @@ private fun openVoltShareRestorePicker(
     }
 }
 
-private fun Context.openUniversalBackupInVoltShare(uri: Uri): Boolean {
+private fun Context.openUniversalBackupInVoltShare(
+    uri: Uri,
+    acknowledgement: PendingIntent?,
+): Boolean {
     val shareIntent = Intent(Intent.ACTION_SEND).apply {
         setPackage(VOLTSHARE_PACKAGE)
         type = "application/octet-stream"
         putExtra(Intent.EXTRA_STREAM, uri)
         putExtra(Intent.EXTRA_SUBJECT, "2FAS universal backup")
+        acknowledgement?.let { putExtra(VOLTSHARE_HANDOFF_ACK_EXTRA, it) }
         clipData = ClipData.newRawUri("2FAS universal backup", uri)
         addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
     }
@@ -367,6 +402,26 @@ private fun Context.openUniversalBackupInVoltShare(uri: Uri): Boolean {
         toastShort("VoltShare cannot receive this file")
         false
     }
+}
+
+private fun scheduleVoltShareBackupCleanup(file: File?) {
+    file ?: return
+    Handler(Looper.getMainLooper()).postDelayed(
+        { file.delete() },
+        VOLTSHARE_HANDOFF_TIMEOUT_MS,
+    )
+}
+
+private fun cleanupExpiredVoltShareBackups(context: Context) {
+    val cutoff = System.currentTimeMillis() - VOLTSHARE_HANDOFF_TIMEOUT_MS
+    context.cacheDir.listFiles()
+        .orEmpty()
+        .filter { file ->
+            file.name.startsWith(VoltShareHandoffReceiver.UNIVERSAL_BACKUP_PREFIX) &&
+                file.name.endsWith(VoltShareHandoffReceiver.UNIVERSAL_BACKUP_SUFFIX) &&
+                file.lastModified() < cutoff
+        }
+        .forEach(File::delete)
 }
 
 private fun Intent.voltShareResultUris(): List<Uri> {

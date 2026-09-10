@@ -1,5 +1,6 @@
 package app.voltshare
 
+import android.app.PendingIntent
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.drawable.Drawable
@@ -186,6 +187,7 @@ import kotlinx.coroutines.withContext
 import java.io.BufferedOutputStream
 import java.io.File
 import java.io.FileOutputStream
+import java.util.UUID
 import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
 
@@ -199,6 +201,7 @@ private val VoltTeal = Color(0xFF00796B)
 data class IncomingShare(
     val uris: List<Uri> = emptyList(),
     val text: String? = null,
+    val handoffAcknowledgement: PendingIntent? = null,
 )
 
 data class InstalledAppChoice(
@@ -372,7 +375,27 @@ private fun Intent.toIncomingShare(): IncomingShare? {
         }
     }.distinct()
     val text = getStringExtra(Intent.EXTRA_TEXT)?.takeIf { it.isNotBlank() }
-    return IncomingShare(uris, text).takeIf { it.uris.isNotEmpty() || it.text != null }
+    @Suppress("DEPRECATION")
+    val acknowledgement = getParcelableExtra<PendingIntent>("com.twofasapp.extra.VOLTSHARE_HANDOFF_ACK")
+    return IncomingShare(uris, text, acknowledgement).takeIf { it.uris.isNotEmpty() || it.text != null }
+}
+
+private fun materializeIncomingUri(context: MainActivity, share: PendingShare): PendingShare? {
+    val uri = (share.source as? PendingShareSource.UriSource)?.uri ?: return share
+    val file = File(context.cacheDir, "voltshare-incoming-${System.currentTimeMillis()}-${UUID.randomUUID()}")
+    return runCatching {
+        context.contentResolver.openInputStream(uri)?.use { input ->
+            file.outputStream().use { output -> input.copyTo(output) }
+        } ?: error("Unable to open incoming share")
+        share.copy(
+            id = "file:${file.absolutePath}",
+            sizeBytes = file.length(),
+            source = PendingShareSource.FileSource(file),
+        )
+    }.getOrElse {
+        file.delete()
+        null
+    }
 }
 
 @Composable
@@ -520,9 +543,24 @@ private fun VoltShareApp(
     LaunchedEffect(configured, unlocked, incomingShare) {
         if (!configured || !unlocked || incomingShare == null) return@LaunchedEffect
         val picked = withContext(Dispatchers.IO) {
-            val uriShares = incomingShare.uris.mapNotNull { pendingShareFromUri(activity, it) }
+            val uriShares = incomingShare.uris.mapNotNull { uri ->
+                pendingShareFromUri(activity, uri)?.let { share ->
+                    if (incomingShare.handoffAcknowledgement != null) {
+                        materializeIncomingUri(activity, share)
+                    } else {
+                        share
+                    }
+                }
+            }
             val textShare = incomingShare.text?.let { createTextShare(activity, it) }
             uriShares + listOfNotNull(textShare)
+        }
+        if (
+            incomingShare.handoffAcknowledgement != null &&
+            incomingShare.uris.isNotEmpty() &&
+            picked.count { it.source is PendingShareSource.FileSource } == incomingShare.uris.size
+        ) {
+            runCatching { incomingShare.handoffAcknowledgement.send() }
         }
         pendingShares = (pendingShares + picked).distinctBy { it.id }
         tab = AppTab.SHARE

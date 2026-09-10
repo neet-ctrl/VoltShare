@@ -20,7 +20,9 @@ Every returned URI, from either source, goes through the existing
 2FAS's encrypted private attachment storage before the entry is saved.
 
 The existing attachment list, preview, delete, encrypted backup, sync, and
-trash behavior are unchanged.
+trash behavior are unchanged. The VoltShare source itself is app-private but
+not encrypted at rest; 2FAS still copies the selected bytes into its own
+encrypted attachment storage.
 
 ## Universal Backup and Restore integration
 
@@ -44,7 +46,10 @@ The source dialog offers:
   using `Intent.ACTION_SEND` and `Intent.EXTRA_STREAM`. VoltShare receives the
   file and opens its Share tab so the user only needs to choose the Android
   device. The temporary file is retained in the 2FA cache while the share
-  handoff is active and is deleted if preparation or launching fails.
+  handoff is active. VoltShare acknowledges the handoff after copying the
+  source into its own pending-share cache, and 2FAS deletes the temporary
+  file. A bounded expiry cleanup also removes it if the user cancels, leaves
+  the flow unfinished, or either app is stopped.
 
 ### Restore universal backup file
 

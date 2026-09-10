@@ -68,6 +68,10 @@
             android:exported="false"
             android:grantUriPermissions="true" />
 
+        <receiver
+            android:name=".VoltShareHandoffReceiver"
+            android:exported="false" />
+
         <service
             android:name=".data.push.FcmMessagingService"
             android:exported="false"
