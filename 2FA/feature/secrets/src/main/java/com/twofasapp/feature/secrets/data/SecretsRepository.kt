@@ -9,6 +9,7 @@ import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKey
 import com.twofasapp.common.domain.SecretsBackupProvider
 import com.twofasapp.data.services.domain.CloudSyncTrigger
+import com.twofasapp.data.services.exceptions.DecryptWrongPassword
 import com.twofasapp.data.services.remote.CloudSyncWorkDispatcher
 import kotlinx.serialization.json.Json
 import java.io.ByteArrayOutputStream
@@ -239,7 +240,11 @@ class SecretsRepository(
                     }.getOrNull()
                 }
                 .firstOrNull()
-                ?: error("Unable to decrypt Secret backup")
+                ?: if (header.requiresPassword == true) {
+                    throw DecryptWrongPassword()
+                } else {
+                    error("Unable to decrypt Secret backup")
+                }
             // Backups created before attachments were copied into the encrypted
             // envelope contain a raw SecretsVault. Keep those backups restorable;
             // read() migrates any legacy attachment URI into encrypted storage.
@@ -272,7 +277,12 @@ class SecretsRepository(
             writeInternal(backup.vault, updateTimestamp = false, triggerSync = false)
             pruneUnusedAttachments(backup.vault)
             true
-        }.getOrDefault(false)
+        }.getOrElse { exception ->
+            if (exception is DecryptWrongPassword) {
+                throw exception
+            }
+            false
+        }
     }
 
     override fun backupUpdatedAt(): Long = read().updatedAt

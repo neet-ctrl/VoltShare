@@ -13,6 +13,7 @@ import com.twofasapp.data.services.domain.CloudBackupUpdateResult
 import com.twofasapp.data.services.domain.CloudSyncError
 import com.twofasapp.data.services.domain.CloudSyncStatus
 import com.twofasapp.data.services.domain.CloudSyncTrigger
+import com.twofasapp.data.services.exceptions.DecryptWrongPassword
 import com.twofasapp.data.services.domain.Group
 import com.twofasapp.data.services.mapper.asDomain
 import com.twofasapp.common.domain.BackupSyncStatus
@@ -295,6 +296,8 @@ class CloudSync(
                     )
                 }
             }
+        } catch (e: DecryptWrongPassword) {
+            return RemoteStatus.Error(CloudSyncError.DecryptWrongPassword)
         } catch (e: Exception) {
             return RemoteStatus.Error(CloudSyncError.SyncFailure)
         }

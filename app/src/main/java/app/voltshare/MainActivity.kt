@@ -362,6 +362,7 @@ open class MainActivity : FragmentActivity() {
 private fun Intent.toIncomingShare(): IncomingShare? {
     if (action != Intent.ACTION_SEND && action != Intent.ACTION_SEND_MULTIPLE) return null
     val uris = buildList {
+        data?.let(::add)
         clipData?.let { clip ->
             for (index in 0 until clip.itemCount) {
                 clip.getItemAt(index).uri?.let(::add)
