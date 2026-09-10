@@ -41,11 +41,14 @@ class VaultContentProvider : ContentProvider() {
     override fun getType(uri: Uri): String? = resolveFile(uri)?.mimeType
 
     override fun openFile(uri: Uri, mode: String): ParcelFileDescriptor {
-        if (mode != "r" && mode != "rw") {
+        if (mode != "r") {
             throw FileNotFoundException("VoltShare vault is read-only")
         }
         checkUnlocked()
         val file = resolveFile(uri) ?: throw FileNotFoundException("Vault file not found")
+        if (file.locked) {
+            throw SecurityException("VoltShare file is locked")
+        }
         return ParcelFileDescriptor.open(
             vault.storedFile(file),
             ParcelFileDescriptor.MODE_READ_ONLY,

@@ -1,0 +1,130 @@
+Is there any way that my another Android app that I will be making, can it access all the file? Only that app. Is there any method by which we can do something that they can locally, without any internet or require anything, that another app can access all the files inside that other app. Is there any method present? Just tell me. But when they will present on the same device, then?
+
+Yes. Two Android apps on the same device can communicate locally without internet, but the second app cannot directly browse VoltShare’s private filesDir. Android gives each app its own sandbox.
+
+The correct method is to make VoltShare intentionally expose a local API to your other app:
+
+Recommended approach: protected ContentProvider
+VoltShare would expose files through a local URI such as:
+
+content://app.voltshare.vault/files/<file-id>
+Your second app could then:
+
+List available vault files
+Read or stream files
+Request metadata
+Optionally import or delete files, if you allow those operations
+Protect the provider with an Android signature permission. Both apps must be signed with the same release certificate. Then only your companion app, signed with that certificate, receives access. Other apps cannot use the provider merely by knowing its URI.
+
+This works:
+
+On the same Android device
+Without Wi-Fi or mobile data
+Without an internet server
+Through Android’s local Binder/IPC system
+Important security behavior
+The provider should check VoltShare’s lock state before returning files. Otherwise, the second app could access the entire vault even while VoltShare is locked.
+
+You can choose policies such as:
+
+Companion app may read files only while VoltShare is unlocked
+Companion app must authenticate separately
+Companion app gets read-only access
+Only selected files are shared instead of the entire vault
+Full access is allowed only when the vault lock is disabled
+Other options
+Bound Android service/AIDL: also works locally and can provide richer commands, but is more complex than a ContentProvider.
+Shared external-storage folder: easy, but other apps and file managers may also access the files. Not recommended for a private vault.
+Shared UID: historically allowed two apps to share a Linux UID, but it is deprecated and unsuitable for a new design.
+Root/system privileges: unnecessary and should not be used.
+So, for your case: build both apps, sign them with the same certificate, and expose a signature-protected ContentProvider or local service from VoltShare. That gives only your other app controlled offline access while both apps are installed on the same device.
+
+I just want that in that app, which I will be making. There, when I will tap to add the attachment, then there will be two options. You could open the internal storage SAF, or you could do another method that will directly list all the files, exactly the same screen of our current app, and I can choose the multiple files, I could select it, and I can import and copy that to that another second app. Is it possible? Tell the best way, okay, so that I can do.
+
+Yes. The best design is to add a “VoltShare Vault” attachment source alongside the normal Android Storage Access Framework picker.
+
+Recommended user flow
+In your second app, the attachment button shows:
+
+Device storage
+
+Opens Android’s normal SAF picker.
+Uses ACTION_OPEN_DOCUMENT with multi-select.
+VoltShare Vault
+
+Opens a dedicated picker screen provided by VoltShare.
+Shows the same vault UI, folders, file previews, selection behavior, and multi-select controls.
+The user selects files and taps Import.
+VoltShare returns secure content:// file URIs to the second app.
+The second app immediately copies those files into its own private storage.
+There is no internet and no network server involved. This uses Android’s local activity and ContentProvider communication.
+
+Best implementation
+Create these two components in VoltShare:
+
+1. A dedicated vault picker activity
+For example:
+
+VaultPickerActivity
+The second app launches it with an explicit intent such as:
+
+app.voltshare.action.PICK_VAULT_FILES
+VoltShare displays its existing vault/file screen in selection mode. The user can:
+
+Browse folders
+Select multiple files
+See file names, sizes, and previews
+Confirm the selection
+Cancel the operation
+This is the best option if you want the screen to be exactly the same as the current VoltShare screen, because the UI remains inside VoltShare instead of being duplicated.
+
+2. A protected ContentProvider
+VoltShare returns selected files through URIs such as:
+
+content://app.voltshare.vault/files/<file-id>
+The second app reads those URIs and copies the bytes into its own internal storage.
+
+The provider should be protected with an Android signature permission. Both apps should be signed with the same release certificate. That ensures that random apps cannot access the provider.
+
+The second app would declare permission for the provider, launch the picker, then copy the returned files:
+
+VoltShare picker
+        ↓
+selected content:// URIs
+        ↓
+second app reads them
+        ↓
+second app copies them into its own private storage
+Security behavior
+The picker should require VoltShare to be unlocked before showing files. The provider should also verify that the vault is currently authorized before opening a file.
+
+For the safest design:
+
+Use read-only access
+Return access only for files the user selected
+Grant access temporarily
+Copy files immediately into the second app
+Do not expose a provider that allows unrestricted vault listing to every app
+If the screen must be inside the second app
+That is also possible, but it requires more work:
+
+VoltShare exposes a protected provider that returns file metadata and streams
+The second app queries that provider
+The second app recreates the vault screen using the same design/components
+Both apps need to stay compatible with the provider’s contract
+This will look the same, but it duplicates the UI and requires maintaining two versions.
+
+Final recommendation
+Use:
+
+SAF picker
++
+VoltShare Vault picker activity
++
+signature-protected ContentProvider
+That gives you the exact current VoltShare picker, multi-file selection, offline same-device transfer, and access limited to your own companion app. Do not use shared external storage or direct filesystem access, because those would make the files accessible to more than just your second app.
+
+So do all those setup on the current app, then just tell me what to do in another app that we'll be making in that. Just tell me and make sure that you set up everything perfectly, and just you do everything in this current app and just tell what to do to the another app, okay? Just tell what to do in another app. Just write in all those things in the markdown file, in a new markdown file, stating what to do in the next app. Okay, just tell everything. You just do the perfect, okay?
+
+I’ll set up the current VoltShare app as the provider side: a protected offline picker contract, a read-only file provider, and multi-file selection returning content:// URIs. I’ll also create a complete markdown handoff for the next app, including manifest, intent, permission, result handling, and copy flow.
+
