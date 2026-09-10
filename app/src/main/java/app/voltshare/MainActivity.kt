@@ -223,6 +223,7 @@ open class MainActivity : FragmentActivity() {
     private val installScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private var pendingIncomingShareState by mutableStateOf<IncomingShare?>(null)
     private var vaultPickerRequestedState by mutableStateOf(false)
+    private var vaultPickerPurposeState by mutableStateOf(VaultShareContract.PICKER_PURPOSE_ATTACHMENTS)
     private var pendingInstallFile: File? = null
     private var installPermissionOpened = false
 
@@ -232,17 +233,21 @@ open class MainActivity : FragmentActivity() {
     val vaultPickerRequested: Boolean
         get() = vaultPickerRequestedState
 
+    val vaultPickerPurpose: String
+        get() = vaultPickerPurposeState
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         pendingIncomingShareState = intent.toIncomingShare()
         vaultPickerRequestedState = intent.action == VaultShareContract.ACTION_PICK_VAULT_FILES
+        vaultPickerPurposeState = intent.vaultPickerPurpose()
         vault = VaultRepository(this)
         lockManager = LockManager(this)
         transfer = PeerTransferManager(this, vault)
         VaultSession.unlocked = false
         setContent {
             VoltShareTheme {
-                VoltShareApp(this, vault, lockManager, transfer, vaultPickerRequested)
+                VoltShareApp(this, vault, lockManager, transfer, vaultPickerRequested, vaultPickerPurpose)
             }
         }
     }
@@ -252,6 +257,7 @@ open class MainActivity : FragmentActivity() {
         setIntent(intent)
         pendingIncomingShareState = intent.toIncomingShare()
         vaultPickerRequestedState = intent.action == VaultShareContract.ACTION_PICK_VAULT_FILES
+        vaultPickerPurposeState = intent.vaultPickerPurpose()
     }
 
     fun consumePendingIncomingShare() {
@@ -261,6 +267,12 @@ open class MainActivity : FragmentActivity() {
     fun completeVaultPicker(files: List<VaultFile>) {
         val exportableFiles = files.filter { file ->
             !file.locked && vault.storedFile(file).isFile
+        }.let { candidates ->
+            if (vaultPickerPurposeState == VaultShareContract.PICKER_PURPOSE_UNIVERSAL_RESTORE) {
+                candidates.take(1)
+            } else {
+                candidates
+            }
         }
         if (exportableFiles.isEmpty()) {
             Toast.makeText(this, "Select at least one unlocked file", Toast.LENGTH_SHORT).show()
@@ -364,6 +376,11 @@ open class MainActivity : FragmentActivity() {
     }
 }
 
+private fun Intent.vaultPickerPurpose(): String =
+    getStringExtra(VaultShareContract.EXTRA_PICKER_PURPOSE)
+        ?.takeIf { it == VaultShareContract.PICKER_PURPOSE_UNIVERSAL_RESTORE }
+        ?: VaultShareContract.PICKER_PURPOSE_ATTACHMENTS
+
 private fun Intent.toIncomingShare(): IncomingShare? {
     if (action != Intent.ACTION_SEND && action != Intent.ACTION_SEND_MULTIPLE) return null
     val uris = buildList {
@@ -461,6 +478,7 @@ private fun VoltShareApp(
     lockManager: LockManager,
     transfer: PeerTransferManager,
     vaultPickerRequested: Boolean,
+    vaultPickerPurpose: String,
 ) {
     var configured by remember { mutableStateOf(lockManager.isConfigured()) }
     var lockEnabled by remember { mutableStateOf(lockManager.isEnabled()) }
@@ -653,6 +671,8 @@ private fun VoltShareApp(
                 } else {
                     selectedFileIds = if (file.id in selectedFileIds) {
                         selectedFileIds - file.id
+                    } else if (vaultPickerPurpose == VaultShareContract.PICKER_PURPOSE_UNIVERSAL_RESTORE) {
+                        setOf(file.id)
                     } else {
                         selectedFileIds + file.id
                     }
@@ -670,6 +690,31 @@ private fun VoltShareApp(
             vault = vault,
             selectionOnly = true,
             onConfirmSelection = { activity.completeVaultPicker(files.filter { it.id in selectedFileIds }) },
+            pickerTitle = if (vaultPickerPurpose == VaultShareContract.PICKER_PURPOSE_UNIVERSAL_RESTORE) {
+                "Restore universal backup"
+            } else {
+                "Choose files"
+            },
+            pickerDescription = if (vaultPickerPurpose == VaultShareContract.PICKER_PURPOSE_UNIVERSAL_RESTORE) {
+                "Select one universal backup file to restore in 2FAS. The file is shared read-only."
+            } else {
+                "Select one or more files to attach to the other app"
+            },
+            pickerReadyText = if (vaultPickerPurpose == VaultShareContract.PICKER_PURPOSE_UNIVERSAL_RESTORE) {
+                "Ready to restore"
+            } else {
+                "Ready to import"
+            },
+            pickerFooterText = if (vaultPickerPurpose == VaultShareContract.PICKER_PURPOSE_UNIVERSAL_RESTORE) {
+                "The selected backup stays in VoltShare and is shared read-only with 2FAS."
+            } else {
+                "Selected files are shared read-only with the requesting app."
+            },
+            pickerConfirmLabel = if (vaultPickerPurpose == VaultShareContract.PICKER_PURPOSE_UNIVERSAL_RESTORE) {
+                "Restore the file"
+            } else {
+                "Import selected"
+            },
         )
         return
     }
@@ -1489,6 +1534,11 @@ private fun FilesHome(
     vault: VaultRepository,
     selectionOnly: Boolean = false,
     onConfirmSelection: (() -> Unit)? = null,
+    pickerTitle: String = "Choose files",
+    pickerDescription: String = "Select one or more files to attach to the other app",
+    pickerReadyText: String = "Ready to import",
+    pickerFooterText: String = "Selected files are shared read-only with the requesting app.",
+    pickerConfirmLabel: String = "Import selected",
 ) {
     var searchQuery by remember { mutableStateOf("") }
     var searchOpen by remember { mutableStateOf(false) }
@@ -1598,7 +1648,7 @@ private fun FilesHome(
                     Spacer(Modifier.height(7.dp))
                     Text(
                         if (selectionOnly) {
-                            if (currentFolder == "/") "Choose files" else currentFolder.substringAfterLast('/')
+                            if (currentFolder == "/") pickerTitle else currentFolder.substringAfterLast('/')
                         } else if (currentFolder == "/") {
                             "Your files"
                         } else {
@@ -1608,7 +1658,7 @@ private fun FilesHome(
                         style = MaterialTheme.typography.headlineMedium,
                     )
                     Text(
-                        if (selectionOnly) "Select one or more files to attach to the other app" else "Private, organized, and only visible to you",
+                        if (selectionOnly) pickerDescription else "Private, organized, and only visible to you",
                         color = VoltTextMuted,
                         fontSize = 12.sp,
                     )
@@ -1852,6 +1902,8 @@ private fun FilesHome(
                         selectedCount = selectedFileIds.size,
                         onConfirm = onConfirmSelection,
                         onClear = onClearSelection,
+                            readyText = pickerReadyText,
+                            confirmLabel = pickerConfirmLabel,
                     )
                 } else {
                     SelectionBar(
@@ -1866,7 +1918,11 @@ private fun FilesHome(
         }
         item {
             Text(
-                if (selectionOnly) "Selected files are shared read-only with the requesting app." else "Your files stay inside VoltShare’s private app storage.",
+                if (selectionOnly) {
+                    pickerFooterText
+                } else {
+                    "Your files stay inside VoltShare’s private app storage."
+                },
                 color = VoltTextMuted.copy(alpha = 0.72f),
                 fontSize = 11.sp,
                 modifier = Modifier.padding(top = 4.dp, bottom = 12.dp),
@@ -2248,6 +2304,8 @@ private fun PickerSelectionBar(
     selectedCount: Int,
     onConfirm: () -> Unit,
     onClear: () -> Unit,
+    readyText: String,
+    confirmLabel: String,
 ) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
@@ -2271,15 +2329,15 @@ private fun PickerSelectionBar(
             Spacer(Modifier.width(9.dp))
             Column(modifier = Modifier.weight(1f)) {
                 Text("$selectedCount selected", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 12.sp)
-                Text("Ready to import", color = VoltTextMuted, fontSize = 10.sp)
+                Text(readyText, color = VoltTextMuted, fontSize = 10.sp)
             }
             TextButton(
                 onClick = onConfirm,
                 colors = ButtonDefaults.textButtonColors(contentColor = VoltGreen),
             ) {
-                Icon(Icons.Default.ArrowDownward, "Import selected", modifier = Modifier.size(17.dp))
+                Icon(Icons.Default.ArrowDownward, confirmLabel, modifier = Modifier.size(17.dp))
                 Spacer(Modifier.width(5.dp))
-                Text("Import selected", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                Text(confirmLabel, fontWeight = FontWeight.Bold, fontSize = 12.sp)
             }
             IconButton(onClick = onClear) {
                 Icon(Icons.Default.Close, "Clear selection", tint = VoltTextMuted)
@@ -4737,9 +4795,44 @@ private fun FileActionDialog(
                         Text("File actions", color = VoltGreen, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.5.sp)
                         Spacer(Modifier.height(3.dp))
                         Text(file.name, color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Black, maxLines = 1)
-                        Text("${file.folderPath} • ${formatSize(file.sizeBytes)}", color = VoltTextMuted, fontSize = 11.sp, maxLines = 1)
+                        Text(file.folderPath, color = VoltTextMuted, fontSize = 11.sp, maxLines = 1)
                     }
                     IconButton(onClick = onDismiss) { Icon(Icons.Default.Close, "Close", tint = VoltTextMuted) }
+                }
+                Spacer(Modifier.height(14.dp))
+                Surface(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(17.dp),
+                    color = VoltGreen.copy(alpha = 0.09f),
+                    border = BorderStroke(1.dp, VoltGreen.copy(alpha = 0.22f)),
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Icon(
+                            Icons.Default.Description,
+                            contentDescription = null,
+                            tint = VoltGreen,
+                            modifier = Modifier.size(19.dp),
+                        )
+                        Spacer(Modifier.width(10.dp))
+                        Column {
+                            Text(
+                                "File size",
+                                color = VoltTextMuted,
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Bold,
+                                letterSpacing = 1.1.sp,
+                            )
+                            Text(
+                                "${formatSize(file.sizeBytes)}  •  ${file.sizeBytes} bytes",
+                                color = Color.White,
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Bold,
+                            )
+                        }
+                    }
                 }
                 Spacer(Modifier.height(17.dp))
                 FileActionRow(Icons.Default.Edit, "Rename", "Change the display name", onRename)
