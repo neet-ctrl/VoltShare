@@ -248,6 +248,8 @@ internal fun UniversalBackupCard(
                                     "${VoltShareHandoffReceiver.UNIVERSAL_BACKUP_PREFIX}${System.currentTimeMillis()}${VoltShareHandoffReceiver.UNIVERSAL_BACKUP_SUFFIX}",
                                 )
                                 runCatching {
+                                     file.parentFile?.mkdirs()
+                                     check(file.createNewFile()) { "Unable to create temporary backup file" }
                                     val uri = FileProvider.getUriForFile(
                                         context,
                                         context.packageName,

@@ -2,6 +2,7 @@ package com.twofasapp.feature.home.ui.settings
 
 import android.app.Application
 import android.net.Uri
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.twofasapp.common.domain.SecretsBackupProvider
@@ -38,12 +39,11 @@ internal class UniversalBackupViewModel(
                     passwordProtected = passwordValue != null,
                     secretsUpdatedAt = secretsBackupProvider.backupUpdatedAt(),
                 ).toByteArray(Charsets.UTF_8)
-                context.contentResolver.openOutputStream(uri)?.use { output ->
-                    output.write(serialized)
-                } ?: error("Unable to open universal backup file")
+                writeBackup(uri, serialized)
             }.onSuccess {
                 publishEvent(UniversalBackupUiEvent.ExportSuccess)
-            }.onFailure {
+            }.onFailure { exception ->
+                Log.e(TAG, "Universal backup export failed for $uri", exception)
                 publishEvent(UniversalBackupUiEvent.ExportError)
             }
         }
@@ -111,6 +111,24 @@ internal class UniversalBackupViewModel(
 
     private fun publishEvent(event: UniversalBackupUiEvent) {
         uiState.update { it.copy(events = it.events + event) }
+    }
+
+    private fun writeBackup(uri: Uri, bytes: ByteArray) {
+        val resolver = context.contentResolver
+        val output = runCatching {
+            resolver.openOutputStream(uri, "wt")
+        }.getOrElse {
+            resolver.openOutputStream(uri, "w")
+        } ?: error("Unable to open universal backup file")
+
+        output.use {
+            it.write(bytes)
+            it.flush()
+        }
+    }
+
+    private companion object {
+        const val TAG = "UniversalBackup"
     }
 
 }
