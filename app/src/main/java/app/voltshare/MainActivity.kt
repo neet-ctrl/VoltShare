@@ -122,6 +122,7 @@ import androidx.compose.material.icons.filled.Replay10
 import androidx.compose.material.icons.filled.RotateRight
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Security
+import androidx.compose.material.icons.filled.Save
 import androidx.compose.material.icons.filled.SelectAll
 import androidx.compose.material.icons.filled.Sort
 import androidx.compose.material.icons.filled.Settings
@@ -251,6 +252,11 @@ data class InstalledAppChoice(
     val icon: Drawable? = null,
 )
 
+private data class PendingVaultRestore(
+    val uri: Uri,
+    val passwordRequired: Boolean,
+)
+
 private data class FileActionTileSpec(
     val icon: ImageVector,
     val title: String,
@@ -264,11 +270,17 @@ open class MainActivity : FragmentActivity() {
     private lateinit var transfer: PeerTransferManager
     private val installScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private var pendingIncomingShareState by mutableStateOf<IncomingShare?>(null)
+    private var pendingBackupUriState by mutableStateOf<Uri?>(null)
     private var vaultPickerRequestedState by mutableStateOf(false)
     private var vaultPickerPurposeState by mutableStateOf(VaultShareContract.PICKER_PURPOSE_ATTACHMENTS)
     private var pendingInstallFile: File? = null
     private var pendingInstallName: String? = null
     private var installPermissionOpened = false
+    private var screenshotsAllowed = false
+    var diagnosticTitle by mutableStateOf<String?>(null)
+        private set
+    var diagnosticLog by mutableStateOf<String?>(null)
+        private set
 
     val pendingIncomingShare: IncomingShare?
         get() = pendingIncomingShareState
@@ -282,6 +294,7 @@ open class MainActivity : FragmentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         pendingIncomingShareState = intent.toIncomingShare()
+        pendingBackupUriState = intent.toVaultShareUri()
         vaultPickerRequestedState = intent.action == VaultShareContract.ACTION_PICK_VAULT_FILES
         vaultPickerPurposeState = intent.vaultPickerPurpose()
         vault = VaultRepository(this)
@@ -289,6 +302,9 @@ open class MainActivity : FragmentActivity() {
         transfer = PeerTransferManager(this, vault)
         VaultSession.unlocked = false
         setScreenshotProtection(false)
+        InstallResultStore.register { log ->
+            showDiagnostic("APK installation failed", log)
+        }
         setContent {
             VoltShareTheme {
                 VoltShareApp(this, vault, lockManager, transfer, vaultPickerRequested, vaultPickerPurpose)
@@ -300,12 +316,20 @@ open class MainActivity : FragmentActivity() {
         super.onNewIntent(intent)
         setIntent(intent)
         pendingIncomingShareState = intent.toIncomingShare()
+        pendingBackupUriState = intent.toVaultShareUri()
         vaultPickerRequestedState = intent.action == VaultShareContract.ACTION_PICK_VAULT_FILES
         vaultPickerPurposeState = intent.vaultPickerPurpose()
     }
 
     fun consumePendingIncomingShare() {
         pendingIncomingShareState = null
+    }
+
+    val pendingBackupUri: Uri?
+        get() = pendingBackupUriState
+
+    fun consumePendingBackupUri() {
+        pendingBackupUriState = null
     }
 
     fun completeVaultPicker(files: List<VaultFile>) {
@@ -381,11 +405,22 @@ open class MainActivity : FragmentActivity() {
     }
 
     fun setScreenshotProtection(enabled: Boolean) {
+        screenshotsAllowed = enabled
         if (enabled) {
             window.clearFlags(WindowManager.LayoutParams.FLAG_SECURE)
         } else {
             window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
         }
+    }
+
+    fun showDiagnostic(title: String, log: String) {
+        diagnosticTitle = title
+        diagnosticLog = log
+    }
+
+    fun dismissDiagnostic() {
+        diagnosticTitle = null
+        diagnosticLog = null
     }
 
     fun installVaultPackage(vault: VaultRepository, file: VaultFile) {
@@ -428,11 +463,17 @@ open class MainActivity : FragmentActivity() {
             result.fold(
                 onSuccess = { Toast.makeText(this@MainActivity, "Android installer opened", Toast.LENGTH_SHORT).show() },
                 onFailure = { error ->
-                    Toast.makeText(
-                        this@MainActivity,
-                        "Could not start installation: ${error.message ?: "unknown error"}",
-                        Toast.LENGTH_LONG,
-                    ).show()
+                    showDiagnostic(
+                        "APK installation could not start",
+                        buildString {
+                            appendLine("VoltShare Android installation diagnostic")
+                            appendLine("Package name: $originalName")
+                            appendLine("Payload path: ${prepared.absolutePath}")
+                            appendLine("Payload bytes: ${prepared.length()}")
+                            appendLine()
+                            appendLine(error.stackTraceToString())
+                        },
+                    )
                 },
             )
         }
@@ -440,10 +481,20 @@ open class MainActivity : FragmentActivity() {
 
     override fun onResume() {
         super.onResume()
+        setScreenshotProtection(screenshotsAllowed)
+        InstallResultStore.consume(this)?.let {
+            showDiagnostic("APK installation failed", it)
+        }
         if (pendingInstallFile != null) continuePendingInstall()
     }
 
+    override fun onWindowFocusChanged(hasFocus: Boolean) {
+        super.onWindowFocusChanged(hasFocus)
+        if (hasFocus) setScreenshotProtection(screenshotsAllowed)
+    }
+
     override fun onDestroy() {
+        InstallResultStore.unregister()
         installScope.cancel()
         transfer.close()
         vault.clearViewCache()
@@ -455,6 +506,13 @@ private fun Intent.vaultPickerPurpose(): String =
     getStringExtra(VaultShareContract.EXTRA_PICKER_PURPOSE)
         ?.takeIf { it == VaultShareContract.PICKER_PURPOSE_UNIVERSAL_RESTORE }
         ?: VaultShareContract.PICKER_PURPOSE_ATTACHMENTS
+
+private fun Intent.toVaultShareUri(): Uri? =
+    data?.takeIf {
+        action == Intent.ACTION_VIEW &&
+            (it.lastPathSegment?.substringAfterLast('/')?.endsWith(".vaultshare", ignoreCase = true) == true ||
+                type == VaultShareContract.MIME_VAULTSHARE)
+    }
 
 private fun Intent.toIncomingShare(): IncomingShare? {
     if (action != Intent.ACTION_SEND && action != Intent.ACTION_SEND_MULTIPLE) return null
@@ -584,6 +642,11 @@ private fun VoltShareApp(
     var lastBackPressAt by remember { mutableStateOf(0L) }
     var securityAction by remember { mutableStateOf<SecurityAction?>(null) }
     var showChangeLock by remember { mutableStateOf(false) }
+    var showBackupPasswordDialog by remember { mutableStateOf(false) }
+    var backupPasswordForExport by remember { mutableStateOf<String?>(null) }
+    var pendingRestore by remember { mutableStateOf<PendingVaultRestore?>(null) }
+    var restorePasswordError by remember { mutableStateOf<String?>(null) }
+    var restoreBusy by remember { mutableStateOf(false) }
     val transferStatus by transfer.status.collectAsStateWithLifecycle()
     val scope = rememberCoroutineScope()
     val incomingShare = activity.pendingIncomingShare
@@ -763,6 +826,130 @@ private fun VoltShareApp(
             )
         }
     }
+    val backupPicker = rememberLauncherForActivityResult(
+        ActivityResultContracts.CreateDocument(VaultShareContract.MIME_VAULTSHARE),
+    ) { uri ->
+        val password = backupPasswordForExport
+        backupPasswordForExport = null
+        if (uri == null) return@rememberLauncherForActivityResult
+        scope.launch {
+            val result = withContext(Dispatchers.IO) {
+                runCatching {
+                    val temporary = File(activity.cacheDir, "vaultshare-export-${UUID.randomUUID()}.vaultshare")
+                    try {
+                        val summary = temporary.outputStream().use { output ->
+                            vault.writeVaultShareBackup(output, password)
+                        }
+                        val output = runCatching {
+                            activity.contentResolver.openOutputStream(uri, "wt")
+                        }.getOrNull() ?: activity.contentResolver.openOutputStream(uri, "w")
+                        check(output != null) { "The selected storage provider could not open the backup file." }
+                        output.use { destination ->
+                            temporary.inputStream().use { source -> source.copyTo(destination, 1024 * 1024) }
+                        }
+                        val savedSize = DocumentFile.fromSingleUri(activity, uri)?.length() ?: -1L
+                        check(savedSize < 0L || savedSize == temporary.length()) {
+                            "The selected storage provider saved an incomplete backup file."
+                        }
+                        summary
+                    } finally {
+                        temporary.delete()
+                    }
+                }
+            }
+            result.fold(
+                onSuccess = { summary ->
+                    Toast.makeText(
+                        activity,
+                        "Backup saved: ${summary.fileCount} file${if (summary.fileCount == 1) "" else "s"}",
+                        Toast.LENGTH_LONG,
+                    ).show()
+                },
+                onFailure = { error ->
+                    activity.showDiagnostic(
+                        "Backup creation failed",
+                        technicalLog("VoltShare backup creation diagnostic", error),
+                    )
+                },
+            )
+        }
+    }
+    fun startRestore(uri: Uri, password: String?) {
+        restoreBusy = true
+        scope.launch {
+            val result = withContext(Dispatchers.IO) {
+                runCatching {
+                    activity.contentResolver.openInputStream(uri)?.use { input ->
+                        vault.restoreVaultShareBackup(input, password)
+                    } ?: error("The selected backup file could not be opened.")
+                }
+            }
+            restoreBusy = false
+            result.fold(
+                onSuccess = { summary ->
+                    pendingRestore = null
+                    restorePasswordError = null
+                    files = vault.listFiles()
+                    folders = vault.listFolders()
+                    primaryFolder = vault.primaryFolder()
+                    currentFolder = "/"
+                    Toast.makeText(
+                        activity,
+                        "Backup restored: ${summary.fileCount} file${if (summary.fileCount == 1) "" else "s"}",
+                        Toast.LENGTH_LONG,
+                    ).show()
+                },
+                onFailure = { error ->
+                    if (error is VaultBackupWrongPasswordException) {
+                        restorePasswordError = "Incorrect backup password. Nothing was changed."
+                    } else {
+                        pendingRestore = null
+                        restorePasswordError = null
+                        activity.showDiagnostic(
+                            "Backup restore failed",
+                            technicalLog("VoltShare backup restore diagnostic", error),
+                        )
+                    }
+                },
+            )
+        }
+    }
+    fun inspectAndRestore(uri: Uri) {
+        runCatching {
+            activity.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        }
+        scope.launch {
+            val infoResult = withContext(Dispatchers.IO) {
+                runCatching {
+                    activity.contentResolver.openInputStream(uri)?.use { input ->
+                        vault.inspectVaultShareBackup(input)
+                    } ?: error("The selected backup file could not be opened.")
+                }
+            }
+            infoResult.fold(
+                onSuccess = { info ->
+                    if (info.passwordRequired) {
+                        restorePasswordError = null
+                        pendingRestore = PendingVaultRestore(uri, passwordRequired = true)
+                    } else {
+                        startRestore(uri, null)
+                    }
+                },
+                onFailure = { error ->
+                    activity.showDiagnostic(
+                        "Backup inspection failed",
+                        technicalLog("VoltShare backup inspection diagnostic", error),
+                    )
+                },
+            )
+        }
+    }
+    val restorePicker = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocument(),
+    ) { uri ->
+        if (uri == null) return@rememberLauncherForActivityResult
+        inspectAndRestore(uri)
+    }
 
     if (!configured) {
         SetupLockScreen(
@@ -782,6 +969,53 @@ private fun VoltShareApp(
             onBiometric = { activity.authenticateWithBiometric { unlocked = true } },
         )
         return
+    }
+
+    LaunchedEffect(activity.pendingBackupUri) {
+        activity.pendingBackupUri?.let { uri ->
+            activity.consumePendingBackupUri()
+            inspectAndRestore(uri)
+        }
+    }
+
+    activity.diagnosticLog?.let { log ->
+        TechnicalErrorDialog(
+            title = activity.diagnosticTitle ?: "VoltShare diagnostic",
+            log = log,
+            onDismiss = activity::dismissDiagnostic,
+        )
+    }
+
+    if (showBackupPasswordDialog) {
+        VaultSharePasswordDialog(
+            title = "Create .vaultshare backup",
+            description = "Choose whether this plain backup should require a password during restore. The file contents are not encrypted.",
+            error = null,
+            allowNoPassword = true,
+            onDismiss = { showBackupPasswordDialog = false },
+            onConfirm = { password ->
+                showBackupPasswordDialog = false
+                backupPasswordForExport = password
+                backupPicker.launch("VoltShare-backup-${System.currentTimeMillis()}.vaultshare")
+            },
+        )
+    }
+
+    pendingRestore?.takeIf { it.passwordRequired }?.let { restore ->
+        VaultSharePasswordDialog(
+            title = "Unlock backup",
+            description = "This backup has a password. Enter it to restore every file and folder. Nothing is changed until it is correct.",
+            error = restorePasswordError,
+            allowNoPassword = false,
+            busy = restoreBusy,
+            onDismiss = {
+                if (!restoreBusy) {
+                    pendingRestore = null
+                    restorePasswordError = null
+                }
+            },
+            onConfirm = { password -> startRestore(restore.uri, password.orEmpty()) },
+        )
     }
 
     if (vaultPickerRequested) {
@@ -914,6 +1148,8 @@ private fun VoltShareApp(
                                 biometricEnabled = false
                                 fileLockDefault = false
                                 fileToUnlock = null
+                                screenshotEnabled = false
+                                screenshotUnlockUntil = null
                                 scope.launch {
                                     files = withContext(Dispatchers.IO) { vault.disableAllFileLocks() }
                                 }
@@ -1328,6 +1564,8 @@ private fun VoltShareApp(
                             screenshotUnlockUntil = null
                         }
                     },
+                    onCreateBackup = { showBackupPasswordDialog = true },
+                    onRestoreBackup = { restorePicker.launch(arrayOf("*/*")) },
                     onLockNow = { if (lockEnabled) securityAction = SecurityAction.LockNow },
                 )
             }
@@ -3905,6 +4143,229 @@ private fun InstalledAppsDialog(
 }
 
 @Composable
+private fun TechnicalErrorDialog(
+    title: String,
+    log: String,
+    onDismiss: () -> Unit,
+) {
+    val clipboard = LocalClipboardManager.current
+    val context = LocalContext.current
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false),
+    ) {
+        Surface(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 18.dp),
+            shape = RoundedCornerShape(30.dp),
+            color = VoltSurfaceRaised,
+            border = BorderStroke(1.dp, Color(0xFFFF6B6B).copy(alpha = 0.38f)),
+            shadowElevation = 24.dp,
+        ) {
+            Column(Modifier.padding(22.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(
+                        modifier = Modifier.size(48.dp).background(Color(0xFFFF6B6B).copy(alpha = 0.12f), CircleShape),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(Icons.Default.Info, null, tint = Color(0xFFFF8A80), modifier = Modifier.size(25.dp))
+                    }
+                    Spacer(Modifier.width(14.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("DIAGNOSTIC REPORT", color = Color(0xFFFF8A80), fontSize = 10.sp, fontWeight = FontWeight.Black, letterSpacing = 1.8.sp)
+                        Spacer(Modifier.height(4.dp))
+                        Text(title, color = Color.White, fontSize = 19.sp, fontWeight = FontWeight.Black)
+                    }
+                    IconButton(onClick = onDismiss) {
+                        Icon(Icons.Default.Close, "Close diagnostic report", tint = VoltTextMuted)
+                    }
+                }
+                Spacer(Modifier.height(14.dp))
+                Text(
+                    "This is the complete error returned by the operation. Copy it when reporting a problem or comparing device behavior.",
+                    color = VoltTextMuted,
+                    fontSize = 13.sp,
+                    lineHeight = 19.sp,
+                )
+                Spacer(Modifier.height(14.dp))
+                Surface(
+                    modifier = Modifier.fillMaxWidth().height(300.dp),
+                    color = Color.Black.copy(alpha = 0.45f),
+                    shape = RoundedCornerShape(18.dp),
+                    border = BorderStroke(1.dp, Color.White.copy(alpha = 0.08f)),
+                ) {
+                    Text(
+                        log,
+                        color = Color.White.copy(alpha = 0.86f),
+                        fontSize = 11.sp,
+                        lineHeight = 16.sp,
+                        modifier = Modifier.padding(14.dp).verticalScroll(rememberScrollState()),
+                    )
+                }
+                Spacer(Modifier.height(16.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
+                    OutlinedButton(
+                        onClick = {
+                            clipboard.setText(AnnotatedString(log))
+                            Toast.makeText(context, "Full diagnostic copied", Toast.LENGTH_SHORT).show()
+                        },
+                        modifier = Modifier.weight(1f).height(48.dp),
+                        shape = RoundedCornerShape(16.dp),
+                        border = BorderStroke(1.dp, VoltGreen.copy(alpha = 0.45f)),
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = VoltGreen),
+                    ) {
+                        Icon(Icons.Default.ContentCopy, null, modifier = Modifier.size(17.dp))
+                        Spacer(Modifier.width(7.dp))
+                        Text("Copy full log")
+                    }
+                    Button(
+                        onClick = onDismiss,
+                        modifier = Modifier.weight(0.72f).height(48.dp),
+                        shape = RoundedCornerShape(16.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = VoltGreen, contentColor = Color.Black),
+                    ) {
+                        Text("Close", fontWeight = FontWeight.Bold)
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun VaultSharePasswordDialog(
+    title: String,
+    description: String,
+    error: String?,
+    allowNoPassword: Boolean,
+    busy: Boolean = false,
+    onDismiss: () -> Unit,
+    onConfirm: (String?) -> Unit,
+) {
+    var protectWithPassword by remember { mutableStateOf(!allowNoPassword) }
+    var password by remember { mutableStateOf("") }
+    var confirmation by remember { mutableStateOf("") }
+    var localError by remember { mutableStateOf<String?>(null) }
+    val visibleError = error ?: localError
+    Dialog(
+        onDismissRequest = { if (!busy) onDismiss() },
+        properties = DialogProperties(usePlatformDefaultWidth = false),
+    ) {
+        Surface(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 18.dp),
+            shape = RoundedCornerShape(30.dp),
+            color = VoltSurfaceRaised,
+            border = BorderStroke(1.dp, VoltGreen.copy(alpha = 0.32f)),
+            shadowElevation = 28.dp,
+        ) {
+            Column(Modifier.padding(22.dp).verticalScroll(rememberScrollState())) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(
+                        modifier = Modifier
+                            .size(52.dp)
+                            .background(VoltGreen.copy(alpha = 0.13f), CircleShape),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(Icons.Default.Security, null, tint = VoltGreen, modifier = Modifier.size(25.dp))
+                    }
+                    Spacer(Modifier.width(14.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("VAULTSHARE", color = VoltGreen, fontSize = 10.sp, fontWeight = FontWeight.Black, letterSpacing = 1.8.sp)
+                        Spacer(Modifier.height(4.dp))
+                        Text(title, color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.Black)
+                    }
+                    IconButton(onClick = { if (!busy) onDismiss() }) {
+                        Icon(Icons.Default.Close, "Close", tint = VoltTextMuted)
+                    }
+                }
+                Spacer(Modifier.height(13.dp))
+                Text(description, color = VoltTextMuted, fontSize = 13.sp, lineHeight = 19.sp)
+                if (allowNoPassword) {
+                    Spacer(Modifier.height(16.dp))
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text("Require a password", color = Color.White, fontWeight = FontWeight.Bold)
+                            Text("Without one, the backup remains plain and does not ask during restore.", color = VoltTextMuted, fontSize = 12.sp, lineHeight = 17.sp)
+                        }
+                        PremiumSwitch(
+                            checked = protectWithPassword,
+                            enabled = !busy,
+                            onCheckedChange = {
+                                protectWithPassword = it
+                                localError = null
+                            },
+                        )
+                    }
+                }
+                if (protectWithPassword) {
+                    Spacer(Modifier.height(16.dp))
+                    SecureField(
+                        value = password,
+                        label = "Backup password",
+                        keyboardType = KeyboardType.Password,
+                        onValueChange = {
+                            password = it
+                            localError = null
+                        },
+                    )
+                    Spacer(Modifier.height(10.dp))
+                    SecureField(
+                        value = confirmation,
+                        label = "Confirm backup password",
+                        keyboardType = KeyboardType.Password,
+                        onValueChange = {
+                            confirmation = it
+                            localError = null
+                        },
+                    )
+                }
+                visibleError?.let {
+                    Text(it, color = Color(0xFFFF8A80), fontSize = 12.sp, modifier = Modifier.padding(top = 10.dp))
+                }
+                Spacer(Modifier.height(19.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
+                    TextButton(
+                        onClick = onDismiss,
+                        enabled = !busy,
+                        modifier = Modifier.weight(1f),
+                        colors = ButtonDefaults.textButtonColors(contentColor = VoltTextMuted),
+                    ) { Text("Cancel") }
+                    Button(
+                        onClick = {
+                            if (protectWithPassword && password != confirmation) {
+                                localError = "The passwords do not match."
+                            } else if (protectWithPassword && password.length < 4) {
+                                localError = "Use at least four characters."
+                            } else {
+                                onConfirm(if (protectWithPassword) password else null)
+                            }
+                        },
+                        enabled = !busy && (!protectWithPassword || password.isNotEmpty()),
+                        modifier = Modifier.weight(1.25f).height(48.dp),
+                        shape = RoundedCornerShape(16.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = VoltGreen, contentColor = Color.Black),
+                    ) {
+                        if (busy) {
+                            CircularProgressIndicator(modifier = Modifier.size(17.dp), strokeWidth = 2.dp, color = Color.Black)
+                        } else {
+                            Icon(Icons.Default.Check, null, modifier = Modifier.size(17.dp))
+                            Spacer(Modifier.width(7.dp))
+                            Text(if (allowNoPassword) "Choose folder" else "Restore", fontWeight = FontWeight.Bold)
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+private fun technicalLog(prefix: String, error: Throwable): String = buildString {
+    appendLine(prefix)
+    appendLine("Time: ${System.currentTimeMillis()}")
+    appendLine()
+    appendLine(error.stackTraceToString())
+}
+
+@Composable
 private fun SecurityHome(
     lockType: LockType,
     lockEnabled: Boolean,
@@ -3918,6 +4379,8 @@ private fun SecurityHome(
     onRequestLock: (Boolean) -> Unit,
     onRequestFileLockDefault: (Boolean) -> Unit,
     onRequestScreenshots: (Boolean) -> Unit,
+    onCreateBackup: () -> Unit,
+    onRestoreBackup: () -> Unit,
     onLockNow: () -> Unit,
 ) {
     LazyColumn(
@@ -4103,6 +4566,54 @@ private fun SecurityHome(
                         enabled = lockEnabled,
                         onCheckedChange = { if (lockEnabled) onRequestScreenshots(it) },
                     )
+                }
+            }
+        }
+        item {
+            GlassCard(modifier = Modifier.fillMaxWidth(), accent = VoltGreen, padding = 18.dp) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(
+                        modifier = Modifier
+                            .size(48.dp)
+                            .background(VoltGreen.copy(alpha = 0.13f), RoundedCornerShape(16.dp)),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(Icons.Default.Folder, null, tint = VoltGreen, modifier = Modifier.size(24.dp))
+                    }
+                    Spacer(Modifier.width(13.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("Vault backup", color = Color.White, fontWeight = FontWeight.Bold)
+                        Text(
+                            "Save every file, folder, lock flag, and custom order as a .vaultshare file",
+                            color = VoltTextMuted,
+                            fontSize = 12.sp,
+                            lineHeight = 17.sp,
+                        )
+                    }
+                }
+                Spacer(Modifier.height(15.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
+                    OutlinedButton(
+                        onClick = onRestoreBackup,
+                        modifier = Modifier.weight(1f).height(48.dp),
+                        shape = RoundedCornerShape(16.dp),
+                        border = BorderStroke(1.dp, VoltGreen.copy(alpha = 0.5f)),
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = VoltGreen),
+                    ) {
+                        Icon(Icons.Default.Replay, null, modifier = Modifier.size(17.dp))
+                        Spacer(Modifier.width(6.dp))
+                        Text("Restore")
+                    }
+                    Button(
+                        onClick = onCreateBackup,
+                        modifier = Modifier.weight(1.15f).height(48.dp),
+                        shape = RoundedCornerShape(16.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = VoltGreen, contentColor = Color.Black),
+                    ) {
+                        Icon(Icons.Default.Save, null, modifier = Modifier.size(17.dp))
+                        Spacer(Modifier.width(6.dp))
+                        Text("Create backup", fontWeight = FontWeight.Bold)
+                    }
                 }
             }
         }

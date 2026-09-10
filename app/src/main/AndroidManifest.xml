@@ -45,6 +45,18 @@
                 <category android:name="android.intent.category.DEFAULT" />
                 <data android:mimeType="*/*" />
             </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:scheme="content" android:mimeType="application/vnd.voltshare.vaultshare" />
+                <data android:scheme="file" android:mimeType="application/vnd.voltshare.vaultshare" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:scheme="content" android:pathPattern=".*\.vaultshare" />
+                <data android:scheme="file" android:pathPattern=".*\.vaultshare" />
+            </intent-filter>
         </activity>
 
         <activity

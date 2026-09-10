@@ -7,6 +7,7 @@ object VaultShareContract {
     const val EXTRA_PICKER_PURPOSE = "app.voltshare.extra.PICKER_PURPOSE"
     const val PICKER_PURPOSE_ATTACHMENTS = "attachments"
     const val PICKER_PURPOSE_UNIVERSAL_RESTORE = "universal_restore"
+    const val MIME_VAULTSHARE = "application/vnd.voltshare.vaultshare"
     const val PERMISSION_ACCESS_VAULT = "app.voltshare.permission.ACCESS_VAULT"
     const val AUTHORITY = "app.voltshare.vaultprovider"
     const val PATH_FILES = "files"
