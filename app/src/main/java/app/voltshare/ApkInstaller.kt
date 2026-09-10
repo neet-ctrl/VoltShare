@@ -94,10 +94,10 @@ class InstallResultReceiver : android.content.BroadcastReceiver() {
         val message = intent.getStringExtra(PackageInstaller.EXTRA_STATUS_MESSAGE)
         if (status == PackageInstaller.STATUS_PENDING_USER_ACTION) {
             val confirmation = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                intent.getParcelableExtra(PackageInstaller.EXTRA_INTENT, Intent::class.java)
+                intent.getParcelableExtra(Intent.EXTRA_INTENT, Intent::class.java)
             } else {
                 @Suppress("DEPRECATION")
-                intent.getParcelableExtra(PackageInstaller.EXTRA_INTENT)
+                intent.getParcelableExtra(Intent.EXTRA_INTENT)
             }
             if (confirmation != null) {
                 confirmation.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)

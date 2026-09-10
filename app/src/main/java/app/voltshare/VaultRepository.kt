@@ -514,7 +514,7 @@ class VaultRepository(private val context: Context) {
         val temporary = copyBackupToCache(input)
         val staging = File(context.filesDir, "vault-restore-${UUID.randomUUID()}").apply { mkdirs() }
         return try {
-            val info = ZipFile(temporary).use { zip ->
+            ZipFile(temporary).use { zip ->
                 val manifest = readManifest(zip)
                 verifyBackupPassword(manifest, password)
                 val indexText = readZipText(zip, BACKUP_INDEX_ENTRY)
