@@ -16,7 +16,9 @@ import android.provider.OpenableColumns
 import android.text.format.Formatter
 import android.view.ViewGroup
 import android.widget.ImageView
+import android.widget.Toast
 import android.media.MediaMetadataRetriever
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -374,6 +376,7 @@ private fun VoltShareApp(
     var viewerFile by remember { mutableStateOf<VaultFile?>(null) }
     var files by remember { mutableStateOf(vault.listFiles()) }
     var folders by remember { mutableStateOf(vault.listFolders()) }
+    var primaryFolder by remember { mutableStateOf(vault.primaryFolder()) }
     var currentFolder by remember { mutableStateOf("/") }
     var fileToUnlock by remember { mutableStateOf<VaultFile?>(null) }
     var fileToMove by remember { mutableStateOf<VaultFile?>(null) }
@@ -386,8 +389,42 @@ private fun VoltShareApp(
     var showDeleteFilesConfirmation by remember { mutableStateOf(false) }
     var showDeleteFolderConfirmation by remember { mutableStateOf<String?>(null) }
     var showMoveSelected by remember { mutableStateOf(false) }
+    var lastBackPressAt by remember { mutableStateOf(0L) }
     val scope = rememberCoroutineScope()
     val incomingShare = activity.pendingIncomingShare
+
+    BackHandler(enabled = configured && unlocked) {
+        when {
+            viewerFile != null -> viewerFile = null
+            fileToUnlock != null -> fileToUnlock = null
+            showNewFolder -> showNewFolder = false
+            fileToMove != null -> fileToMove = null
+            fileActionTarget != null -> fileActionTarget = null
+            fileToRename != null -> fileToRename = null
+            showDeleteFilesConfirmation -> showDeleteFilesConfirmation = false
+            showDeleteFolderConfirmation != null -> showDeleteFolderConfirmation = null
+            showMoveSelected -> showMoveSelected = false
+            selectedFileIds.isNotEmpty() -> selectedFileIds = emptySet()
+            tab == AppTab.FILES && currentFolder != "/" -> currentFolder = currentFolder.parentFolder()
+            tab != AppTab.VAULT -> tab = AppTab.VAULT
+            else -> {
+                val now = System.currentTimeMillis()
+                if (now - lastBackPressAt < 1800L) {
+                    activity.finish()
+                } else {
+                    lastBackPressAt = now
+                    Toast.makeText(activity, "Press back again to exit", Toast.LENGTH_SHORT).show()
+                }
+            }
+        }
+    }
+    BackHandler(enabled = !configured || !unlocked) {
+        Toast.makeText(
+            activity,
+            if (!configured) "Finish setting up your vault to continue" else "Unlock VoltShare to continue",
+            Toast.LENGTH_SHORT,
+        ).show()
+    }
 
     LaunchedEffect(transfer) {
         transfer.status.collect { status ->
@@ -613,6 +650,7 @@ private fun VoltShareApp(
                     onClick = {
                         vault.deleteFolder(folder)
                         folders = vault.listFolders()
+                        primaryFolder = vault.primaryFolder()
                         currentFolder = folder.parentFolder()
                         files = vault.listFiles()
                         showDeleteFolderConfirmation = null
@@ -705,7 +743,7 @@ private fun VoltShareApp(
                     files = files,
                     folders = folders,
                     currentFolder = currentFolder,
-                    primaryFolder = vault.primaryFolder(),
+                    primaryFolder = primaryFolder,
                     selectedFileIds = selectedFileIds,
                     onImport = {
                         importFolder = currentFolder
@@ -717,7 +755,7 @@ private fun VoltShareApp(
                         showDeleteFolderConfirmation = folder
                     },
                     onMakePrimary = {
-                        vault.setPrimaryFolder(it)
+                        primaryFolder = vault.setPrimaryFolder(it)
                         folders = vault.listFolders()
                     },
                     onOpen = { file ->
@@ -1100,6 +1138,14 @@ private fun FilesHome(
     var activeFilter by remember { mutableStateOf(FileFilter.ALL) }
     var sortMode by remember { mutableStateOf(VaultSort.CUSTOM) }
     var showSortDialog by remember { mutableStateOf(false) }
+    var draggedFileId by remember { mutableStateOf<String?>(null) }
+    var dropTargetFileId by remember { mutableStateOf<String?>(null) }
+    var dropTargetBelow by remember { mutableStateOf(false) }
+    LaunchedEffect(currentFolder) {
+        draggedFileId = null
+        dropTargetFileId = null
+        dropTargetBelow = false
+    }
     val searching = searchQuery.trim().isNotEmpty()
     val filteredFiles = files.filter { file ->
         activeFilter == FileFilter.ALL ||
@@ -1134,6 +1180,14 @@ private fun FilesHome(
         }
     }
     val directFiles = sortVaultFiles(filteredFiles.filter { it.folderPath == currentFolder }, VaultSort.CUSTOM)
+    fun reorderDirectFile(file: VaultFile, delta: Int) {
+        val position = directFiles.indexOfFirst { it.id == file.id }
+        if (position < 0 || directFiles.isEmpty()) return
+        val targetPosition = (position + delta).coerceIn(0, directFiles.lastIndex)
+        dropTargetFileId = directFiles.getOrNull(targetPosition)?.id
+        dropTargetBelow = delta > 0
+        if (targetPosition != position) onReorderTo(file, targetPosition)
+    }
     val nestedFolderCount = if (currentFolder == "/") {
         folders.count { folder ->
             folder != "/" && (activeFilter == FileFilter.ALL || filteredFiles.any {
@@ -1274,33 +1328,6 @@ private fun FilesHome(
                     }
                 }
             }
-            item {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    Column {
-                        Text(
-                            if (searching) "Search results" else "Browse files",
-                            color = Color.White,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 17.sp,
-                        )
-                        Text(
-                            if (searching) "${visibleFiles.size} matching items" else sortMode.label,
-                            color = VoltTextMuted,
-                            fontSize = 11.sp,
-                        )
-                    }
-                    Text(
-                        "${visibleFiles.size} items",
-                        color = VoltGreen,
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Bold,
-                    )
-                }
-            }
         }
         item {
             FolderHeaderCard(
@@ -1314,45 +1341,21 @@ private fun FilesHome(
                 onDelete = { onDeleteFolder(currentFolder) },
                 onMakePrimary = { onMakePrimary(currentFolder) },
                 reorderMode = reorderMode,
+                draggedFileName = visibleFiles.firstOrNull { it.id == draggedFileId }?.name,
+                dropTargetFileName = visibleFiles.firstOrNull { it.id == dropTargetFileId }?.name,
+                dropTargetBelow = dropTargetBelow,
                 onToggleReorder = {
                     searchQuery = ""
+                    activeFilter = FileFilter.ALL
+                    draggedFileId = null
+                    dropTargetFileId = null
+                    dropTargetBelow = false
                     reorderMode = !reorderMode
                 },
             )
         }
-        if (searching || (!reorderMode && visibleFolders.isNotEmpty())) {
-            item {
-                Text(
-                    if (searching) "Matching folders" else "Folders",
-                    color = Color.White,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 17.sp,
-                )
-            }
-        }
-        if (searching || (!reorderMode && visibleFolders.isNotEmpty())) {
-            items(visibleFolders, key = { "folder:$it" }) { folder ->
-                FolderCard(
-                    path = folder,
-                    primaryFolder = primaryFolder,
-                    folderCount = folders.count { nested ->
-                        nested != folder &&
-                            nested.startsWith("$folder/") &&
-                            (activeFilter == FileFilter.ALL || filteredFiles.any {
-                                it.folderPath == nested || it.folderPath.startsWith("$nested/")
-                            })
-                    },
-                    fileCount = filteredFiles.count { it.folderPath == folder || it.folderPath.startsWith("$folder/") },
-                    onOpen = {
-                        searchQuery = ""
-                        onFolderSelected(folder)
-                    },
-                    onMakePrimary = { onMakePrimary(folder) },
-                    onDelete = { onDeleteFolder(folder) },
-                )
-            }
-        }
-        if (!reorderMode && visibleFiles.isEmpty()) {
+        val libraryEmpty = visibleFolders.isEmpty() && visibleFiles.isEmpty()
+        if (!reorderMode && libraryEmpty) {
             item {
                 FilesEmptyState(
                     searching = searching,
@@ -1362,37 +1365,97 @@ private fun FilesHome(
                 )
             }
         } else {
-            if (!reorderMode && visibleFolders.isNotEmpty()) {
-                item {
+            item {
+                Row(
+                    verticalAlignment = Alignment.Bottom,
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    modifier = Modifier.fillMaxWidth().padding(top = 3.dp),
+                ) {
+                    Column {
+                        Text("Library", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 17.sp)
+                        Text(
+                            if (searching) "Matching folders and files" else "Everything in this location",
+                            color = VoltTextMuted,
+                            fontSize = 11.sp,
+                        )
+                    }
                     Text(
-                        "Files",
-                        color = Color.White,
+                        "${visibleFolders.size + visibleFiles.size} items",
+                        color = VoltGreen,
+                        fontSize = 11.sp,
                         fontWeight = FontWeight.Bold,
-                        fontSize = 17.sp,
                     )
                 }
             }
-            items(visibleFiles, key = { it.id }) { file ->
-                FileRow(
-                    file = file,
-                    vault = vault,
-                    onOpen = onOpen,
-                    onToggleLock = onToggleLock,
-                    onMoveUp = { onReorder(file, -1) },
-                    onMoveDown = { onReorder(file, 1) },
-                    allowReorder = reorderMode && !searching,
-                    onReorder = { delta ->
-                        val position = directFiles.indexOfFirst { it.id == file.id }
-                        if (position >= 0 && directFiles.isNotEmpty()) {
-                            onReorderTo(file, (position + delta).coerceIn(0, directFiles.lastIndex))
+            item {
+                Surface(
+                    modifier = Modifier.fillMaxWidth(),
+                    color = VoltSurfaceRaised.copy(alpha = 0.82f),
+                    shape = RoundedCornerShape(22.dp),
+                    border = BorderStroke(1.dp, Color.White.copy(alpha = 0.08f)),
+                    shadowElevation = 16.dp,
+                ) {
+                    Column(modifier = Modifier.padding(vertical = 4.dp)) {
+                        visibleFolders.forEach { folder ->
+                            FolderCard(
+                                path = folder,
+                                primaryFolder = primaryFolder,
+                                folderCount = folders.count { nested ->
+                                    nested != folder &&
+                                        nested.startsWith("$folder/") &&
+                                        (activeFilter == FileFilter.ALL || filteredFiles.any {
+                                            it.folderPath == nested || it.folderPath.startsWith("$nested/")
+                                        })
+                                },
+                                fileCount = filteredFiles.count { it.folderPath == folder || it.folderPath.startsWith("$folder/") },
+                                onOpen = {
+                                    searchQuery = ""
+                                    onFolderSelected(folder)
+                                },
+                                onMakePrimary = { onMakePrimary(folder) },
+                                onDelete = { onDeleteFolder(folder) },
+                                compact = true,
+                            )
+                            if (visibleFiles.isNotEmpty() || folder != visibleFolders.last()) {
+                                Divider(color = Color.White.copy(alpha = 0.06f), modifier = Modifier.padding(horizontal = 14.dp))
+                            }
                         }
-                    },
-                    onLongPress = { onLongPress(file) },
-                    onDelete = { onDeleteFile(file) },
-                    isSelected = file.id in selectedFileIds,
-                    selectionMode = selectedFileIds.isNotEmpty(),
-                    reorderMode = reorderMode,
-                )
+                        visibleFiles.forEach { file ->
+                            FileRow(
+                                file = file,
+                                vault = vault,
+                                onOpen = onOpen,
+                                onToggleLock = onToggleLock,
+                                onMoveUp = { reorderDirectFile(file, -1) },
+                                onMoveDown = { reorderDirectFile(file, 1) },
+                                allowReorder = reorderMode && !searching,
+                                onReorder = { delta -> reorderDirectFile(file, delta) },
+                                onDragStart = {
+                                    draggedFileId = file.id
+                                    dropTargetFileId = file.id
+                                    dropTargetBelow = false
+                                },
+                                onDragEnd = {
+                                    draggedFileId = null
+                                    dropTargetFileId = null
+                                    dropTargetBelow = false
+                                },
+                                onLongPress = { onLongPress(file) },
+                                onDelete = { onDeleteFile(file) },
+                                isSelected = file.id in selectedFileIds,
+                                selectionMode = selectedFileIds.isNotEmpty(),
+                                reorderMode = reorderMode,
+                                dragging = draggedFileId == file.id,
+                                dropTarget = dropTargetFileId == file.id,
+                                dropTargetBelow = dropTargetBelow,
+                                compact = true,
+                            )
+                            if (file != visibleFiles.last()) {
+                                Divider(color = Color.White.copy(alpha = 0.06f), modifier = Modifier.padding(horizontal = 14.dp))
+                            }
+                        }
+                    }
+                }
             }
         }
         if (selectedFileIds.isNotEmpty()) {
@@ -1424,29 +1487,38 @@ private fun FilesLibrarySummary(
     visibleCount: Int,
 ) {
     val totalBytes = files.sumOf { it.sizeBytes }
-    GlassCard(
-        modifier = Modifier.fillMaxWidth(),
-        accent = VoltGreen,
-        padding = 18.dp,
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .shadow(18.dp, RoundedCornerShape(22.dp), spotColor = VoltGreen.copy(alpha = 0.18f))
+            .background(
+                Brush.horizontalGradient(
+                    listOf(VoltGreen.copy(alpha = 0.16f), VoltSurfaceRaised, VoltSurface),
+                ),
+                RoundedCornerShape(22.dp),
+            )
+            .border(1.dp, Color.White.copy(alpha = 0.09f), RoundedCornerShape(22.dp)),
+        color = Color.Transparent,
+        shape = RoundedCornerShape(22.dp),
     ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween,
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
         ) {
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     "PROTECTED LIBRARY",
-                    color = VoltTextMuted,
+                    color = VoltGreen,
                     fontSize = 10.sp,
                     fontWeight = FontWeight.Bold,
                     letterSpacing = 1.7.sp,
                 )
-                Spacer(Modifier.height(7.dp))
+                Spacer(Modifier.height(5.dp))
                 Text(
                     "${files.size} protected file${if (files.size == 1) "" else "s"}",
                     color = Color.White,
-                    fontSize = 20.sp,
+                    fontSize = 18.sp,
                     fontWeight = FontWeight.Black,
                 )
                 Spacer(Modifier.height(4.dp))
@@ -1456,26 +1528,16 @@ private fun FilesLibrarySummary(
                     fontSize = 12.sp,
                 )
             }
-            Box(
+            Row(
                 modifier = Modifier
-                    .size(58.dp)
-                    .background(VoltGreen.copy(alpha = 0.12f), CircleShape),
-                contentAlignment = Alignment.Center,
+                    .background(Color.Black.copy(alpha = 0.18f), RoundedCornerShape(16.dp))
+                    .padding(horizontal = 10.dp, vertical = 8.dp),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
             ) {
-                Icon(Icons.Default.Security, null, tint = VoltGreen, modifier = Modifier.size(27.dp))
+                LibraryStat("$visibleCount", "view")
+                LibraryStat("$folderCount", "folders")
+                LibraryStat(files.count { it.locked }.toString(), "locked")
             }
-        }
-        Spacer(Modifier.height(16.dp))
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(Color.Black.copy(alpha = 0.18f), RoundedCornerShape(16.dp))
-                .padding(horizontal = 12.dp, vertical = 10.dp),
-            horizontalArrangement = Arrangement.SpaceEvenly,
-        ) {
-            LibraryStat("${visibleCount}", "in view")
-            LibraryStat("$folderCount", "folders")
-            LibraryStat(files.count { it.locked }.toString(), "locked")
         }
     }
 }
@@ -1563,10 +1625,27 @@ private fun FolderHeaderCard(
     onDelete: () -> Unit,
     onMakePrimary: () -> Unit,
     reorderMode: Boolean,
+    draggedFileName: String? = null,
+    dropTargetFileName: String? = null,
+    dropTargetBelow: Boolean = false,
     onToggleReorder: () -> Unit,
 ) {
-    GlassCard(modifier = Modifier.fillMaxWidth(), accent = VoltTeal, padding = 14.dp) {
-        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .shadow(14.dp, RoundedCornerShape(20.dp), spotColor = VoltTeal.copy(alpha = 0.18f))
+            .background(
+                Brush.horizontalGradient(
+                    listOf(VoltTeal.copy(alpha = 0.14f), VoltSurfaceRaised, VoltSurface),
+                ),
+                RoundedCornerShape(20.dp),
+            )
+            .border(1.dp, Color.White.copy(alpha = 0.08f), RoundedCornerShape(20.dp)),
+        color = Color.Transparent,
+        shape = RoundedCornerShape(20.dp),
+    ) {
+        Column(modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
             if (!reorderMode) {
                 IconButton(onClick = onBack, enabled = currentFolder != "/") {
                     Icon(
@@ -1603,31 +1682,43 @@ private fun FolderHeaderCard(
                     }
                 }
             }
-        }
-        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-            Text(
-                if (currentFolder == "/") "Private root" else currentFolder,
-                color = VoltTextMuted,
-                fontSize = 11.sp,
-                modifier = Modifier.weight(1f),
-            )
-            if (!reorderMode) {
+            }
+            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+                Text(
+                    if (reorderMode && draggedFileName != null && dropTargetFileName != null) {
+                        if (draggedFileName == dropTargetFileName) {
+                            "Holding “$draggedFileName” • already in this position"
+                        } else {
+                            "Holding “$draggedFileName” • place ${if (dropTargetBelow) "after" else "before"} “$dropTargetFileName”"
+                        }
+                    } else if (reorderMode) {
+                        "Hold a grip and drag • green line marks the new position"
+                    } else {
+                        if (currentFolder == "/") "Private root" else currentFolder
+                    },
+                    color = if (reorderMode) VoltGreen else VoltTextMuted,
+                    fontSize = 11.sp,
+                    maxLines = if (reorderMode) 2 else 1,
+                    modifier = Modifier.weight(1f),
+                )
+                if (!reorderMode) {
+                    TextButton(
+                        onClick = onImport,
+                        colors = ButtonDefaults.textButtonColors(contentColor = VoltGreen),
+                    ) {
+                        Icon(Icons.Default.ArrowUpward, "Import files", modifier = Modifier.size(16.dp))
+                        Spacer(Modifier.width(5.dp))
+                        Text("Import", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                    }
+                }
                 TextButton(
-                    onClick = onImport,
+                    onClick = onToggleReorder,
                     colors = ButtonDefaults.textButtonColors(contentColor = VoltGreen),
                 ) {
-                    Icon(Icons.Default.ArrowUpward, "Import files", modifier = Modifier.size(16.dp))
+                    Icon(Icons.Default.DragHandle, null, modifier = Modifier.size(17.dp))
                     Spacer(Modifier.width(5.dp))
-                    Text("Import", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                    Text(if (reorderMode) "Done" else "Reorder", fontSize = 12.sp, fontWeight = FontWeight.Bold)
                 }
-            }
-            TextButton(
-                onClick = onToggleReorder,
-                colors = ButtonDefaults.textButtonColors(contentColor = VoltGreen),
-            ) {
-                Icon(Icons.Default.DragHandle, null, modifier = Modifier.size(17.dp))
-                Spacer(Modifier.width(5.dp))
-                Text(if (reorderMode) "Done" else "Reorder", fontSize = 12.sp, fontWeight = FontWeight.Bold)
             }
         }
     }
@@ -1642,19 +1733,16 @@ private fun FolderCard(
     onOpen: () -> Unit,
     onMakePrimary: () -> Unit,
     onDelete: () -> Unit,
+    compact: Boolean = false,
 ) {
-    GlassCard(
-        modifier = Modifier.fillMaxWidth().clickable(onClick = onOpen),
-        accent = if (path == primaryFolder) VoltGreen else VoltTeal,
-        padding = 16.dp,
-    ) {
+    val rowContent: @Composable ColumnScope.() -> Unit = {
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
             Box(
                 modifier = Modifier
-                    .size(52.dp)
+                    .size(if (compact) 44.dp else 52.dp)
                     .background(
                         if (path == primaryFolder) VoltGreen.copy(alpha = 0.16f) else VoltTeal.copy(alpha = 0.14f),
-                        RoundedCornerShape(17.dp),
+                        RoundedCornerShape(if (compact) 14.dp else 17.dp),
                     ),
                 contentAlignment = Alignment.Center,
             ) {
@@ -1662,10 +1750,10 @@ private fun FolderCard(
                     Icons.Default.Folder,
                     "Open folder",
                     tint = if (path == primaryFolder) VoltGreen else Color(0xFF65D8C8),
-                    modifier = Modifier.size(27.dp),
+                    modifier = Modifier.size(if (compact) 23.dp else 27.dp),
                 )
             }
-            Spacer(Modifier.width(14.dp))
+            Spacer(Modifier.width(if (compact) 12.dp else 14.dp))
             Column(modifier = Modifier.weight(1f)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
@@ -1689,26 +1777,64 @@ private fun FolderCard(
                 Text(
                     "$folderCount folder${if (folderCount == 1) "" else "s"} • $fileCount file${if (fileCount == 1) "" else "s"}",
                     color = VoltTextMuted,
-                    fontSize = 11.sp,
+                    fontSize = if (compact) 10.sp else 11.sp,
                 )
-                Text(path, color = VoltTextMuted.copy(alpha = 0.7f), fontSize = 10.sp, maxLines = 1)
+                if (!compact) {
+                    Text(path, color = VoltTextMuted.copy(alpha = 0.7f), fontSize = 10.sp, maxLines = 1)
+                }
             }
-            IconButton(onClick = onMakePrimary) {
+            IconButton(
+                onClick = onMakePrimary,
+                modifier = Modifier.size(if (compact) 40.dp else 48.dp),
+            ) {
                 Icon(
                     if (path == primaryFolder) Icons.Default.Star else Icons.Default.StarBorder,
                     "Make primary folder",
                     tint = if (path == primaryFolder) VoltGreen else VoltTextMuted,
                 )
             }
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                IconButton(onClick = onOpen) {
+            if (compact) {
+                IconButton(onClick = onDelete, modifier = Modifier.size(40.dp)) {
+                    Icon(Icons.Default.Delete, "Delete folder", tint = Color(0xFFFF8A80))
+                }
+                IconButton(onClick = onOpen, modifier = Modifier.size(40.dp)) {
                     Icon(Icons.Default.ArrowForward, "Open folder", tint = Color.White.copy(alpha = 0.75f))
                 }
-                IconButton(onClick = onDelete) {
-                    Icon(Icons.Default.Delete, "Delete folder", tint = Color(0xFFFF8A80))
+            } else {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    IconButton(onClick = onOpen) {
+                        Icon(Icons.Default.ArrowForward, "Open folder", tint = Color.White.copy(alpha = 0.75f))
+                    }
+                    IconButton(onClick = onDelete) {
+                        Icon(Icons.Default.Delete, "Delete folder", tint = Color(0xFFFF8A80))
+                    }
                 }
             }
         }
+    }
+    if (compact) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable(onClick = onOpen)
+                .background(
+                    Brush.horizontalGradient(
+                        listOf(
+                            if (path == primaryFolder) VoltGreen.copy(alpha = 0.06f) else VoltTeal.copy(alpha = 0.035f),
+                            Color.Transparent,
+                        ),
+                    ),
+                )
+                .padding(horizontal = 10.dp, vertical = 7.dp),
+            content = rowContent,
+        )
+    } else {
+        GlassCard(
+            modifier = Modifier.fillMaxWidth().clickable(onClick = onOpen),
+            accent = if (path == primaryFolder) VoltGreen else VoltTeal,
+            padding = 16.dp,
+            content = rowContent,
+        )
     }
 }
 
@@ -1820,37 +1946,24 @@ private fun FileRow(
     allowReorder: Boolean,
     onDrag: (Float) -> Unit = {},
     onReorder: (Int) -> Unit = {},
+    onDragStart: () -> Unit = {},
+    onDragEnd: () -> Unit = {},
     onLongPress: () -> Unit = {},
     onDelete: () -> Unit = {},
     isSelected: Boolean = false,
     selectionMode: Boolean = false,
     reorderMode: Boolean = false,
+    dragging: Boolean = false,
+    dropTarget: Boolean = false,
+    dropTargetBelow: Boolean = false,
+    compact: Boolean = false,
 ) {
     val icon = fileIcon(file)
     var dragDistance by remember(file.id) { mutableStateOf(0f) }
     var isDragging by remember(file.id) { mutableStateOf(false) }
     val accent = if (file.locked) Color(0xFF9B7CFF) else VoltGreen
-    GlassCard(
-        modifier = Modifier
-            .fillMaxWidth()
-            .graphicsLayer {
-                scaleX = if (isDragging) 1.025f else 1f
-                scaleY = if (isDragging) 1.025f else 1f
-                alpha = if (isDragging) 0.86f else 1f
-            }
-            .pointerInput(file.id, selectionMode, reorderMode) {
-                detectTapGestures(
-                    onTap = {
-                        if (!reorderMode) onOpen(file)
-                    },
-                    onLongPress = {
-                        if (!reorderMode) onLongPress()
-                    },
-                )
-            },
-        accent = accent,
-        padding = 14.dp,
-    ) {
+    val visuallyDragging = dragging || isDragging
+    val rowContent: @Composable ColumnScope.() -> Unit = {
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
             if (vault != null) {
                 FileThumbnail(vault, file)
@@ -1898,34 +2011,35 @@ private fun FileRow(
                 }
             }
             if (reorderMode && allowReorder) {
-                Icon(
-                    Icons.Default.DragHandle,
-                    "Hold and drag to reorder",
-                    tint = if (isDragging) VoltGreen else VoltTextMuted,
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
                     modifier = Modifier
-                        .size(30.dp)
+                        .width(42.dp)
                         .pointerInput(file.id) {
                             detectDragGesturesAfterLongPress(
                                 onDragStart = {
                                     isDragging = true
                                     dragDistance = 0f
+                                    onDragStart()
                                 },
                                 onDragCancel = {
                                     isDragging = false
                                     dragDistance = 0f
+                                    onDragEnd()
                                 },
                                 onDragEnd = {
                                     isDragging = false
                                     dragDistance = 0f
+                                    onDragEnd()
                                 },
                                 onDrag = { change, dragAmount ->
                                     change.consume()
                                     dragDistance += dragAmount.y
-                                    if (dragDistance <= -64f) {
+                                    if (dragDistance <= -48f) {
                                         if (reorderMode) onReorder(-1) else onMoveUp()
                                         onDrag(dragDistance)
                                         dragDistance = 0f
-                                    } else if (dragDistance >= 64f) {
+                                    } else if (dragDistance >= 48f) {
                                         if (reorderMode) onReorder(1) else onMoveDown()
                                         onDrag(dragDistance)
                                         dragDistance = 0f
@@ -1933,7 +2047,23 @@ private fun FileRow(
                                 },
                             )
                         },
-                )
+                ) {
+                    Icon(
+                        Icons.Default.DragHandle,
+                        "Hold and drag to reorder",
+                        tint = if (visuallyDragging) VoltGreen else VoltTextMuted,
+                        modifier = Modifier.size(30.dp),
+                    )
+                    if (visuallyDragging) {
+                        Text(
+                            "MOVE",
+                            color = VoltGreen,
+                            fontSize = 7.sp,
+                            fontWeight = FontWeight.Black,
+                            letterSpacing = 0.8.sp,
+                        )
+                    }
+                }
             } else if (selectionMode) {
                 Box(
                     modifier = Modifier
@@ -1957,6 +2087,74 @@ private fun FileRow(
                 }
             }
         }
+    }
+    val rowModifier = Modifier
+        .fillMaxWidth()
+        .shadow(
+            if (visuallyDragging) 22.dp else 0.dp,
+            RoundedCornerShape(16.dp),
+            spotColor = accent.copy(alpha = 0.42f),
+        )
+        .graphicsLayer {
+            scaleX = if (visuallyDragging) 1.025f else 1f
+            scaleY = if (visuallyDragging) 1.025f else 1f
+            alpha = if (visuallyDragging) 0.9f else 1f
+            rotationZ = if (visuallyDragging) -0.6f else 0f
+        }
+        .pointerInput(file.id, selectionMode, reorderMode) {
+            detectTapGestures(
+                onTap = {
+                    if (!reorderMode) onOpen(file)
+                },
+                onLongPress = {
+                    if (!reorderMode) onLongPress()
+                },
+            )
+        }
+    if (compact) {
+        Column(
+            modifier = rowModifier
+                .border(
+                    1.dp,
+                    if (visuallyDragging) VoltGreen.copy(alpha = 0.9f) else Color.Transparent,
+                    RoundedCornerShape(16.dp),
+                )
+                .background(
+                    Brush.horizontalGradient(
+                        listOf(accent.copy(alpha = 0.045f), Color.Transparent),
+                    ),
+                )
+                .padding(horizontal = 10.dp, vertical = 7.dp),
+        ) {
+            if (dropTarget && !visuallyDragging && !dropTargetBelow) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(3.dp)
+                        .padding(horizontal = 8.dp)
+                        .background(VoltGreen, RoundedCornerShape(3.dp)),
+                )
+                Spacer(Modifier.height(4.dp))
+            }
+            rowContent()
+            if (dropTarget && !visuallyDragging && dropTargetBelow) {
+                Spacer(Modifier.height(4.dp))
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(3.dp)
+                        .padding(horizontal = 8.dp)
+                        .background(VoltGreen, RoundedCornerShape(3.dp)),
+                )
+            }
+        }
+    } else {
+        GlassCard(
+            modifier = rowModifier,
+            accent = accent,
+            padding = 14.dp,
+            content = rowContent,
+        )
     }
 }
 

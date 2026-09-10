@@ -1,0 +1,35 @@
+Why There is not proper visual and effect when i am reodering as i get confused who is hold and where it is getting placed and primary indicator not changing instantly and more such issue
+
+Considering FileRow state
+
+I need to clarify the state of FileRow. Right now, it seems the onDrag function is being called after a movement occurs, but I’m noticing there are no onDragStart or onDragEnd functions implemented. It feels like something might be missing there for proper functionality. Okay, I should investigate this further to determine if I need to implement those additional drag event handlers for a complete drag-and-drop experience.
+
+I’ll fix the reorder interaction as a stateful drag flow instead of a silent up/down gesture: clear drag handle, lifted-row styling, live drop-position marker, movement feedback, and a visible reorder hint. I’ll also trace the primary-folder state update so the indicator refreshes immediately after tapping it.
+
+I found two real causes: the reorder gesture only moved data after a silent threshold with no drag state communicated to the list, and the primary folder was read directly from preferences instead of being owned by Compose state. I’m fixing both so movement and the primary badge update on the same frame as the action.
+
+Continuing the patch
+
+I need to keep working on the patch, focusing on adding the FilesHome states and a helper function. It seems essential for the function and structure to be in order, or I might run into issues later. I should ensure the code is clean and easy to follow. Let’s get those states integrated smoothly to avoid any hiccups down the line. I’m on it!
+
+Evaluating code issues
+
+I need to continue with the task by checking a potential issue related to the if (compact) ... else condition. This is specifically about ensuring the non-compact branch is properly addressed after I've added it. I think I need to check the lines in the file to confirm everything is in order and functioning as intended. This step seems important, so I'll make sure to give it a thorough look.
+
+Analyzing folder state
+
+I need to continue my analysis. There's a potential issue with the primaryFolder state patch, particularly with the line primaryFolder = vault.primaryFolder() in the delete function on line 653. I'm wondering if there might not be a primaryFolder defined beforehand — that seems likely. To fully understand this, I need to look at the rest of the FileRow after line 2090. Let's dive deeper into this!
+
+Considering drag-and-drop implementation
+
+I'm thinking about how to set dropTargetFileId after moving a target. It seems we need to clarify whether to indicate the target for a downward drop. We might use dropTargetType, along with dropMarkerFileId and a boolean for dropMarkerBelow. It might be simpler to show the dragged file row itself with a note like “AFTER...”. The user is asking for clarity, so we need to ensure we implement the line position accurately with the target row and marker.
+
+Considering list movements
+
+I’m thinking about the list manipulation process. After arranging files into positions A, B, and C, I've managed to move A to follow C at index 2, which seems good. Moving the marker above the target is also helpful for clarity. I need to address the highlighted row during drag operations to ensure everything is functioning smoothly. It looks like I'm making progress in refining this dragging and positioning feature!
+
+Evaluating drag and drop parameters
+
+I'm thinking that maybe in the onDragStart function, I should set dropTargetBelow to false, and then do the same for onDragEnd. It seems that might help maintain the right behavior. Additionally, when resetting the reorder toggle, I should definitely add a parameter for clarity. This way, it'll be easier to manage the state throughout the drag-and-drop process. I'm glad I'm considering these adjustments!
+
+You've reached your daily free quota limit. It will reset at 12:00 AM UTC.
