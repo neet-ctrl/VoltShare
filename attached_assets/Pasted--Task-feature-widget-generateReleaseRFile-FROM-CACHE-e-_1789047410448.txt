@@ -1,0 +1,47 @@
+
+> Task :feature:widget:generateReleaseRFile FROM-CACHE
+e: file:///home/runner/work/2FA/2FA/feature/home/src/main/java/com/twofasapp/feature/home/ui/settings/UniversalBackupCard.kt:34:22 Unresolved reference 'VoltShareHandoffReceiver'.
+
+> Task :feature:home:compileReleaseKotlin
+e: file:///home/runner/work/2FA/2FA/feature/home/src/main/java/com/twofasapp/feature/home/ui/settings/UniversalBackupCard.kt:248:40 Unresolved reference 'VoltShareHandoffReceiver'.
+e: file:///home/runner/work/2FA/2FA/feature/home/src/main/java/com/twofasapp/feature/home/ui/settings/UniversalBackupCard.kt:248:120 Unresolved reference 'VoltShareHandoffReceiver'.
+e: file:///home/runner/work/2FA/2FA/feature/home/src/main/java/com/twofasapp/feature/home/ui/settings/UniversalBackupCard.kt:256:73 Inapplicable candidate(s): static fun getBroadcast(p0: Context!, p1: Int, p2: Intent, p3: Int): PendingIntent!
+e: file:///home/runner/work/2FA/2FA/feature/home/src/main/java/com/twofasapp/feature/home/ui/settings/UniversalBackupCard.kt:259:57 Unresolved reference 'VoltShareHandoffReceiver'.
+e: file:///home/runner/work/2FA/2FA/feature/home/src/main/java/com/twofasapp/feature/home/ui/settings/UniversalBackupCard.kt:259:89 Cannot infer type for type parameter 'T'. Specify it explicitly.
+e: file:///home/runner/work/2FA/2FA/feature/home/src/main/java/com/twofasapp/feature/home/ui/settings/UniversalBackupCard.kt:259:89 Unresolved reference. None of the following candidates is applicable because of a receiver type mismatch:
+val <T> KClass<T>.java: Class<T>
+e: file:///home/runner/work/2FA/2FA/feature/home/src/main/java/com/twofasapp/feature/home/ui/settings/UniversalBackupCard.kt:259:95 Cannot infer type for type parameter 'T'. Specify it explicitly.
+e: file:///home/runner/work/2FA/2FA/feature/home/src/main/java/com/twofasapp/feature/home/ui/settings/UniversalBackupCard.kt:259:95 Unresolved reference. None of the following candidates is applicable because of a receiver type mismatch:
+fun <T> T.apply(block: T.() -> Unit): T
+e: file:///home/runner/work/2FA/2FA/feature/home/src/main/java/com/twofasapp/feature/home/ui/settings/UniversalBackupCard.kt:259:101 Cannot infer type for type parameter 'T'. Specify it explicitly.
+e: file:///home/runner/work/2FA/2FA/feature/home/src/main/java/com/twofasapp/feature/home/ui/settings/UniversalBackupCard.kt:260:45 Unresolved reference 'action'.
+e: file:///home/runner/work/2FA/2FA/feature/home/src/main/java/com/twofasapp/feature/home/ui/settings/UniversalBackupCard.kt:260:54 Unresolved reference 'VoltShareHandoffReceiver'.
+e: file:///home/runner/work/2FA/2FA/feature/home/src/main/java/com/twofasapp/feature/home/ui/settings/UniversalBackupCard.kt:261:45 Unresolved reference 'putExtra'.
+e: file:///home/runner/work/2FA/2FA/feature/home/src/main/java/com/twofasapp/feature/home/ui/settings/UniversalBackupCard.kt:262:49 Unresolved reference 'VoltShareHandoffReceiver'.
+e: file:///home/runner/work/2FA/2FA/feature/home/src/main/java/com/twofasapp/feature/home/ui/settings/UniversalBackupCard.kt:420:34 Unresolved reference 'VoltShareHandoffReceiver'.
+e: file:///home/runner/work/2FA/2FA/feature/home/src/main/java/com/twofasapp/feature/home/ui/settings/UniversalBackupCard.kt:421:36 Unresolved reference 'VoltShareHandoffReceiver'.
+
+> Task :feature:home:compileReleaseKotlin FAILED
+
+> Task :feature:widget:compileReleaseKotlin
+w: Opt-in requirement marker kotlin.Experimental is unresolved. Please make sure it's present in the module dependencies
+w: Opt-in requirement marker androidx.lifecycle.compose.ExperimentalLifecycleComposeApi is unresolved. Please make sure it's present in the module dependencies
+w: file:///home/runner/work/2FA/2FA/feature/widget/src/main/java/com/twofasapp/feature/widget/di/WidgetModule.kt:22:9 'fun <reified R : ViewModel, reified T1, reified T2, reified T3, reified T4> Module.viewModelOf(crossinline constructor: (T1, T2, T3, T4) -> R, noinline options: (BeanDefinition<R>.() -> Unit)? = ...): KoinDefinition<R>' is deprecated. Moved ViewModel DSL package. Remove old imports and use org.koin.core.module.dsl.*.
+
+423 actionable tasks: 205 executed, 218 from cache
+FAILURE: Build failed with an exception.
+
+* What went wrong:
+Execution failed for task ':feature:home:compileReleaseKotlin'.
+> A failure occurred while executing org.jetbrains.kotlin.compilerRunner.GradleCompilerRunnerWithWorkers$GradleKotlinCompilerWorkAction
+   > Compilation error. See log for more details
+
+* Try:
+> Run with --stacktrace option to get the stack trace.
+> Run with --info or --debug option to get more log output.
+> Run with --scan to generate a Build Scan (Powered by Develocity).
+> Get more help at https://help.gradle.org.
+
+BUILD FAILED in 3m 4s
+Configuration cache entry stored.
+Error: Process completed with exit code 1.
