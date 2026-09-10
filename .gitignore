@@ -52,3 +52,5 @@ Thumbs.db
 *.keystore
 *.jks
 *.keystore.b64
+
+/2FA/
