@@ -696,7 +696,7 @@ private fun VoltShareApp(
             title = { Text("Delete selected files?", color = Color.White) },
             text = {
                 Text(
-                    "This permanently removes ${selectedFileIds.size} encrypted file${if (selectedFileIds.size == 1) "" else "s"} from this device.",
+                    "This permanently removes ${selectedFileIds.size} private file${if (selectedFileIds.size == 1) "" else "s"} from this device.",
                     color = VoltTextMuted,
                 )
             },
@@ -963,7 +963,7 @@ private fun SetupLockScreen(onComplete: () -> Unit) {
     LockScaffold(
         eyebrow = "PRIVATE BY DESIGN",
         title = "Build your vault",
-        description = "Every file is encrypted inside VoltShare’s app-private folder. Choose the gate that feels right for you.",
+        description = "Every file stays inside VoltShare’s app-private folder. Choose the gate that feels right for you.",
     ) {
         GlassCard(modifier = Modifier.fillMaxWidth(), accent = VoltGreen, padding = 18.dp) {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -1058,7 +1058,7 @@ private fun UnlockScreen(
     LockScaffold(
         eyebrow = "SECURITY CORE / LOCKED",
         title = "Welcome back",
-        description = "Your private files are still here. Authenticate to enter your encrypted space.",
+        description = "Your private files are still here. Authenticate to enter your private space.",
     ) {
         Box(
             modifier = Modifier
@@ -1151,7 +1151,7 @@ private fun UnlockScreen(
         }
         Spacer(Modifier.height(14.dp))
         Text(
-            "Encrypted locally • no network required",
+            "Stored privately • no network required",
             color = VoltTextMuted,
             fontSize = 11.sp,
             modifier = Modifier.align(Alignment.CenterHorizontally),
@@ -1293,7 +1293,7 @@ private fun VaultHome(
         }
         item {
             Text(
-                "Files stay inside encrypted app-private storage",
+                "Files stay inside private app-only storage",
                 color = VoltTextMuted,
                 fontSize = 12.sp,
                 modifier = Modifier.padding(top = 8.dp, bottom = 20.dp),
@@ -1438,7 +1438,7 @@ private fun FilesHome(
                         style = MaterialTheme.typography.headlineMedium,
                     )
                     Text(
-                        "Encrypted, organized, and only visible to you",
+                        "Private, organized, and only visible to you",
                         color = VoltTextMuted,
                         fontSize = 12.sp,
                     )
@@ -1450,7 +1450,7 @@ private fun FilesHome(
                         .background(VoltGreen.copy(alpha = 0.12f), CircleShape),
                     contentAlignment = Alignment.Center,
                 ) {
-                    Icon(Icons.Default.Security, "Encrypted private library", tint = VoltGreen, modifier = Modifier.size(23.dp))
+                    Icon(Icons.Default.Security, "Private library", tint = VoltGreen, modifier = Modifier.size(23.dp))
                 }
             }
         }
@@ -1686,7 +1686,7 @@ private fun FilesHome(
         }
         item {
             Text(
-                "Your files stay encrypted inside VoltShare’s private storage.",
+                "Your files stay inside VoltShare’s private app storage.",
                 color = VoltTextMuted.copy(alpha = 0.72f),
                 fontSize = 11.sp,
                 modifier = Modifier.padding(top = 4.dp, bottom = 12.dp),
@@ -1738,7 +1738,7 @@ private fun FilesLibrarySummary(
                 )
                 Spacer(Modifier.height(4.dp))
                 Text(
-                    "${formatSize(totalBytes)} encrypted on this device",
+                    "${formatSize(totalBytes)} stored on this device",
                     color = VoltTextMuted,
                     fontSize = 12.sp,
                 )
@@ -1807,7 +1807,7 @@ private fun FilesEmptyState(
             if (searching) {
                 "Try another name or clear the search to browse your library."
             } else {
-                "Import a file here and it will be encrypted before it enters the vault."
+                "Import a file here and it will stay inside the app-only vault."
             },
             color = VoltTextMuted,
             lineHeight = 20.sp,
@@ -2112,7 +2112,7 @@ private fun VaultMetricCard(files: List<VaultFile>) {
             Column {
                 Text("VAULT STATUS", color = VoltTextMuted, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.5.sp)
                 Spacer(Modifier.height(10.dp))
-                Text("Encrypted + hidden", color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.Black)
+                Text("Private + hidden", color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.Black)
                 Spacer(Modifier.height(5.dp))
                 Text("${files.size} protected files • ${formatSize(total)}", color = VoltTextMuted, fontSize = 13.sp)
             }
@@ -2733,7 +2733,7 @@ private fun ShareHome(
                     }
                     Spacer(Modifier.height(18.dp))
                     Text(
-                        "Files sent from another VoltShare device are verified and saved to your encrypted vault only after the transfer completes.",
+                        "Files sent from another VoltShare device are verified and saved to your private app storage only after the transfer completes.",
                         color = Color.White.copy(alpha = 0.78f),
                         fontSize = 13.sp,
                         lineHeight = 19.sp,
@@ -3912,27 +3912,14 @@ private fun ChangeLockDialog(
 @Composable
 @OptIn(ExperimentalMaterial3Api::class)
 private fun FileViewerScreen(activity: MainActivity, vault: VaultRepository, file: VaultFile, onBack: () -> Unit) {
-    var prepared by remember(file.id) { mutableStateOf<File?>(null) }
-    var preparing by remember(file.id) { mutableStateOf(true) }
-    LaunchedEffect(file.id) {
-        prepared = withContext(Dispatchers.IO) { vault.prepareViewing(file) }
-        preparing = false
-    }
+    val prepared = remember(file.id) { vault.prepareViewing(file) }
     Column(Modifier.fillMaxSize().background(VoltBlack)) {
         TopAppBar(
             title = { Text(file.name, maxLines = 1, color = Color.White) },
             navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.Default.ArrowBack, "Back", tint = Color.White) } },
             colors = TopAppBarDefaults.topAppBarColors(containerColor = VoltBlack),
         )
-        if (preparing) {
-            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                CircularProgressIndicator(
-                    modifier = Modifier.size(26.dp),
-                    color = VoltGreen,
-                    strokeWidth = 2.dp,
-                )
-            }
-        } else if (prepared == null) {
+        if (prepared == null) {
             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 Text("This file could not be opened.", color = VoltTextMuted)
             }
@@ -4683,7 +4670,7 @@ private fun pendingShareFromFile(file: File, displayName: String = file.name, mi
 }
 
 private fun pendingShareFromVault(vault: VaultRepository, file: VaultFile): PendingShare? {
-    if (vault.encryptedFile(file).isFile.not()) return null
+    if (vault.storedFile(file).isFile.not()) return null
     return PendingShare(
         id = "vault:${file.id}",
         name = file.name,

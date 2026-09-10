@@ -12,14 +12,7 @@ import java.io.FileOutputStream
 import java.io.InputStream
 import java.io.ByteArrayInputStream
 import java.security.MessageDigest
-import java.security.KeyStore
 import java.util.UUID
-import javax.crypto.Cipher
-import javax.crypto.CipherInputStream
-import javax.crypto.CipherOutputStream
-import javax.crypto.KeyGenerator
-import javax.crypto.SecretKey
-import javax.crypto.spec.GCMParameterSpec
 
 enum class TransferDirection(val label: String) {
     LOCAL("Local"),
@@ -52,10 +45,18 @@ enum class VaultSort(val label: String) {
 }
 
 class VaultRepository(private val context: Context) {
+    private val preferences = context.getSharedPreferences("voltshare-vault", Context.MODE_PRIVATE)
     private val vaultDir = File(context.filesDir, "vault").apply { mkdirs() }
     private val metadataFile = File(vaultDir, "index.json")
-    private val viewCacheDir = File(context.cacheDir, "view-cache").apply { mkdirs() }
-    private val preferences = context.getSharedPreferences("voltshare-vault", Context.MODE_PRIVATE)
+
+    init {
+        if (!preferences.getBoolean(PLAIN_STORAGE_READY_KEY, false)) {
+            vaultDir.deleteRecursively()
+            File(context.cacheDir, "view-cache").deleteRecursively()
+            vaultDir.mkdirs()
+            preferences.edit().putBoolean(PLAIN_STORAGE_READY_KEY, true).apply()
+        }
+    }
 
     fun isFileLockDefault(): Boolean = preferences.getBoolean(FILE_LOCK_DEFAULT_KEY, true)
 
@@ -96,33 +97,33 @@ class VaultRepository(private val context: Context) {
         val displayName = queryDisplayName(uri) ?: "untitled-${System.currentTimeMillis()}"
         val mimeType = resolver.getType(uri) ?: mimeFromName(displayName)
         val id = UUID.randomUUID().toString()
-        val encryptedFile = File(vaultDir, "$id.vault")
-        var encoded: EncodedFile? = null
+        val storedFile = File(vaultDir, "$id.data")
+        var copied: StoredFile? = null
         return runCatching {
             resolver.openInputStream(uri)?.use { input ->
-                encoded = encrypt(input, encryptedFile)
+                copied = copyToStorage(input, storedFile)
             } ?: return null
 
             val now = System.currentTimeMillis()
             val requestedFolder = normalizeFolderPath(folderPath)
             val targetFolder = if (requestedFolder == "/" && primaryFolder() != "/") primaryFolder() else requestedFolder
             ensureFolderPath(targetFolder)
-            val existing = encoded?.sha256?.let(::findFileByHash)
+            val existing = copied?.sha256?.let(::findFileByHash)
             if (existing != null) {
-                encryptedFile.delete()
+                storedFile.delete()
                 return existing
             }
             val record = VaultFile(
                 id = id,
                 name = displayName,
                 mimeType = mimeType,
-                sizeBytes = encoded?.sizeBytes ?: 0L,
+                sizeBytes = copied?.sizeBytes ?: 0L,
                 locked = isFileLockDefault(),
                 folderPath = targetFolder,
                 createdAt = now,
                 order = now,
                 transferDirection = TransferDirection.LOCAL,
-                contentHash = encoded?.sha256,
+                contentHash = copied?.sha256,
             )
             writeFiles(listFiles() + record)
             record
@@ -163,17 +164,17 @@ class VaultRepository(private val context: Context) {
         folderPath: String = primaryFolder(),
     ): VaultFile? {
         val id = UUID.randomUUID().toString()
-        val encryptedFile = File(vaultDir, "$id.vault.tmp")
+        val storedTempFile = File(vaultDir, "$id.data.tmp")
         return runCatching {
-            val digest = encryptExact(input, encryptedFile, size)
+            val digest = copyExact(input, storedTempFile, size)
             check(expectedSha256 == null || digest.equals(expectedSha256, ignoreCase = true)) { "Transfer checksum mismatch" }
             val existing = findFileByHash(digest)
             if (existing != null) {
-                encryptedFile.delete()
+                storedTempFile.delete()
                 return existing
             }
-            val finalFile = File(vaultDir, "$id.vault")
-            check(encryptedFile.renameTo(finalFile)) { "Could not commit received file" }
+            val finalFile = File(vaultDir, "$id.data")
+            check(storedTempFile.renameTo(finalFile)) { "Could not commit received file" }
             val now = System.currentTimeMillis()
             val requestedFolder = normalizeFolderPath(folderPath)
             val targetFolder = if (requestedFolder == "/" && primaryFolder() != "/") primaryFolder() else requestedFolder
@@ -192,7 +193,7 @@ class VaultRepository(private val context: Context) {
             )
             writeFiles(listFiles() + record)
             record
-        }.onFailure { encryptedFile.delete() }.getOrNull()
+        }.onFailure { storedTempFile.delete() }.getOrNull()
     }
 
     fun toggleLocked(file: VaultFile): VaultFile {
@@ -217,7 +218,7 @@ class VaultRepository(private val context: Context) {
 
     fun deleteFile(file: VaultFile): Boolean {
         val existed = listFiles().any { it.id == file.id }
-        val deleted = encryptedFile(file).delete()
+        val deleted = storedFile(file).delete()
         val remaining = listFiles().filterNot { it.id == file.id }
         writeFiles(remaining)
         return existed || deleted
@@ -337,7 +338,7 @@ class VaultRepository(private val context: Context) {
 
     fun deleteFiles(files: Collection<VaultFile>) {
         val ids = files.map { it.id }.toSet()
-        files.forEach { encryptedFile(it).delete() }
+        files.forEach { storedFile(it).delete() }
         writeFiles(listFiles().filterNot { it.id in ids })
     }
 
@@ -352,23 +353,16 @@ class VaultRepository(private val context: Context) {
         VaultSort.TYPE -> files.sortedWith(compareBy({ it.mimeType }, { it.name.lowercase() }))
     }
 
-    fun openDecrypted(file: VaultFile): InputStream? {
-        val source = File(vaultDir, "${file.id}.vault")
+    fun openStored(file: VaultFile): InputStream? {
+        val source = storedFile(file)
         if (!source.exists()) return null
-        return runCatching {
-            val input = FileInputStream(source)
-            val iv = ByteArray(12)
-            check(input.read(iv) == iv.size) { "Invalid encrypted file" }
-            val cipher = Cipher.getInstance(TRANSFORMATION)
-            cipher.init(Cipher.DECRYPT_MODE, key(), GCMParameterSpec(128, iv))
-            CipherInputStream(input, cipher)
-        }.getOrNull()
+        return runCatching { FileInputStream(source) }.getOrNull()
     }
 
     fun sha256(file: VaultFile): String? {
         return runCatching {
             val digest = MessageDigest.getInstance("SHA-256")
-            openDecrypted(file)?.use { input ->
+            openStored(file)?.use { input ->
                 val buffer = ByteArray(1024 * 1024)
                 while (true) {
                     val read = input.read(buffer)
@@ -381,24 +375,12 @@ class VaultRepository(private val context: Context) {
     }
 
     fun prepareViewing(file: VaultFile): File? {
-        val source = File(vaultDir, "${file.id}.vault")
-        if (!source.exists()) return null
-        val safeName = file.name.sanitizeName()
-        val output = File(viewCacheDir, "${file.id}-$safeName")
-        return synchronized(viewCacheDir) {
-            runCatching {
-                if (output.exists() && output.length() > 0L) return@runCatching output
-                decrypt(source, output)
-                output
-            }.getOrNull()
-        }
+        return storedFile(file).takeIf { it.isFile }
     }
 
-    fun encryptedFile(file: VaultFile): File = File(vaultDir, "${file.id}.vault")
+    fun storedFile(file: VaultFile): File = File(vaultDir, "${file.id}.data")
 
-    fun clearViewCache() {
-        viewCacheDir.listFiles()?.forEach { it.delete() }
-    }
+    fun clearViewCache() = Unit
 
     private fun importStream(
         input: InputStream,
@@ -407,33 +389,33 @@ class VaultRepository(private val context: Context) {
         folderPath: String,
     ): VaultFile {
         val id = UUID.randomUUID().toString()
-        val encryptedFile = File(vaultDir, "$id.vault")
+        val storedFile = File(vaultDir, "$id.data")
         return try {
-            val encoded = encrypt(input, encryptedFile)
+            val copied = copyToStorage(input, storedFile)
             val now = System.currentTimeMillis()
             val requestedFolder = normalizeFolderPath(folderPath)
             val targetFolder = if (requestedFolder == "/" && primaryFolder() != "/") primaryFolder() else requestedFolder
             ensureFolderPath(targetFolder)
-            val existing = findFileByHash(encoded.sha256)
+            val existing = findFileByHash(copied.sha256)
             if (existing != null) {
-                encryptedFile.delete()
+                storedFile.delete()
                 return existing
             }
             val record = VaultFile(
                 id = id,
                 name = displayName.sanitizeName(),
                 mimeType = mimeType,
-                sizeBytes = encoded.sizeBytes,
+                sizeBytes = copied.sizeBytes,
                 locked = isFileLockDefault(),
                 folderPath = targetFolder,
                 createdAt = now,
                 order = now,
-                contentHash = encoded.sha256,
+                contentHash = copied.sha256,
             )
             writeFiles(listFiles() + record)
             record
         } catch (error: Throwable) {
-            encryptedFile.delete()
+            storedFile.delete()
             throw error
         }
     }
@@ -479,80 +461,39 @@ class VaultRepository(private val context: Context) {
         }
     }
 
-    private data class EncodedFile(val sizeBytes: Long, val sha256: String)
+    private data class StoredFile(val sizeBytes: Long, val sha256: String)
 
-    private fun encrypt(input: InputStream, destination: File): EncodedFile {
-        val cipher = Cipher.getInstance(TRANSFORMATION)
-        cipher.init(Cipher.ENCRYPT_MODE, key())
+    private fun copyToStorage(input: InputStream, destination: File): StoredFile {
         val digest = MessageDigest.getInstance("SHA-256")
         var count = 0L
         FileOutputStream(destination).use { output ->
-            output.write(cipher.iv)
-            CipherOutputStream(output, cipher).use { encrypted ->
-                val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
-                while (true) {
-                    val read = input.read(buffer)
-                    if (read <= 0) break
-                    encrypted.write(buffer, 0, read)
-                    digest.update(buffer, 0, read)
-                    count += read
-                }
+            val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
+            while (true) {
+                val read = input.read(buffer)
+                if (read <= 0) break
+                output.write(buffer, 0, read)
+                digest.update(buffer, 0, read)
+                count += read
             }
         }
-        return EncodedFile(count, digest.digest().joinToString("") { "%02x".format(it) })
+        return StoredFile(count, digest.digest().joinToString("") { "%02x".format(it) })
     }
 
-    private fun encryptExact(input: InputStream, destination: File, expectedSize: Long): String {
-        val cipher = Cipher.getInstance(TRANSFORMATION)
-        cipher.init(Cipher.ENCRYPT_MODE, key())
+    private fun copyExact(input: InputStream, destination: File, expectedSize: Long): String {
         val digest = MessageDigest.getInstance("SHA-256")
         var count = 0L
         FileOutputStream(destination).use { output ->
-            output.write(cipher.iv)
-            CipherOutputStream(output, cipher).use { encrypted ->
-                val buffer = ByteArray(1024 * 1024)
-                while (count < expectedSize) {
-                    val read = input.read(buffer, 0, minOf(buffer.size.toLong(), expectedSize - count).toInt())
-                    check(read > 0) { "Transfer ended early" }
-                    encrypted.write(buffer, 0, read)
-                    digest.update(buffer, 0, read)
-                    count += read
-                }
+            val buffer = ByteArray(1024 * 1024)
+            while (count < expectedSize) {
+                val read = input.read(buffer, 0, minOf(buffer.size.toLong(), expectedSize - count).toInt())
+                check(read > 0) { "Transfer ended early" }
+                output.write(buffer, 0, read)
+                digest.update(buffer, 0, read)
+                count += read
             }
         }
         check(count == expectedSize) { "Transfer size mismatch" }
         return digest.digest().joinToString("") { "%02x".format(it) }
-    }
-
-    private fun decrypt(source: File, destination: File) {
-        FileInputStream(source).use { input ->
-            val iv = ByteArray(12)
-            input.read(iv)
-            val cipher = Cipher.getInstance(TRANSFORMATION)
-            cipher.init(Cipher.DECRYPT_MODE, key(), GCMParameterSpec(128, iv))
-            CipherInputStream(input, cipher).use { decrypted ->
-                FileOutputStream(destination).use { output -> decrypted.copyTo(output) }
-            }
-        }
-    }
-
-    private fun key(): SecretKey {
-        val store = KeyStore.getInstance("AndroidKeyStore").apply { load(null) }
-        val existing = store.getKey(KEY_ALIAS, null)
-        if (existing is SecretKey) return existing
-        val generator = KeyGenerator.getInstance("AES", "AndroidKeyStore")
-        generator.init(
-            android.security.keystore.KeyGenParameterSpec.Builder(
-                KEY_ALIAS,
-                android.security.keystore.KeyProperties.PURPOSE_ENCRYPT or
-                    android.security.keystore.KeyProperties.PURPOSE_DECRYPT,
-            )
-                .setBlockModes(android.security.keystore.KeyProperties.BLOCK_MODE_GCM)
-                .setEncryptionPaddings(android.security.keystore.KeyProperties.ENCRYPTION_PADDING_NONE)
-                .setRandomizedEncryptionRequired(true)
-                .build(),
-        )
-        return generator.generateKey()
     }
 
     private fun mimeFromName(name: String): String = when (name.substringAfterLast('.', "").lowercase()) {
@@ -588,8 +529,7 @@ class VaultRepository(private val context: Context) {
     }
 
     companion object {
-        private const val KEY_ALIAS = "voltshare-vault-key"
-        private const val TRANSFORMATION = "AES/GCM/NoPadding"
+        private const val PLAIN_STORAGE_READY_KEY = "plain-storage-ready"
         private const val PRIMARY_FOLDER_KEY = "primary-folder"
         private const val FILE_LOCK_DEFAULT_KEY = "file-lock-default"
     }
