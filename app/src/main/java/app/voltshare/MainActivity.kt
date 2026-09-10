@@ -21,6 +21,7 @@ import android.view.ActionMode
 import android.view.Menu
 import android.view.MenuItem
 import android.view.ViewGroup
+import android.view.WindowManager
 import android.widget.ImageView
 import android.widget.TextView
 import android.widget.Toast
@@ -187,6 +188,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.BufferedOutputStream
@@ -203,6 +205,7 @@ private val VoltSurface = Color(0xFF121212)
 private val VoltSurfaceRaised = Color(0xFF1B1F1E)
 private val VoltTextMuted = Color.White.copy(alpha = 0.52f)
 private val VoltTeal = Color(0xFF00796B)
+private const val SCREENSHOT_UNLOCK_DURATION_MS = 5 * 60 * 1000L
 
 data class IncomingShare(
     val uris: List<Uri> = emptyList(),
@@ -226,6 +229,7 @@ open class MainActivity : FragmentActivity() {
     private var vaultPickerRequestedState by mutableStateOf(false)
     private var vaultPickerPurposeState by mutableStateOf(VaultShareContract.PICKER_PURPOSE_ATTACHMENTS)
     private var pendingInstallFile: File? = null
+    private var pendingInstallName: String? = null
     private var installPermissionOpened = false
 
     val pendingIncomingShare: IncomingShare?
@@ -246,6 +250,7 @@ open class MainActivity : FragmentActivity() {
         lockManager = LockManager(this)
         transfer = PeerTransferManager(this, vault)
         VaultSession.unlocked = false
+        setScreenshotProtection(false)
         setContent {
             VoltShareTheme {
                 VoltShareApp(this, vault, lockManager, transfer, vaultPickerRequested, vaultPickerPurpose)
@@ -337,16 +342,32 @@ open class MainActivity : FragmentActivity() {
         )
     }
 
+    fun setScreenshotProtection(enabled: Boolean) {
+        if (enabled) {
+            window.clearFlags(WindowManager.LayoutParams.FLAG_SECURE)
+        } else {
+            window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
+        }
+    }
+
     fun installVaultPackage(vault: VaultRepository, file: VaultFile) {
         installScope.launch {
             val prepared = withContext(Dispatchers.IO) { vault.prepareViewing(file) } ?: return@launch
             pendingInstallFile = prepared
+            pendingInstallName = file.name
             continuePendingInstall()
         }
     }
 
+    fun installPreparedPackage(file: File, originalName: String) {
+        pendingInstallFile = file
+        pendingInstallName = originalName
+        continuePendingInstall()
+    }
+
     private fun continuePendingInstall() {
         val prepared = pendingInstallFile ?: return
+        val originalName = pendingInstallName ?: prepared.name
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && !packageManager.canRequestPackageInstalls()) {
             if (!installPermissionOpened) {
                 installPermissionOpened = true
@@ -360,8 +381,23 @@ open class MainActivity : FragmentActivity() {
             return
         }
         installPermissionOpened = false
-        ApkInstaller.install(this, prepared)
         pendingInstallFile = null
+        pendingInstallName = null
+        installScope.launch {
+            val result = withContext(Dispatchers.IO) {
+                ApkInstaller.install(this@MainActivity, prepared, originalName)
+            }
+            result.fold(
+                onSuccess = { Toast.makeText(this@MainActivity, "Android installer opened", Toast.LENGTH_SHORT).show() },
+                onFailure = { error ->
+                    Toast.makeText(
+                        this@MainActivity,
+                        "Could not start installation: ${error.message ?: "unknown error"}",
+                        Toast.LENGTH_LONG,
+                    ).show()
+                },
+            )
+        }
     }
 
     override fun onResume() {
@@ -469,6 +505,7 @@ private sealed class SecurityAction {
     data class SetBiometric(val enabled: Boolean) : SecurityAction()
     data class SetLock(val enabled: Boolean) : SecurityAction()
     data class SetFileLockDefault(val enabled: Boolean) : SecurityAction()
+    data class SetScreenshots(val enabled: Boolean) : SecurityAction()
     object LockNow : SecurityAction()
 }
 
@@ -485,6 +522,8 @@ private fun VoltShareApp(
     var lockEnabled by remember { mutableStateOf(lockManager.isEnabled()) }
     var biometricEnabled by remember { mutableStateOf(lockManager.isBiometricEnabled()) }
     var fileLockDefault by remember { mutableStateOf(vault.isFileLockDefault()) }
+    var screenshotEnabled by remember { mutableStateOf(false) }
+    var screenshotUnlockUntil by remember { mutableStateOf<Long?>(null) }
     var unlocked by remember { mutableStateOf(!configured || !lockEnabled) }
     var tab by remember { mutableStateOf(AppTab.VAULT) }
     var viewerFile by remember { mutableStateOf<VaultFile?>(null) }
@@ -499,6 +538,7 @@ private fun VoltShareApp(
     var pendingShares by remember { mutableStateOf<List<PendingShare>>(emptyList()) }
     var selectedFileIds by remember { mutableStateOf<Set<String>>(emptySet()) }
     var fileActionTarget by remember { mutableStateOf<VaultFile?>(null) }
+    var exportTarget by remember { mutableStateOf<VaultFile?>(null) }
     var fileToRename by remember { mutableStateOf<VaultFile?>(null) }
     var showDeleteFilesConfirmation by remember { mutableStateOf(false) }
     var showDeleteFolderConfirmation by remember { mutableStateOf<String?>(null) }
@@ -563,6 +603,30 @@ private fun VoltShareApp(
 
     LaunchedEffect(configured, unlocked) {
         VaultSession.unlocked = configured && unlocked
+    }
+
+    LaunchedEffect(screenshotEnabled) {
+        activity.setScreenshotProtection(!screenshotEnabled)
+    }
+
+    LaunchedEffect(screenshotUnlockUntil) {
+        val deadline = screenshotUnlockUntil ?: return@LaunchedEffect
+        val remaining = deadline - System.currentTimeMillis()
+        if (remaining <= 0L) {
+            screenshotEnabled = false
+            screenshotUnlockUntil = null
+        } else {
+            delay(remaining)
+            screenshotEnabled = false
+            screenshotUnlockUntil = null
+        }
+    }
+
+    LaunchedEffect(unlocked, lockEnabled) {
+        if (!unlocked || !lockEnabled) {
+            screenshotEnabled = false
+            screenshotUnlockUntil = null
+        }
     }
 
     LaunchedEffect(configured, unlocked, incomingShare) {
@@ -631,6 +695,34 @@ private fun VoltShareApp(
                 }
             }
             pending?.let { pendingShares = (pendingShares + it).distinctBy { share -> share.id } }
+        }
+    }
+    val exportPicker = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocumentTree(),
+    ) { uri ->
+        val target = exportTarget
+        exportTarget = null
+        if (uri == null || target == null) return@rememberLauncherForActivityResult
+        runCatching {
+            activity.contentResolver.takePersistableUriPermission(
+                uri,
+                Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION,
+            )
+        }
+        scope.launch {
+            val result = withContext(Dispatchers.IO) {
+                copyVaultFileToTree(activity, vault, target, uri)
+            }
+            result.fold(
+                onSuccess = { Toast.makeText(activity, "Saved ${target.name}", Toast.LENGTH_SHORT).show() },
+                onFailure = {
+                    Toast.makeText(
+                        activity,
+                        "Could not save ${target.name}: ${it.message ?: "storage error"}",
+                        Toast.LENGTH_LONG,
+                    ).show()
+                },
+            )
         }
     }
 
@@ -758,6 +850,7 @@ private fun VoltShareApp(
                 is SecurityAction.SetBiometric -> if (action.enabled) "Verify to enable biometric unlock" else "Verify to disable biometric unlock"
                 is SecurityAction.SetLock -> if (action.enabled) "Verify to enable the vault lock" else "Verify to disable the vault lock"
                 is SecurityAction.SetFileLockDefault -> if (action.enabled) "Verify to lock new files by default" else "Verify to leave new files unlocked"
+                is SecurityAction.SetScreenshots -> "Verify to temporarily allow screenshots"
                 SecurityAction.LockNow -> "Verify before locking the vault"
             },
             type = lockManager.type(),
@@ -802,8 +895,19 @@ private fun VoltShareApp(
                             }
                             securityAction = null
                         }
+                        is SecurityAction.SetScreenshots -> {
+                            screenshotEnabled = action.enabled
+                            screenshotUnlockUntil = if (action.enabled) {
+                                System.currentTimeMillis() + SCREENSHOT_UNLOCK_DURATION_MS
+                            } else {
+                                null
+                            }
+                            securityAction = null
+                        }
                         SecurityAction.LockNow -> {
                             securityAction = null
+                            screenshotEnabled = false
+                            screenshotUnlockUntil = null
                             unlocked = false
                         }
                     }
@@ -865,6 +969,11 @@ private fun VoltShareApp(
                     files = vault.listFiles()
                 }
                 fileActionTarget = null
+            },
+            onSaveToDevice = {
+                fileActionTarget = null
+                exportTarget = target
+                exportPicker.launch(null)
             },
             onDelete = {
                 vault.deleteFile(target)
@@ -1144,12 +1253,21 @@ private fun VoltShareApp(
                     lockEnabled = lockEnabled,
                     biometricEnabled = biometricEnabled,
                     fileLockDefault = fileLockDefault,
+                    screenshotEnabled = screenshotEnabled,
                     transferStatus = transferStatus,
                     biometricAvailable = activity.canUseBiometric(),
                     onRequestChangeMethod = { securityAction = SecurityAction.ChangeMethod },
                     onRequestBiometric = { enabled -> securityAction = SecurityAction.SetBiometric(enabled) },
                     onRequestLock = { enabled -> securityAction = SecurityAction.SetLock(enabled) },
                     onRequestFileLockDefault = { enabled -> securityAction = SecurityAction.SetFileLockDefault(enabled) },
+                    onRequestScreenshots = { enabled ->
+                        if (enabled) {
+                            securityAction = SecurityAction.SetScreenshots(true)
+                        } else {
+                            screenshotEnabled = false
+                            screenshotUnlockUntil = null
+                        }
+                    },
                     onLockNow = { if (lockEnabled) securityAction = SecurityAction.LockNow },
                 )
             }
@@ -3732,12 +3850,14 @@ private fun SecurityHome(
     lockEnabled: Boolean,
     biometricEnabled: Boolean,
     fileLockDefault: Boolean,
+    screenshotEnabled: Boolean,
     transferStatus: TransferStatus,
     biometricAvailable: Boolean,
     onRequestChangeMethod: () -> Unit,
     onRequestBiometric: (Boolean) -> Unit,
     onRequestLock: (Boolean) -> Unit,
     onRequestFileLockDefault: (Boolean) -> Unit,
+    onRequestScreenshots: (Boolean) -> Unit,
     onLockNow: () -> Unit,
 ) {
     LazyColumn(
@@ -3881,6 +4001,47 @@ private fun SecurityHome(
                         checked = lockEnabled && biometricEnabled && biometricAvailable,
                         enabled = lockEnabled && biometricAvailable,
                         onCheckedChange = { if (lockEnabled) onRequestBiometric(it) },
+                    )
+                }
+            }
+        }
+        item {
+            GlassCard(
+                modifier = Modifier.fillMaxWidth(),
+                accent = if (screenshotEnabled) VoltGreen else VoltTeal,
+                padding = 18.dp,
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(
+                        modifier = Modifier
+                            .size(44.dp)
+                            .background(
+                                if (screenshotEnabled) VoltGreen.copy(alpha = 0.12f) else VoltTeal.copy(alpha = 0.13f),
+                                RoundedCornerShape(15.dp),
+                            ),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(
+                            Icons.Default.Smartphone,
+                            null,
+                            tint = if (screenshotEnabled) VoltGreen else VoltTextMuted,
+                            modifier = Modifier.size(22.dp),
+                        )
+                    }
+                    Spacer(Modifier.width(13.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("Allow screenshots", color = Color.White, fontWeight = FontWeight.Bold)
+                        Text(
+                            if (screenshotEnabled) "Temporarily allowed for five minutes" else "Screenshots are blocked everywhere in VoltShare",
+                            color = VoltTextMuted,
+                            fontSize = 12.sp,
+                            lineHeight = 17.sp,
+                        )
+                    }
+                    PremiumSwitch(
+                        checked = screenshotEnabled,
+                        enabled = lockEnabled,
+                        onCheckedChange = { if (lockEnabled) onRequestScreenshots(it) },
                     )
                 }
             }
@@ -4589,10 +4750,8 @@ private fun InstallerViewer(activity: MainActivity, file: File, vaultFile: Vault
         Text("Installer package stays in your private vault until you choose to install it.", color = VoltTextMuted, textAlign = androidx.compose.ui.text.style.TextAlign.Center)
         Spacer(Modifier.height(26.dp))
         GlowButton("Install package", Icons.Default.ArrowDownward, onClick = {
-            installResult.value = ApkInstaller.install(activity, file).fold(
-                onSuccess = { "Android installer opened" },
-                onFailure = { "Could not open this package" },
-            )
+            activity.installPreparedPackage(file, vaultFile.name)
+            installResult.value = "Android installer opened"
         })
         installResult.value?.let { Text(it, color = VoltGreen, modifier = Modifier.padding(top = 16.dp)) }
     }
@@ -4768,6 +4927,7 @@ private fun FileActionDialog(
     onDismiss: () -> Unit,
     onRename: () -> Unit,
     onToggleLock: () -> Unit,
+    onSaveToDevice: () -> Unit,
     onDelete: () -> Unit,
     onMove: () -> Unit,
     onSelect: () -> Unit,
@@ -4839,6 +4999,7 @@ private fun FileActionDialog(
                 FileActionRow(Icons.Default.Edit, "Rename", "Change the display name", onRename)
                 FileActionRow(if (file.locked) Icons.Default.LockOpen else Icons.Default.Lock, if (file.locked) "Unlock preview" else "Lock preview", "Require your vault lock before opening", onToggleLock)
                 FileActionRow(Icons.Default.DriveFileMove, "Move", "Choose another folder", onMove)
+                FileActionRow(Icons.Default.FolderOpen, "Save to device", "Choose a folder in device storage", onSaveToDevice)
                 FileActionRow(Icons.Default.SelectAll, "Select", "Add this file to bulk actions", onSelect)
                 FileActionRow(Icons.Default.Delete, "Delete", "Permanently remove this file", onDelete, destructive = true)
             }
@@ -5242,6 +5403,32 @@ private fun pendingShareFromVault(vault: VaultRepository, file: VaultFile): Pend
         sizeBytes = file.sizeBytes,
         source = PendingShareSource.VaultSource(file),
     )
+}
+
+private fun copyVaultFileToTree(
+    context: MainActivity,
+    vault: VaultRepository,
+    file: VaultFile,
+    treeUri: Uri,
+): Result<Unit> = runCatching {
+    val source = vault.storedFile(file)
+    check(source.isFile) { "The vault file is no longer available." }
+    val tree = DocumentFile.fromTreeUri(context, treeUri)
+    check(tree?.isDirectory == true) { "The selected storage folder is not available." }
+
+    val existing = tree.findFile(file.name)?.takeUnless { it.isDirectory }
+    val destination = existing ?: tree.createFile(
+        file.mimeType.ifBlank { "application/octet-stream" },
+        file.name,
+    )
+    check(destination != null) { "The selected storage provider could not create the file." }
+    val output = runCatching {
+        context.contentResolver.openOutputStream(destination.uri, "wt")
+    }.getOrNull() ?: context.contentResolver.openOutputStream(destination.uri, "w")
+    check(output != null) { "The selected storage provider could not open the file." }
+    output.use { destinationStream ->
+        source.inputStream().use { sourceStream -> sourceStream.copyTo(destinationStream) }
+    }
 }
 
 private fun createTextShare(context: MainActivity, text: String): PendingShare? {
