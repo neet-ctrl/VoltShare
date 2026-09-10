@@ -13,6 +13,7 @@ import android.net.Uri
 import android.os.Bundle
 import android.os.Build
 import android.os.ParcelFileDescriptor
+import android.provider.Browser
 import android.provider.Settings
 import android.provider.OpenableColumns
 import android.text.format.Formatter
@@ -4500,12 +4501,17 @@ private fun TextView.selectedHttpUrl(): String? {
 }
 
 private fun openInChromeIncognito(context: android.content.Context, url: String) {
-    val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url)).apply {
-        setPackage(ChromeStablePackage)
+    val intent = context.packageManager.getLaunchIntentForPackage(ChromeStablePackage)?.apply {
+        // Chrome only consistently honors its Incognito extra when launched through
+        // its explicit launcher activity, rather than through ACTION_VIEW.
+        action = Intent.ACTION_MAIN
+        addCategory(Intent.CATEGORY_LAUNCHER)
+        data = Uri.parse(url)
+        putExtra(Browser.EXTRA_CREATE_NEW_TAB, true)
         putExtra(ChromeIncognitoExtra, true)
         addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
     }
-    if (intent.resolveActivity(context.packageManager) == null) {
+    if (intent == null) {
         Toast.makeText(context, "Google Chrome is not installed", Toast.LENGTH_SHORT).show()
         return
     }

@@ -1,0 +1,30 @@
+The viewer changes are in place. I’m running a focused source check now: whitespace validation, import/reference checks, and the Android build command if the environment has Java available. I’ll also confirm the final diff only contains the intended viewer changes.
+
+The focused checks pass, and the Android build is still unavailable only because this environment has no Java runtime. The remaining genuine gap is device-level confirmation of the native selection toolbar and full-file copying, so I’m recording that as a follow-up verification item rather than claiming an APK test I could not run.
+
+Implemented in the VoltShare Universal Manager viewer.
+
+Changes made
+Added a visible Copy all button for recognized text files.
+Copying now places the complete file contents on the Android clipboard.
+Removed the previous 200,000-character truncation.
+Enabled text selection through Compose’s native selection support.
+Long-pressing or dragging over text now allows Android’s selection toolbar actions such as:
+Copy
+Select all
+Share
+Other system actions available on the device
+Expanded recognized text formats, including:
+TXT, Markdown, JSON, XML, CSV, TSV
+YAML, TOML, INI, properties, logs
+HTML, CSS, SVG
+Kotlin, Java, JavaScript, TypeScript
+Python, C/C++, C#, Go, Rust, Swift
+SQL, shell scripts, GraphQL, subtitles, patches, and more
+Image, video, audio, PDF, and installer previews remain unchanged.
+
+git diff --check passes. I could not run the Android Gradle build because Java is unavailable in this environment, so I proposed a follow-up task for paired-device verification of the native selection toolbar and full clipboard contents.
+
+Is it possible that when I select any text, in those Android options, can you add one more option to directly open in the Chrome incognito mode? It means it will open the incognito mode, and then it will open that same URL that I have selected. Means when only the URL is selected in that. Means when the URL is selected, first of all, you have to just find does it it is a URL? If it is a URL, then you just show an option to directly open in the Chrome incognito mode and make sure that you do not expose that URL anywhere else other than the Chrome incognito mode, okay? Only it will open in the Chrome's incognito mode. So make sure that 100% it's open that URL in the incognito mode.
+
+You've reached your daily free quota limit. It will reset at 12:00 AM UTC.

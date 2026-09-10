@@ -1,0 +1,33 @@
+The implementation is now structurally complete: the native selection menu keeps Android’s normal actions, adds the incognito action only when the selected range is exactly one valid HTTP/HTTPS URL, and sends that URL directly to stable Chrome with no chooser. I’m doing the final source-level checks now; the repository has no root Gradle wrapper and this environment has no Java runtime, so I’ll record the build limitation precisely rather than claim an APK build.
+
+The final checks show the 2FA app has no comparable selectable text-file viewer; its existing selection surface is unrelated, so this change correctly stays in VoltShare. Source whitespace and reference checks pass, and the final diff is limited to the viewer. I’m checking whether there is a meaningful follow-up verification item to record before I wrap up.
+
+One genuine follow-up remains: device-level confirmation that Chrome honors the incognito extra and that the action is hidden for non-URL selections. The code and source checks are complete, but this environment cannot build or launch Android because Java is unavailable, so I’m recording that verification separately rather than overstating certainty.
+
+Implemented the Chrome Incognito URL action in VoltShare.
+
+What changed
+Replaced the text preview’s Compose selection surface with a native selectable Android TextView.
+Added “Open in Chrome Incognito” to the Android selection actions.
+The option appears only when the entire selected text is:
+A valid http:// URL, or
+A valid https:// URL
+It does not appear for ordinary text, partial URLs, mixed text, or selections with surrounding whitespace.
+Uses an explicit Chrome package intent:
+No Android chooser
+No fallback browser
+No URL copied to the clipboard
+No URL included in logs or messages
+Uses Chrome’s incognito-tab intent extra
+Scope review
+The 2FA app does not contain the selectable text-file viewer involved in this request, so no unrelated 2FA code was changed.
+Reviewed the recent VoltShare/2FA coordination commits and the attached handoff notes.
+Existing full-text copying and text-file viewing remain available.
+Verification
+git diff --check passes.
+Source/reference checks pass.
+An APK build could not be run because this environment has no Java runtime or Gradle executable.
+A device verification follow-up was proposed to confirm Chrome’s behavior on a real Android device, including the native toolbar placement and actual Incognito-tab launch.
+No local build ok
+
+Understood. I’ll leave the implementation as-is without a local build. The Chrome Incognito feature is complete in the source, and the only remaining verification is on a real Android device.
