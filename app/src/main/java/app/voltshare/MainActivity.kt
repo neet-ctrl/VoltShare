@@ -1044,7 +1044,6 @@ private fun VoltShareApp(
                     }
                 }
             },
-            onToggleLock = {},
             onPinFile = {},
             onReorder = { _, _ -> },
             onReorderTo = { _, _ -> },
@@ -1432,10 +1431,6 @@ private fun VoltShareApp(
                     onOpen = { file ->
                         openVaultFile(file)
                     },
-                    onToggleLock = {
-                        if (lockEnabled) vault.toggleLocked(it)
-                        files = vault.listFiles()
-                    },
                     onPinFile = {
                         vault.togglePinnedToTop(it)
                         files = vault.listFiles()
@@ -1468,10 +1463,6 @@ private fun VoltShareApp(
                         } else {
                             openVaultFile(file)
                         }
-                    },
-                    onToggleLock = {
-                        if (lockEnabled) vault.toggleLocked(it)
-                        files = vault.listFiles()
                     },
                     onPinFile = {
                         vault.togglePinnedToTop(it)
@@ -1859,7 +1850,6 @@ private fun VaultHome(
     files: List<VaultFile>,
     onImport: () -> Unit,
     onOpen: (VaultFile) -> Unit,
-    onToggleLock: (VaultFile) -> Unit,
     onPinFile: (VaultFile) -> Unit,
     vault: VaultRepository,
 ) {
@@ -1919,7 +1909,6 @@ private fun VaultHome(
                     file = file,
                     vault = vault,
                     onOpen = onOpen,
-                    onToggleLock = onToggleLock,
                     onPin = { onPinFile(file) },
                     onMoveUp = {},
                     onMoveDown = {},
@@ -1951,7 +1940,6 @@ private fun FilesHome(
     onDeleteFolder: (String) -> Unit,
     onMakePrimary: (String) -> Unit,
     onOpen: (VaultFile) -> Unit,
-    onToggleLock: (VaultFile) -> Unit,
     onPinFile: (VaultFile) -> Unit,
     onReorder: (VaultFile, Int) -> Unit,
     onReorderTo: (VaultFile, Int) -> Unit,
@@ -2299,7 +2287,6 @@ private fun FilesHome(
                                 file = file,
                                 vault = vault,
                                 onOpen = onOpen,
-                                onToggleLock = onToggleLock,
                                 onPin = { onPinFile(file) },
                                 onMoveUp = { reorderDirectFile(file, -1) },
                                 onMoveDown = { reorderDirectFile(file, 1) },
@@ -2319,7 +2306,6 @@ private fun FilesHome(
                                 onDelete = { onDeleteFile(file) },
                                 isSelected = file.id in selectedFileIds,
                                 selectionMode = selectedFileIds.isNotEmpty(),
-                                showPin = true,
                                 isPinned = file.pinned,
                                 reorderMode = reorderMode,
                                 dragging = draggedFileId == file.id,
@@ -2888,7 +2874,6 @@ private fun FileRow(
     file: VaultFile,
     vault: VaultRepository? = null,
     onOpen: (VaultFile) -> Unit,
-    onToggleLock: (VaultFile) -> Unit,
     onPin: () -> Unit = {},
     onMoveUp: () -> Unit,
     onMoveDown: () -> Unit,
@@ -2901,7 +2886,6 @@ private fun FileRow(
     onDelete: () -> Unit = {},
     isSelected: Boolean = false,
     selectionMode: Boolean = false,
-    showPin: Boolean = true,
     isPinned: Boolean = false,
     reorderMode: Boolean = false,
     dragging: Boolean = false,
@@ -3026,22 +3010,12 @@ private fun FileRow(
                     if (isSelected) Icon(Icons.Default.Check, null, tint = Color.Black, modifier = Modifier.size(18.dp))
                 }
             } else {
-                if (showPin) {
-                    IconButton(onClick = onPin) {
-                        Icon(
-                            Icons.Default.PushPin,
-                            if (isPinned) "Unpin ${file.name}" else "Pin ${file.name} to top",
-                            tint = if (isPinned) VoltGreen else VoltTextMuted,
-                        )
-                    }
-                } else {
-                    IconButton(onClick = { onToggleLock(file) }) {
-                        Icon(
-                            if (file.locked) Icons.Default.Star else Icons.Default.StarBorder,
-                            if (file.locked) "Unlock ${file.name}" else "Lock ${file.name}",
-                            tint = if (file.locked) accent else VoltTextMuted,
-                        )
-                    }
+                IconButton(onClick = onPin) {
+                    Icon(
+                        Icons.Default.PushPin,
+                        if (isPinned) "Unpin ${file.name}" else "Pin ${file.name} to top",
+                        tint = if (isPinned) VoltGreen else VoltTextMuted,
+                    )
                 }
                 IconButton(onClick = onDelete) {
                     Icon(Icons.Default.Delete, "Delete ${file.name}", tint = Color(0xFFFF8A80))
