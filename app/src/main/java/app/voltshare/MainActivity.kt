@@ -112,6 +112,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Divider
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
@@ -1326,6 +1327,7 @@ private fun FilesHome(
     vault: VaultRepository,
 ) {
     var searchQuery by remember { mutableStateOf("") }
+    var searchOpen by remember { mutableStateOf(false) }
     var reorderMode by remember { mutableStateOf(false) }
     var activeFilter by remember { mutableStateOf(FileFilter.ALL) }
     var sortMode by remember { mutableStateOf(VaultSort.CUSTOM) }
@@ -1462,7 +1464,7 @@ private fun FilesHome(
         if (!reorderMode) item {
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically,
             ) {
                 FileFilter.entries.forEach { filter ->
                     FilterChip(
@@ -1476,10 +1478,23 @@ private fun FilesHome(
                             labelColor = VoltTextMuted,
                         ),
                     )
+                    if (filter != FileFilter.RECEIVED) Spacer(Modifier.width(6.dp))
+                }
+                Spacer(Modifier.weight(1f))
+                Surface(
+                    modifier = Modifier.size(42.dp),
+                    color = VoltSurfaceRaised,
+                    shape = CircleShape,
+                    border = BorderStroke(1.dp, VoltGreen.copy(alpha = 0.3f)),
+                    shadowElevation = 8.dp,
+                ) {
+                    IconButton(onClick = { searchOpen = true }) {
+                        Icon(Icons.Default.Search, "Search files and folders", tint = VoltGreen)
+                    }
                 }
             }
         }
-        if (!reorderMode) {
+        if (!reorderMode && searchOpen) {
             item {
                 Surface(
                     modifier = Modifier.fillMaxWidth(),
@@ -1492,6 +1507,14 @@ private fun FilesHome(
                         modifier = Modifier.padding(start = 5.dp, end = 7.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
+                        IconButton(
+                            onClick = {
+                                searchQuery = ""
+                                searchOpen = false
+                            },
+                        ) {
+                            Icon(Icons.Default.Close, "Close search", tint = VoltTextMuted)
+                        }
                         OutlinedTextField(
                             value = searchQuery,
                             onValueChange = { searchQuery = it },
@@ -2428,8 +2451,6 @@ private fun createFileThumbnail(context: android.content.Context, vault: VaultRe
             }
             else -> null
         }
-    } finally {
-        prepared.delete()
     }
 }
 
@@ -3892,8 +3913,10 @@ private fun ChangeLockDialog(
 @OptIn(ExperimentalMaterial3Api::class)
 private fun FileViewerScreen(activity: MainActivity, vault: VaultRepository, file: VaultFile, onBack: () -> Unit) {
     var prepared by remember(file.id) { mutableStateOf<File?>(null) }
+    var preparing by remember(file.id) { mutableStateOf(true) }
     LaunchedEffect(file.id) {
         prepared = withContext(Dispatchers.IO) { vault.prepareViewing(file) }
+        preparing = false
     }
     Column(Modifier.fillMaxSize().background(VoltBlack)) {
         TopAppBar(
@@ -3901,9 +3924,17 @@ private fun FileViewerScreen(activity: MainActivity, vault: VaultRepository, fil
             navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.Default.ArrowBack, "Back", tint = Color.White) } },
             colors = TopAppBarDefaults.topAppBarColors(containerColor = VoltBlack),
         )
-        if (prepared == null) {
+        if (preparing) {
             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Text("Preparing a private preview…", color = VoltTextMuted)
+                CircularProgressIndicator(
+                    modifier = Modifier.size(26.dp),
+                    color = VoltGreen,
+                    strokeWidth = 2.dp,
+                )
+            }
+        } else if (prepared == null) {
+            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                Text("This file could not be opened.", color = VoltTextMuted)
             }
         } else {
             when {
@@ -3921,11 +3952,23 @@ private fun FileViewerScreen(activity: MainActivity, vault: VaultRepository, fil
 
 @Composable
 private fun ImageViewer(file: File) {
-    val bitmap = remember(file) { BitmapFactory.decodeFile(file.absolutePath) }
+    var bitmap by remember(file) { mutableStateOf<Bitmap?>(null) }
+    LaunchedEffect(file) {
+        bitmap = withContext(Dispatchers.IO) {
+            val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+            BitmapFactory.decodeFile(file.absolutePath, bounds)
+            BitmapFactory.decodeFile(
+                file.absolutePath,
+                BitmapFactory.Options().apply {
+                    inSampleSize = calculateSampleSize(bounds.outWidth, bounds.outHeight, 2048, 2048)
+                },
+            )
+        }
+    }
     Box(Modifier.fillMaxSize().background(Color.Black), contentAlignment = Alignment.Center) {
         bitmap?.let {
             Image(it.asImageBitmap(), contentDescription = null, modifier = Modifier.fillMaxWidth(), contentScale = ContentScale.Fit)
-        } ?: Text("Could not decode this image", color = VoltTextMuted)
+        } ?: CircularProgressIndicator(color = VoltGreen, strokeWidth = 2.dp)
     }
 }
 

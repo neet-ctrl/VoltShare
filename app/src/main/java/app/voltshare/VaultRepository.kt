@@ -385,10 +385,13 @@ class VaultRepository(private val context: Context) {
         if (!source.exists()) return null
         val safeName = file.name.sanitizeName()
         val output = File(viewCacheDir, "${file.id}-$safeName")
-        return runCatching {
-            decrypt(source, output)
-            output
-        }.getOrNull()
+        return synchronized(viewCacheDir) {
+            runCatching {
+                if (output.exists() && output.length() > 0L) return@runCatching output
+                decrypt(source, output)
+                output
+            }.getOrNull()
+        }
     }
 
     fun encryptedFile(file: VaultFile): File = File(vaultDir, "${file.id}.vault")
