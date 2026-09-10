@@ -92,6 +92,17 @@ partial attachment is not left behind.
 The complete 2FA-specific verification checklist is in
 `2FA/VOLTSHARE_ATTACHMENT_INTEGRATION.md`.
 
+The same VoltShare bridge is also used by the 2FA app's Universal Backup card:
+
+- **Universal backup file → Open in VoltShare Share** creates the normal
+  universal backup with the existing view model, sends it as an explicit
+  `ACTION_SEND` with `EXTRA_STREAM`, and opens VoltShare's Share tab.
+- **Restore universal backup file → VoltShare Vault** opens the protected
+  multi-select vault picker and passes one selected returned URI into the
+  existing universal restore flow.
+
+The original Device storage behavior remains available for both actions.
+
 ## Companion app: launch the VoltShare picker
 
 Keep the existing SAF launcher for **Device storage**. Add a separate action

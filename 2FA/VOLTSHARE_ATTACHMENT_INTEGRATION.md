@@ -22,6 +22,44 @@ Every returned URI, from either source, goes through the existing
 The existing attachment list, preview, delete, encrypted backup, sync, and
 trash behavior are unchanged.
 
+## Universal Backup and Restore integration
+
+The Universal Backup card in the 2FA Settings screen also offers two source
+choices for each action.
+
+### Universal backup file
+
+The source dialog offers:
+
+- **Device storage** — the existing behavior. It opens the password dialog and
+  then the normal Android `CreateDocument` flow.
+- **Open in VoltShare Share** — creates the exact same universal backup format
+  using the existing `UniversalBackupViewModel`, writes it to a temporary
+  private `FileProvider` URI, and sends that URI directly to:
+
+  ```text
+  app.voltshare
+  ```
+
+  using `Intent.ACTION_SEND` and `Intent.EXTRA_STREAM`. VoltShare receives the
+  file and opens its Share tab so the user only needs to choose the Android
+  device. The temporary file is retained in the 2FA cache while the share
+  handoff is active and is deleted if preparation or launching fails.
+
+### Restore universal backup file
+
+The source dialog offers:
+
+- **Device storage** — the existing `OpenDocument` behavior.
+- **VoltShare Vault** — launches the protected
+  `app.voltshare.action.PICK_VAULT_FILES` picker. One selected VoltShare URI
+  is passed to the existing `UniversalBackupViewModel.restore()` flow, which
+  performs the same universal backup validation, password handling, token
+  restore, Secrets restore, and sync dispatch as device-selected files.
+
+The restore option requires exactly one selected file. If multiple files are
+selected in VoltShare, the 2FA app asks the user to select one backup file.
+
 ## Files changed
 
 ### Companion app
