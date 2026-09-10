@@ -1,0 +1,14 @@
+Are you sure that when this time the universal backup file creation will be filled? Will it 100% give all the complete log with a copy button in a premium dialog instantly? And the same applies for when it failed for the restore. The same premium dialog will show the full log. Okay. And 100% sure add everything implemented or not, and will the universal backup creation file will be handled created? After that, just push them accordingly how I told you earlier.
+
+Implementing log copy feature
+
+I need to act quickly on the user's request for a full log copy button in the premium dialog for export and restore failures. First, I'll inspect the relevant files and understand the design of the existing premium dialog. It seems I need to read about dialog designs and search for logs related to 2FA. The user feels 100% sure, but I can't guarantee without thorough testing.
+
+Additionally, I may need to consider using the clipboard for copying logs while ensuring that sensitive URLs aren't exposed. I'll create structures for logging and UI display on failures.Considering password error handling
+
+I'm thinking about how to handle the wrong password situation. The user suggests that it should remain a special case and not show a full failure log. Instead, it might make sense to simply indicate "wrong password" without making it look like a full error. However, for actual restore failures, I need to show the appropriate dialog and potentially include a full stack trace.
+
+For cases of DecryptWrongPassword, I should consider keeping that dialog separate. Maybe I can log details if the user requests it. The premium dialog should pull from existing styles like TwDialog or AlertDialog. I need to search for these styles and functionalities.
+
+I’ll make the failure path explicit instead of relying on the generic toast: capture the complete export/restore exception chain, show it immediately in the app’s styled dialog, and add a copy button. I’ll also verify every export and restore branch is covered, then push the two repositories separately as requested.
+
