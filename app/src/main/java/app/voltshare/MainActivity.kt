@@ -117,6 +117,7 @@ import androidx.compose.material.icons.filled.NavigateNext
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PictureAsPdf
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.PushPin
 import androidx.compose.material.icons.filled.Replay
 import androidx.compose.material.icons.filled.Replay10
 import androidx.compose.material.icons.filled.RotateRight
@@ -1044,6 +1045,7 @@ private fun VoltShareApp(
                 }
             },
             onToggleLock = {},
+            onPinFile = {},
             onReorder = { _, _ -> },
             onReorderTo = { _, _ -> },
             onLongPress = {},
@@ -1434,6 +1436,10 @@ private fun VoltShareApp(
                         if (lockEnabled) vault.toggleLocked(it)
                         files = vault.listFiles()
                     },
+                    onPinFile = {
+                        vault.togglePinnedToTop(it)
+                        files = vault.listFiles()
+                    },
                     vault = vault,
                 )
 
@@ -1465,6 +1471,10 @@ private fun VoltShareApp(
                     },
                     onToggleLock = {
                         if (lockEnabled) vault.toggleLocked(it)
+                        files = vault.listFiles()
+                    },
+                    onPinFile = {
+                        vault.togglePinnedToTop(it)
                         files = vault.listFiles()
                     },
                     onReorder = { file, direction ->
@@ -1850,6 +1860,7 @@ private fun VaultHome(
     onImport: () -> Unit,
     onOpen: (VaultFile) -> Unit,
     onToggleLock: (VaultFile) -> Unit,
+    onPinFile: (VaultFile) -> Unit,
     vault: VaultRepository,
 ) {
     val recentFiles = files.sortedByDescending { it.createdAt }.take(5)
@@ -1909,6 +1920,7 @@ private fun VaultHome(
                     vault = vault,
                     onOpen = onOpen,
                     onToggleLock = onToggleLock,
+                    onPin = { onPinFile(file) },
                     onMoveUp = {},
                     onMoveDown = {},
                     allowReorder = false,
@@ -1940,6 +1952,7 @@ private fun FilesHome(
     onMakePrimary: (String) -> Unit,
     onOpen: (VaultFile) -> Unit,
     onToggleLock: (VaultFile) -> Unit,
+    onPinFile: (VaultFile) -> Unit,
     onReorder: (VaultFile, Int) -> Unit,
     onReorderTo: (VaultFile, Int) -> Unit,
     onLongPress: (VaultFile) -> Unit,
@@ -1988,7 +2001,14 @@ private fun FilesHome(
             }
         },
         if (reorderMode) VaultSort.CUSTOM else sortMode,
-    )
+    ).let { ordered ->
+        if (searching) {
+            ordered
+        } else {
+            val (pinned, unpinned) = ordered.partition { it.pinned }
+            pinned + unpinned
+        }
+    }
     val visibleFolders = if (searching) {
         folders.filter { folder ->
             folder != "/" &&
@@ -2280,6 +2300,7 @@ private fun FilesHome(
                                 vault = vault,
                                 onOpen = onOpen,
                                 onToggleLock = onToggleLock,
+                                onPin = { onPinFile(file) },
                                 onMoveUp = { reorderDirectFile(file, -1) },
                                 onMoveDown = { reorderDirectFile(file, 1) },
                                 allowReorder = reorderMode && !searching,
@@ -2298,6 +2319,8 @@ private fun FilesHome(
                                 onDelete = { onDeleteFile(file) },
                                 isSelected = file.id in selectedFileIds,
                                 selectionMode = selectedFileIds.isNotEmpty(),
+                                showPin = true,
+                                isPinned = file.pinned,
                                 reorderMode = reorderMode,
                                 dragging = draggedFileId == file.id,
                                 dropTarget = dropTargetFileId == file.id,
@@ -2866,6 +2889,7 @@ private fun FileRow(
     vault: VaultRepository? = null,
     onOpen: (VaultFile) -> Unit,
     onToggleLock: (VaultFile) -> Unit,
+    onPin: () -> Unit = {},
     onMoveUp: () -> Unit,
     onMoveDown: () -> Unit,
     allowReorder: Boolean,
@@ -2877,6 +2901,8 @@ private fun FileRow(
     onDelete: () -> Unit = {},
     isSelected: Boolean = false,
     selectionMode: Boolean = false,
+    showPin: Boolean = true,
+    isPinned: Boolean = false,
     reorderMode: Boolean = false,
     dragging: Boolean = false,
     dropTarget: Boolean = false,
@@ -3000,12 +3026,22 @@ private fun FileRow(
                     if (isSelected) Icon(Icons.Default.Check, null, tint = Color.Black, modifier = Modifier.size(18.dp))
                 }
             } else {
-                IconButton(onClick = { onToggleLock(file) }) {
-                    Icon(
-                        if (file.locked) Icons.Default.Star else Icons.Default.StarBorder,
-                        if (file.locked) "Unlock ${file.name}" else "Lock ${file.name}",
-                        tint = if (file.locked) accent else VoltTextMuted,
-                    )
+                if (showPin) {
+                    IconButton(onClick = onPin) {
+                        Icon(
+                            Icons.Default.PushPin,
+                            if (isPinned) "Unpin ${file.name}" else "Pin ${file.name} to top",
+                            tint = if (isPinned) VoltGreen else VoltTextMuted,
+                        )
+                    }
+                } else {
+                    IconButton(onClick = { onToggleLock(file) }) {
+                        Icon(
+                            if (file.locked) Icons.Default.Star else Icons.Default.StarBorder,
+                            if (file.locked) "Unlock ${file.name}" else "Lock ${file.name}",
+                            tint = if (file.locked) accent else VoltTextMuted,
+                        )
+                    }
                 }
                 IconButton(onClick = onDelete) {
                     Icon(Icons.Default.Delete, "Delete ${file.name}", tint = Color(0xFFFF8A80))

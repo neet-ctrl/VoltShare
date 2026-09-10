@@ -35,6 +35,7 @@ data class VaultFile(
     val mimeType: String,
     val sizeBytes: Long,
     val locked: Boolean,
+    val pinned: Boolean = false,
     val folderPath: String = "/",
     val createdAt: Long = System.currentTimeMillis(),
     val order: Long = createdAt,
@@ -111,6 +112,7 @@ class VaultRepository(private val context: Context) {
                             mimeType = item.optString("mimeType", "application/octet-stream"),
                             sizeBytes = storedSize ?: metadataSize,
                             locked = item.optBoolean("locked", false),
+                            pinned = item.optBoolean("pinned", false),
                             folderPath = item.optString("folderPath", "/").ifBlank { "/" },
                             createdAt = item.optLong("createdAt", 0L).takeIf { it > 0 } ?: System.currentTimeMillis(),
                             order = item.optLong("order", index.toLong()),
@@ -234,6 +236,37 @@ class VaultRepository(private val context: Context) {
         val updated = file.copy(locked = !file.locked)
         writeFiles(listFiles().map { if (it.id == file.id) updated else it })
         return updated
+    }
+
+    /**
+     * Pins a file to the top of its own folder. Pinned files stay above
+     * unpinned siblings, while preserving their existing order within each
+     * group. Tapping a pinned file again unpins it and places it after the
+     * remaining siblings in that folder.
+     */
+    fun togglePinnedToTop(file: VaultFile): List<VaultFile> {
+        val allFiles = listFiles()
+        val siblings = allFiles
+            .filter { it.folderPath == file.folderPath }
+            .sortedBy { it.order }
+            .toMutableList()
+        val target = siblings.firstOrNull { it.id == file.id } ?: return siblings
+        val remaining = siblings.filterNot { it.id == target.id }
+        val ordered = if (!target.pinned) {
+            listOf(target.copy(pinned = true)) +
+                remaining.filter { it.pinned } +
+                remaining.filterNot { it.pinned }
+        } else {
+            remaining.filter { it.pinned } +
+                remaining.filterNot { it.pinned } +
+                target.copy(pinned = false)
+        }
+        val normalized = ordered.mapIndexed { position, item ->
+            item.copy(order = position.toLong())
+        }
+        val byId = normalized.associateBy { it.id }
+        writeFiles(allFiles.map { byId[it.id] ?: it })
+        return normalized
     }
 
     fun markSent(file: VaultFile): VaultFile {
@@ -563,6 +596,7 @@ class VaultRepository(private val context: Context) {
                     mimeType = item.optString("mimeType", "application/octet-stream"),
                     sizeBytes = item.optLong("sizeBytes", 0L).coerceAtLeast(0L),
                     locked = item.optBoolean("locked", false),
+                    pinned = item.optBoolean("pinned", false),
                     folderPath = item.optString("folderPath", "/").ifBlank { "/" },
                     createdAt = item.optLong("createdAt", 0L).takeIf { it > 0 } ?: System.currentTimeMillis(),
                     order = item.optLong("order", index.toLong()),
@@ -694,6 +728,7 @@ class VaultRepository(private val context: Context) {
                     .put("mimeType", file.mimeType)
                     .put("sizeBytes", file.sizeBytes)
                     .put("locked", file.locked)
+                    .put("pinned", file.pinned)
                     .put("folderPath", file.folderPath)
                      .put("createdAt", file.createdAt)
                      .put("order", file.order)
