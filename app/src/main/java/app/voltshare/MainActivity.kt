@@ -251,7 +251,14 @@ open class MainActivity : FragmentActivity() {
     }
 
     fun completeVaultPicker(files: List<VaultFile>) {
-        val uris = files.map { VaultShareContract.uriForFile(it.id) }
+        val exportableFiles = files.filter { file ->
+            !file.locked && vault.storedFile(file).isFile
+        }
+        if (exportableFiles.isEmpty()) {
+            Toast.makeText(this, "Select at least one unlocked file", Toast.LENGTH_SHORT).show()
+            return
+        }
+        val uris = exportableFiles.map { VaultShareContract.uriForFile(it.id) }
         val result = Intent().apply {
             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
             if (uris.isNotEmpty()) {
@@ -263,6 +270,12 @@ open class MainActivity : FragmentActivity() {
                         grantUriPermission(packageName, uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
                     }
                 }
+            }
+            type = "*/*"
+            if (uris.size == 1) {
+                putExtra(Intent.EXTRA_STREAM, uris.first())
+            } else {
+                putParcelableArrayListExtra(Intent.EXTRA_STREAM, ArrayList(uris))
             }
             putExtra(Intent.EXTRA_ALLOW_MULTIPLE, uris.size > 1)
         }
@@ -591,10 +604,14 @@ private fun VoltShareApp(
             onDeleteFolder = {},
             onMakePrimary = {},
             onOpen = { file ->
-                selectedFileIds = if (file.id in selectedFileIds) {
-                    selectedFileIds - file.id
+                if (file.locked) {
+                    Toast.makeText(activity, "Unlock this file in VoltShare before sharing it", Toast.LENGTH_SHORT).show()
                 } else {
-                    selectedFileIds + file.id
+                    selectedFileIds = if (file.id in selectedFileIds) {
+                        selectedFileIds - file.id
+                    } else {
+                        selectedFileIds + file.id
+                    }
                 }
             },
             onToggleLock = {},
@@ -2172,6 +2189,51 @@ private fun FolderCard(
             padding = 16.dp,
             content = rowContent,
         )
+    }
+}
+
+@Composable
+private fun PickerSelectionBar(
+    selectedCount: Int,
+    onConfirm: () -> Unit,
+    onClear: () -> Unit,
+) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        color = VoltSurfaceRaised,
+        shape = RoundedCornerShape(22.dp),
+        border = BorderStroke(1.dp, VoltGreen.copy(alpha = 0.35f)),
+        shadowElevation = 18.dp,
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(34.dp)
+                    .background(VoltGreen.copy(alpha = 0.14f), CircleShape),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(Icons.Default.Check, null, tint = VoltGreen, modifier = Modifier.size(19.dp))
+            }
+            Spacer(Modifier.width(9.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text("$selectedCount selected", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                Text("Ready to import", color = VoltTextMuted, fontSize = 10.sp)
+            }
+            TextButton(
+                onClick = onConfirm,
+                colors = ButtonDefaults.textButtonColors(contentColor = VoltGreen),
+            ) {
+                Icon(Icons.Default.ArrowDownward, "Import selected", modifier = Modifier.size(17.dp))
+                Spacer(Modifier.width(5.dp))
+                Text("Import selected", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+            }
+            IconButton(onClick = onClear) {
+                Icon(Icons.Default.Close, "Clear selection", tint = VoltTextMuted)
+            }
+        }
     }
 }
 
