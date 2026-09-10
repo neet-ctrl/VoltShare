@@ -1627,7 +1627,7 @@ private fun FileRow(
                     if (isSelected) Icon(Icons.Default.Check, null, tint = Color.Black, modifier = Modifier.size(18.dp))
                 }
             } else {
-                IconButton(onClick = onToggleLock) {
+                IconButton(onClick = { onToggleLock(file) }) {
                     Icon(
                         if (file.locked) Icons.Default.Star else Icons.Default.StarBorder,
                         "Pin ${file.name}",
