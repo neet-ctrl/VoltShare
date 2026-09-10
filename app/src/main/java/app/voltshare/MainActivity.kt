@@ -15,6 +15,8 @@ import android.os.Build
 import android.os.ParcelFileDescriptor
 import android.provider.Settings
 import android.provider.OpenableColumns
+import android.text.Selection
+import android.text.SpannableString
 import android.text.format.Formatter
 import android.text.method.ScrollingMovementMethod
 import android.view.ActionMode
@@ -75,6 +77,7 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.weight
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
@@ -1042,7 +1045,6 @@ private fun VoltShareApp(
                                 ).show()
                             },
                         )
-                        }
                     }
                 }
             },
@@ -4728,7 +4730,7 @@ private fun MediaViewer(
             } else {
                 delay(250L)
             }
-        },
+        }
     }
     Box(
         modifier = Modifier
@@ -5093,14 +5095,16 @@ private fun TextViewer(file: File, fullscreen: Boolean, onToggleFullscreen: () -
                         textView.textSize = fontSize
                         textView.setHorizontallyScrolling(!wrapText)
                         if (textView.text.toString() != text!!) {
-                            textView.text = text
+                            textView.text = SpannableString(text!!)
                         }
                         val matches = findTextMatches(text!!, searchQuery)
                         val matchStart = matches.getOrNull(searchIndex)
                         matchStart?.let { start ->
                             textView.post {
                                 textView.requestFocus()
-                                textView.setSelection(start, start + searchQuery.length)
+                                (textView.text as? android.text.Spannable)?.let { spannable ->
+                                    Selection.setSelection(spannable, start, start + searchQuery.length)
+                                }
                                 textView.layout?.let { layout ->
                                     textView.scrollTo(0, layout.getLineTop(layout.getLineForOffset(start)))
                                 }

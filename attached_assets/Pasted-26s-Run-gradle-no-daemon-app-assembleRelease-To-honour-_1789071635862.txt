@@ -1,0 +1,336 @@
+26s
+Run gradle --no-daemon :app:assembleRelease \
+To honour the JVM settings for this build a single-use Daemon process will be forked. For more on this, please refer to https://docs.gradle.org/8.9/userguide/gradle_daemon.html#sec:disabling_the_daemon in the Gradle documentation.
+Daemon will be stopped at the end of the build 
+> Task :app:preBuild UP-TO-DATE
+> Task :app:preReleaseBuild UP-TO-DATE
+> Task :app:mergeReleaseJniLibFolders
+> Task :app:mergeReleaseNativeLibs
+> Task :app:buildKotlinToolingMetadata
+
+> Task :app:stripReleaseDebugSymbols
+Unable to strip the following libraries, packaging them as they are: libandroidx.graphics.path.so.
+
+> Task :app:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :app:extractReleaseNativeSymbolTables
+> Task :app:generateReleaseBuildConfig
+> Task :app:mergeReleaseNativeDebugMetadata NO-SOURCE
+> Task :app:checkReleaseDuplicateClasses
+> Task :app:generateReleaseResValues
+> Task :app:checkReleaseAarMetadata
+> Task :app:mapReleaseSourceSetPaths
+> Task :app:generateReleaseResources
+> Task :app:packageReleaseResources
+> Task :app:createReleaseCompatibleScreenManifests
+> Task :app:extractDeepLinksRelease
+> Task :app:parseReleaseLocalResources
+> Task :app:processReleaseMainManifest
+> Task :app:processReleaseManifest
+> Task :app:javaPreCompileRelease
+> Task :app:mergeReleaseResources
+> Task :app:processReleaseManifestForPackage
+> Task :app:mergeReleaseArtProfile
+> Task :app:extractProguardFiles
+> Task :app:mergeReleaseStartupProfile
+> Task :app:mergeReleaseShaders
+> Task :app:compileReleaseShaders NO-SOURCE
+> Task :app:generateReleaseAssets UP-TO-DATE
+> Task :app:mergeReleaseAssets
+> Task :app:compressReleaseAssets
+> Task :app:extractReleaseVersionControlInfo
+> Task :app:collectReleaseDependencies
+> Task :app:sdkReleaseDependencyData
+> Task :app:validateSigningRelease
+> Task :app:processReleaseResources
+> Task :app:writeReleaseAppMetadata
+> Task :app:writeReleaseSigningConfigVersions
+> Task :app:convertLinkedResourcesToProtoRelease
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:1047:18 Syntax error: Expecting ')'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:1048:14 Syntax error: Unexpected tokens (use ';' to separate expressions on the same line).
+
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:1049:9 Syntax error: Expecting an element.
+> Task :app:compileReleaseKotlin FAILED
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:1052:5 Syntax error: Expecting a top level declaration.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:1052:17 Syntax error: Expecting a top level declaration.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:1052:19 Syntax error: Expecting a top level declaration.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:1052:23 Syntax error: Expecting a top level declaration.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:1052:23 Functions which invoke @Composable functions must be marked with the @Composable annotation
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:1052:23 Function declaration must have a name.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:1052:25 Unresolved reference 'target'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:1052:32 Syntax error: Unexpected tokens (use ';' to separate expressions on the same line).
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:1053:9 @Composable invocations can only happen from the context of a @Composable function
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:1056:27 Unresolved reference 'target'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:1057:27 Unresolved reference 'fileToRename'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:1059:17 Unresolved reference 'vault'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:1059:34 Unresolved reference 'target'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:1060:17 Unresolved reference 'files'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:1060:25 Unresolved reference 'vault'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:1061:17 Unresolved reference 'fileToRename'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:1066:5 Syntax error: Expecting a top level declaration.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:1066:32 Syntax error: Expecting a top level declaration.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:1066:33 Syntax error: Expecting a top level declaration.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:1066:40 Syntax error: Expecting a top level declaration.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:1066:40 Function declaration must have a name.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:1066:42 Unresolved reference 'it'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:1066:46 Syntax error: Expecting a top level declaration.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:1066:48 Syntax error: Expecting a top level declaration.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:1066:52 Syntax error: Expecting a top level declaration.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:1066:52 Functions which invoke @Composable functions must be marked with the @Composable annotation
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:1066:52 Function declaration must have a name.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:1067:9 @Composable invocations can only happen from the context of a @Composable function
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:1068:34 Unresolved reference 'showDeleteFilesConfirmation'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:1073:49 Unresolved reference 'selectedFileIds'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:1073:89 Unresolved reference 'selectedFileIds'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:1080:25 Unresolved reference 'vault'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:1080:43 Unresolved reference 'files'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:1080:58 Unresolved reference 'it'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:1080:67 Unresolved reference 'selectedFileIds'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:1081:25 Unresolved reference 'selectedFileIds'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:1081:43 Cannot infer type for this parameter. Please specify it explicitly.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:1081:43 Not enough information to infer type argument for 'T'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:1082:25 Unresolved reference 'files'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:1082:33 Unresolved reference 'vault'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:1083:25 Unresolved reference 'showDeleteFilesConfirmation'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:1090:33 Unresolved reference 'showDeleteFilesConfirmation'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:1097:5 Syntax error: Expecting a top level declaration.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:1097:33 Syntax error: Expecting a top level declaration.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:1097:35 Syntax error: Expecting a top level declaration.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:1097:39 Syntax error: Expecting a top level declaration.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:1097:39 Functions which invoke @Composable functions must be marked with the @Composable annotation
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:1097:39 Function declaration must have a name.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:1097:41 Unresolved reference 'folder'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:1097:48 Syntax error: Unexpected tokens (use ';' to separate expressions on the same line).
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:1098:9 @Composable invocations can only happen from the context of a @Composable function
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:1099:34 Unresolved reference 'showDeleteFolderConfirmation'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:1111:25 Unresolved reference 'vault'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:1111:44 Unresolved reference 'folder'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:1112:25 Unresolved reference 'folders'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:1112:35 Unresolved reference 'vault'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:1113:25 Unresolved reference 'primaryFolder'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:1113:41 Unresolved reference 'vault'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:1114:25 Unresolved reference 'currentFolder'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:1114:41 Unresolved reference 'folder'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:1115:25 Unresolved reference 'files'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:1115:33 Unresolved reference 'vault'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:1116:25 Unresolved reference 'showDeleteFolderConfirmation'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:1123:33 Unresolved reference 'showDeleteFolderConfirmation'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:1130:5 Syntax error: Expecting a top level declaration.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:1130:8 Syntax error: Expecting a top level declaration.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:1130:9 Syntax error: Expecting a top level declaration.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:1130:25 Syntax error: Expecting a top level declaration.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:1130:27 Syntax error: Expecting a top level declaration.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:1130:27 Functions which invoke @Composable functions must be marked with the @Composable annotation
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:1130:27 Function declaration must have a name.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:1131:9 @Composable invocations can only happen from the context of a @Composable function
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:1132:21 Unresolved reference 'selectedFileIds'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:1133:23 Unresolved reference 'folders'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:1134:27 Unresolved reference 'showMoveSelected'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:1136:17 Unresolved reference 'files'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:1136:32 Unresolved reference 'it'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:1136:41 Unresolved reference 'selectedFileIds'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:1136:59 Overload resolution ambiguity between candidates:
+fun <T> Iterable<T>.forEach(action: (T) -> Unit): Unit
+fun <K, V> Map<out K, V>.forEach(action: (Map.Entry<K, V>) -> Unit): Unit
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:1136:67 Unresolved reference 'moveFile'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:1136:69 Unresolved reference 'vault'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:1136:84 Unresolved reference 'it'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:1137:17 Unresolved reference 'files'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:1137:25 Unresolved reference 'vault'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:1138:17 Unresolved reference 'selectedFileIds'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:1138:35 Cannot infer type for this parameter. Please specify it explicitly.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:1138:35 Not enough information to infer type argument for 'T'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:1139:17 Unresolved reference 'showMoveSelected'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:1145:13 Unresolved reference 'lockEnabled'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:1146:13 Unresolved reference 'fileToUnlock'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:1148:13 Unresolved reference 'activity'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:1148:42 Unresolved reference 'vault'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:1150:13 Unresolved reference 'viewerFile'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:1154:5 Syntax error: Expecting a top level declaration.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:1154:13 Syntax error: Expecting a top level declaration.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:1155:9 Syntax error: Expecting a top level declaration.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:1155:24 Syntax error: Expecting a top level declaration.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:1155:26 Syntax error: Expecting a top level declaration.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:1155:35 Syntax error: Expecting a top level declaration.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:1156:9 Syntax error: Expecting a top level declaration.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:1156:19 Syntax error: Expecting a top level declaration.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:1156:21 Syntax error: Expecting a top level declaration.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:1156:21 Functions which invoke @Composable functions must be marked with the @Composable annotation
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:1156:21 Function declaration must have a name.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:1157:13 @Composable invocations can only happen from the context of a @Composable function
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:1164:36 Unresolved reference 'tab'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:1165:37 Unresolved reference 'tab'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:1178:10 Syntax error: Expecting a top level declaration.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:1179:5 Syntax error: Expecting a top level declaration.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:1179:7 Syntax error: Expecting a top level declaration.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:1179:7 Functions which invoke @Composable functions must be marked with the @Composable annotation
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:1179:7 Function declaration must have a name.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:1179:9 Unresolved reference 'padding'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:1179:17 Syntax error: Unexpected tokens (use ';' to separate expressions on the same line).
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:1180:9 Cannot infer type for this parameter. Please specify it explicitly.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:1180:9 @Composable invocations can only happen from the context of a @Composable function
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:1181:27 Unresolved reference 'tab'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:1182:41 Unresolved reference 'padding'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:1184:13 Cannot infer type for this parameter. Please specify it explicitly.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:1186:33 @Composable invocations can only happen from the context of a @Composable function
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:1187:29 Unresolved reference 'files'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:1189:25 Unresolved reference 'importFolder'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:1190:25 Unresolved reference 'picker'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:1196:29 Unresolved reference 'lockEnabled'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:1196:42 Unresolved reference 'vault'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:1197:25 Unresolved reference 'files'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:1197:33 Unresolved reference 'vault'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:1199:29 Unresolved reference 'vault'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:1202:33 @Composable invocations can only happen from the context of a @Composable function
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:1203:29 Unresolved reference 'files'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:1204:31 Unresolved reference 'folders'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:1205:37 Unresolved reference 'currentFolder'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:1206:37 Unresolved reference 'primaryFolder'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:1207:39 Unresolved reference 'selectedFileIds'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:1209:25 Unresolved reference 'importFolder'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:1209:40 Unresolved reference 'currentFolder'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:1210:25 Unresolved reference 'picker'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:1212:42 Unresolved reference 'currentFolder'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:1213:40 Unresolved reference 'showNewFolder'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:1215:25 Unresolved reference 'showDeleteFolderConfirmation'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:1218:25 Unresolved reference 'primaryFolder'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:1218:41 Unresolved reference 'vault'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:1219:25 Unresolved reference 'folders'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:1219:35 Unresolved reference 'vault'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:1222:29 Unresolved reference 'selectedFileIds'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:1223:29 Unresolved reference 'selectedFileIds'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:1223:62 Unresolved reference 'selectedFileIds'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:1223:79 Unresolved reference 'selectedFileIds'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:1223:110 Unresolved reference 'selectedFileIds'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:1229:29 Unresolved reference 'lockEnabled'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:1229:42 Unresolved reference 'vault'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:1230:25 Unresolved reference 'files'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:1230:33 Unresolved reference 'vault'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:1233:25 Unresolved reference 'vault'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:1234:25 Unresolved reference 'files'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:1234:33 Unresolved reference 'vault'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:1237:25 Unresolved reference 'vault'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:1238:25 Unresolved reference 'files'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:1238:33 Unresolved reference 'vault'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:1240:37 Unresolved reference 'fileActionTarget'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:1242:25 Unresolved reference 'vault'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:1243:25 Unresolved reference 'selectedFileIds'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:1243:43 Unresolved reference 'selectedFileIds'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:1244:25 Unresolved reference 'files'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:1244:33 Unresolved reference 'vault'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:1246:42 Unresolved reference 'selectedFileIds'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:1246:60 Cannot infer type for this parameter. Please specify it explicitly.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:1246:60 Not enough information to infer type argument for 'T'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:1247:42 Unresolved reference 'showDeleteFilesConfirmation'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:1248:40 Unresolved reference 'showMoveSelected'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:1250:40 Unresolved reference 'files'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:1250:55 Unresolved reference 'it'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:1250:64 Unresolved reference 'selectedFileIds'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:1251:47 Overload resolution ambiguity between candidates:
+fun <T, R : Any> Array<out T>.mapNotNull(transform: (T) -> R?): List<R>
+fun <T, R : Any> Iterable<T>.mapNotNull(transform: (T) -> R?): List<R>
+fun <K, V, R : Any> Map<out K, V>.mapNotNull(transform: (Map.Entry<K, V>) -> R?): List<R>
+fun <T, R : Any> Sequence<T>.mapNotNull(transform: (T) -> R?): Sequence<R>
+fun <R : Any> CharSequence.mapNotNull(transform: (Char) -> R?): List<R>
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:1251:82 Unresolved reference 'vault'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:1251:89 Unresolved reference 'it'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:1252:25 Unresolved reference 'pendingShares'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:1252:42 Unresolved reference 'pendingShares'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:1252:66 Overload resolution ambiguity between candidates:
+fun <T, K> Array<out T>.distinctBy(selector: (T) -> K): List<T>
+fun <K> BooleanArray.distinctBy(selector: (Boolean) -> K): List<Boolean>
+fun <K> ByteArray.distinctBy(selector: (Byte) -> K): List<Byte>
+fun <K> CharArray.distinctBy(selector: (Char) -> K): List<Char>
+fun <K> DoubleArray.distinctBy(selector: (Double) -> K): List<Double>
+fun <K> FloatArray.distinctBy(selector: (Float) -> K): List<Float>
+fun <K> IntArray.distinctBy(selector: (Int) -> K): List<Int>
+fun <K> LongArray.distinctBy(selector: (Long) -> K): List<Long>
+fun <K> ShortArray.distinctBy(selector: (Short) -> K): List<Short>
+fun <T, K> Iterable<T>.distinctBy(selector: (T) -> K): List<T>
+fun <T, K> Sequence<T>.distinctBy(selector: (T) -> K): Sequence<T>
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:1252:77 Unresolved reference 'id'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:1252:79 Unresolved reference 'it'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:1253:25 Unresolved reference 'selectedFileIds'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:1253:43 Cannot infer type for this parameter. Please specify it explicitly.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:1253:43 Not enough information to infer type argument for 'T'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:1254:25 Unresolved reference 'tab'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:1256:29 Unresolved reference 'vault'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:1259:33 @Composable invocations can only happen from the context of a @Composable function
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:1260:32 Unresolved reference 'transfer'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:1261:36 Unresolved reference 'pendingShares'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:1262:36 Unresolved reference 'shareFilePicker'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:1263:37 Unresolved reference 'mediaPicker'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:1264:38 Unresolved reference 'folderPicker'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:1266:25 Unresolved reference 'scope'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:1268:49 Unresolved reference 'activity'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:1270:44 Unresolved reference 'pendingShares'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:1270:61 Unresolved reference 'pendingShares'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:1270:81 Unresolved reference 'distinctBy'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:1270:94 Cannot infer type for this parameter. Please specify it explicitly.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:1270:109 Unresolved reference 'id'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:1274:25 Unresolved reference 'scope'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:1277:63 Unresolved reference 'activity'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:1286:29 Unresolved reference 'pendingShares'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:1286:46 Unresolved reference 'pendingShares'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:1286:71 Unresolved reference 'distinctBy'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:1286:82 Unresolved reference 'id'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:1286:84 Unresolved reference 'it'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:1290:25 Unresolved reference 'pendingShares'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:1290:41 Unresolved reference 'pendingShares'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:1290:67 Unresolved reference 'it'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:1291:45 Unresolved reference 'activity'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:1294:25 Unresolved reference 'pendingShares'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:1294:69 Unresolved reference 'activity'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:1294:79 Unresolved reference 'it'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:1295:25 Unresolved reference 'pendingShares'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:1295:41 Cannot infer type for this parameter. Please specify it explicitly.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:1295:41 Not enough information to infer type argument for 'T'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:1298:25 Unresolved reference 'scope'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:1300:72 Unresolved reference 'activity'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:1300:82 Unresolved reference 'vault'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:1302:29 Unresolved reference 'pendingShares'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:1302:45 Unresolved reference 'pendingShares'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:1302:71 Unresolved reference 'it'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:1303:29 Unresolved reference 'files'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:1303:37 Unresolved reference 'vault'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:1304:29 Unresolved reference 'folders'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:1304:39 Unresolved reference 'vault'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:1309:36 @Composable invocations can only happen from the context of a @Composable function
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:1310:32 Unresolved reference 'lockManager'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:1311:35 Unresolved reference 'lockEnabled'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:1312:40 Unresolved reference 'biometricEnabled'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:1313:39 Unresolved reference 'fileLockDefault'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:1314:41 Unresolved reference 'screenshotEnabled'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:1315:38 Unresolved reference 'transferStatus'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:1316:42 Unresolved reference 'activity'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:1317:47 Unresolved reference 'securityAction'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:1318:55 Unresolved reference 'securityAction'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:1319:50 Unresolved reference 'securityAction'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:1320:61 Unresolved reference 'securityAction'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:1323:29 Unresolved reference 'securityAction'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:1325:29 Unresolved reference 'screenshotEnabled'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:1326:29 Unresolved reference 'screenshotUnlockUntil'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:1329:39 Unresolved reference 'lockEnabled'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:1329:52 Unresolved reference 'securityAction'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:1334:1 Syntax error: Expecting a top level declaration.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:4597:41 Unresolved reference 'weight'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:4731:10 Syntax error: Unexpected tokens (use ';' to separate expressions on the same line).
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:4914:41 Unresolved reference 'weight'.
+e: file:///home/runner/work/VoltShare/VoltShare/app/src/main/java/app/voltshare/MainActivity.kt:5103:42 Unresolved reference 'setSelection'.
+
+gradle/actions: Writing build results to /home/runner/work/_temp/.gradle-actions/build-results/__run_2-1789071522783.json
+35 actionable tasks: 35 executed
+FAILURE: Build failed with an exception.
+
+* What went wrong:
+Execution failed for task ':app:compileReleaseKotlin'.
+> A failure occurred while executing org.jetbrains.kotlin.compilerRunner.GradleCompilerRunnerWithWorkers$GradleKotlinCompilerWorkAction
+   > Compilation error. See log for more details
+
+* Try:
+> Run with --stacktrace option to get the stack trace.
+> Run with --info or --debug option to get more log output.
+> Run with --scan to get full insights.
+> Get more help at https://help.gradle.org.
+
+BUILD FAILED in 25s
+Error: Process completed with exit code
