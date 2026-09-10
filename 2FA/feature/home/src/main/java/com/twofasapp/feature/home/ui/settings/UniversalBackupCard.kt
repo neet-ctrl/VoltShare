@@ -86,7 +86,7 @@ internal fun UniversalBackupCard(
         if (result.resultCode != android.app.Activity.RESULT_OK) return@rememberLauncherForActivityResult
         val uris = result.data?.voltShareResultUris().orEmpty()
         when {
-            uris.isEmpty() -> Unit
+            uris.isEmpty() -> context.toastShort("No universal backup file was selected")
             uris.size > 1 -> context.toastShort("Select one universal backup file")
             else -> viewModel.restore(uris.single())
         }
@@ -103,7 +103,7 @@ internal fun UniversalBackupCard(
                         pendingVoltShareFile = null
                         val handoffAck = pendingVoltShareAck
                         pendingVoltShareAck = null
-                        if (!context.openUniversalBackupInVoltShare(voltShareUri, handoffAck)) {
+                        if (!context.shareUniversalBackup(voltShareUri, handoffAck)) {
                             voltShareFile?.delete()
                         } else {
                             scheduleVoltShareBackupCleanup(voltShareFile)
@@ -200,7 +200,7 @@ internal fun UniversalBackupCard(
                     password = ""
                     showPasswordDialog = true
                 } else {
-                    openVoltShareRestorePicker(
+                    launchVoltShareVaultPicker(
                         launcher = voltShareRestorePicker,
                         context = context,
                     )
@@ -330,7 +330,7 @@ private fun UniversalBackupSourceDialog(
         text = {
             Text(
                 if (isBackup) {
-                    "Create the same universal backup file using your device or open it directly in VoltShare's Share tab."
+                    "Create the same universal backup file on your device or share it through Android's sharing dialog."
                 } else {
                     "Restore using the existing device picker or choose a universal backup file from your VoltShare vault."
                 },
@@ -347,7 +347,7 @@ private fun UniversalBackupSourceDialog(
                     onClick = onDeviceStorage,
                 )
                 TwButton(
-                    text = if (isBackup) "Open in VoltShare Share" else "VoltShare Vault",
+                    text = if (isBackup) "Share via apps" else "VoltShare Vault",
                     leadingIcon = if (isBackup) TwIcons.Share else TwIcons.Lock,
                     leadingIconTint = androidx.compose.ui.graphics.Color.White,
                     modifier = Modifier.fillMaxWidth(),
@@ -363,7 +363,7 @@ private fun UniversalBackupSourceDialog(
     )
 }
 
-private fun openVoltShareRestorePicker(
+private fun launchVoltShareVaultPicker(
     launcher: androidx.activity.result.ActivityResultLauncher<Intent>,
     context: Context,
 ) {
@@ -379,12 +379,11 @@ private fun openVoltShareRestorePicker(
     }
 }
 
-private fun Context.openUniversalBackupInVoltShare(
+private fun Context.shareUniversalBackup(
     uri: Uri,
     acknowledgement: PendingIntent?,
 ): Boolean {
     val shareIntent = Intent(Intent.ACTION_SEND).apply {
-        setPackage(VOLTSHARE_PACKAGE)
         type = "application/octet-stream"
         putExtra(Intent.EXTRA_STREAM, uri)
         putExtra(Intent.EXTRA_SUBJECT, "2FAS universal backup")
@@ -393,13 +392,13 @@ private fun Context.openUniversalBackupInVoltShare(
         addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
     }
     return try {
-        startActivity(shareIntent)
+        startActivity(Intent.createChooser(shareIntent, "Share universal backup"))
         true
     } catch (_: ActivityNotFoundException) {
-        toastShort("VoltShare is not installed on this device")
+        toastShort("No app can share this backup file")
         false
     } catch (_: SecurityException) {
-        toastShort("VoltShare cannot receive this file")
+        toastShort("Unable to share this backup file")
         false
     }
 }

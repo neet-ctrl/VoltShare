@@ -1844,10 +1844,19 @@ private fun EntryEditorDialog(
         },
     )
     val context = LocalContext.current
-    val filePicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
-        uri ?: return@rememberLauncherForActivityResult
-        onSaveAttachment(uri)?.let { attachments = attachments + it }
-            ?: android.widget.Toast.makeText(context, "Unable to securely import attachment", android.widget.Toast.LENGTH_SHORT).show()
+    val filePicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { uris ->
+        if (uris.isEmpty()) return@rememberLauncherForActivityResult
+        val imported = uris.mapNotNull { uri -> onSaveAttachment(uri) }
+        if (imported.isNotEmpty()) {
+            attachments = attachments + imported
+        }
+        if (imported.size != uris.size) {
+            android.widget.Toast.makeText(
+                context,
+                "${imported.size} of ${uris.size} attachment${if (uris.size == 1) "" else "s"} imported",
+                android.widget.Toast.LENGTH_SHORT,
+            ).show()
+        }
     }
     val voltSharePicker = rememberLauncherForActivityResult(
         ActivityResultContracts.StartActivityForResult(),

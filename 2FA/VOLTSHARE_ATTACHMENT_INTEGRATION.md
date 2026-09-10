@@ -35,21 +35,15 @@ The source dialog offers:
 
 - **Device storage** — the existing behavior. It opens the password dialog and
   then the normal Android `CreateDocument` flow.
-- **Open in VoltShare Share** — creates the exact same universal backup format
-  using the existing `UniversalBackupViewModel`, writes it to a temporary
-  private `FileProvider` URI, and sends that URI directly to:
-
-  ```text
-  app.voltshare
-  ```
-
-  using `Intent.ACTION_SEND` and `Intent.EXTRA_STREAM`. VoltShare receives the
-  file and opens its Share tab so the user only needs to choose the Android
-  device. The temporary file is retained in the 2FA cache while the share
-  handoff is active. VoltShare acknowledges the handoff after copying the
-  source into its own pending-share cache, and 2FAS deletes the temporary
-  file. A bounded expiry cleanup also removes it if the user cancels, leaves
-  the flow unfinished, or either app is stopped.
+- **Share via apps** — creates the exact same universal backup format using the
+  existing `UniversalBackupViewModel`, writes it to a temporary private
+  `FileProvider` URI, and opens Android's normal share chooser with
+  `Intent.ACTION_SEND` and `Intent.EXTRA_STREAM`. The user can choose VoltShare
+  or any other compatible app. If VoltShare receives the optional handoff
+  acknowledgement extra, it acknowledges after copying the source into its own
+  pending-share cache and 2FAS deletes the temporary file. Other share targets
+  simply use the bounded expiry cleanup, which also removes the file if the
+  user cancels, leaves the flow unfinished, or either app is stopped.
 
 ### Restore universal backup file
 
