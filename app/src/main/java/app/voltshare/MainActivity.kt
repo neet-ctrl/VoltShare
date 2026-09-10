@@ -66,6 +66,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -77,7 +78,6 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.weight
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
@@ -4611,7 +4611,7 @@ private fun ZoomableBitmapSurface(
     contentDescription: String,
     fullscreen: Boolean,
     onToggleFullscreen: () -> Unit,
-    toolbar: @Composable (reset: () -> Unit, zoomIn: () -> Unit, rotate: () -> Unit) -> Unit,
+    toolbar: @Composable RowScope.(reset: () -> Unit, zoomIn: () -> Unit, rotate: () -> Unit) -> Unit,
 ) {
     var scale by remember(bitmap) { mutableFloatStateOf(1f) }
     var rotation by remember(bitmap) { mutableFloatStateOf(0f) }
