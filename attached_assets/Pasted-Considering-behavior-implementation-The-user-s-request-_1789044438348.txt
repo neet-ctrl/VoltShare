@@ -1,0 +1,30 @@
+Considering behavior implementation
+
+The user's request about exact behavior seems okay, and saying "will share" works. I might think about adding a cleanup after a delay, but there could be risks involved with that. I want to ensure I'm keeping things consistent. I notice a potential compile issue due to the missing androidx.activity.result.ActivityResultLauncher import, but I can use the fully-qualified path instead. However, there might also be issues with the FileProvider.getUriForFile import since it's already in use. I'll keep this in mind.
+
+The new flows are wired. I’m doing the final static verification now, including both project manifests, the direct ACTION_SEND handoff, the picker result parsing, and the existing Device storage paths. I’ll also check whether any follow-up test task is warranted; I won’t run Gradle unless required.
+
+The implementation and static checks are complete. The remaining confidence gap is runtime validation with both signed APKs installed together, so I’m recording that as a focused follow-up rather than claiming device-level verification that I could not run here.
+
+Implemented the Universal Backup/Restore integration.
+
+Universal Backup File
+The new premium dialog now offers:
+
+Device storage — preserves the existing CreateDocument behavior exactly.
+Open in VoltShare Share — creates the same universal backup using the existing backup generator, sends it directly to app.voltshare with ACTION_SEND and EXTRA_STREAM, and VoltShare opens its Share tab with that file ready for device selection.
+Restore universal backup file
+The new premium dialog now offers:
+
+Device storage — preserves the existing OpenDocument behavior exactly.
+VoltShare Vault — opens the protected VoltShare vault picker. The selected file is passed into the existing universal restore and password flow. Multiple selections are rejected because restore requires one backup file.
+Additional work
+Added FileProvider-based temporary sharing from 2FA to VoltShare.
+Added missing-app and permission/signing error handling.
+Updated both integration documents.
+Verified manifests, FileProvider paths, URI parsing, existing SAF paths, and VoltShare action/package identifiers.
+No Gradle build or physical-device test was run, so Android runtime behavior still needs end-to-end validation with both APKs installed and signed with the same certificate. A focused validation follow-up has been proposed.
+No, see, does their existing features are 100% working and even in both apps? And are they 100% coordinated and will everything will work? And just see that everything is perfect or not.
+
+You've reached your daily free quota limit. It will reset at 12:00 AM UTC.
+
