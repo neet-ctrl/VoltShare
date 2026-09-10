@@ -37,6 +37,8 @@ import com.twofasapp.designsystem.TwTheme
 import com.twofasapp.designsystem.common.TwButton
 import com.twofasapp.designsystem.common.TwOutlinedButton
 import com.twofasapp.designsystem.dialog.ExportPasswordRegex
+import com.twofasapp.designsystem.dialog.InfoDialog
+import com.twofasapp.designsystem.ktx.copyToClipboard
 import com.twofasapp.designsystem.ktx.toastShort
 import com.twofasapp.designsystem.settings.SettingsLink
 import org.koin.androidx.compose.koinViewModel
@@ -61,6 +63,7 @@ internal fun UniversalBackupCard(
     var pendingVoltShareAck by remember { mutableStateOf<PendingIntent?>(null) }
     var showPasswordDialog by remember { mutableStateOf(false) }
     var showSourceDialog by remember { mutableStateOf<UniversalBackupSource?>(null) }
+    var failureLog by remember { mutableStateOf<String?>(null) }
 
     LaunchedEffect(Unit) {
         cleanupExpiredVoltShareBackups(context)
@@ -103,8 +106,14 @@ internal fun UniversalBackupCard(
                         pendingVoltShareFile = null
                         val handoffAck = pendingVoltShareAck
                         pendingVoltShareAck = null
-                        if (!context.shareUniversalBackup(voltShareUri, handoffAck)) {
+                        val shareError = context.shareUniversalBackup(voltShareUri, handoffAck)
+                        if (shareError != null) {
                             voltShareFile?.delete()
+                            viewModel.reportExportFailure(
+                                operation = "share",
+                                uri = voltShareUri,
+                                exception = shareError,
+                            )
                         } else {
                             scheduleVoltShareBackupCleanup(voltShareFile)
                         }
@@ -113,12 +122,12 @@ internal fun UniversalBackupCard(
                     }
                 }
 
-                UniversalBackupUiEvent.ExportError -> {
+                is UniversalBackupUiEvent.ExportError -> {
                     pendingVoltShareFile?.delete()
                     pendingVoltShareUri = null
                     pendingVoltShareFile = null
                     pendingVoltShareAck = null
-                    context.toastShort("Universal backup failed")
+                    failureLog = event.log
                 }
 
                 is UniversalBackupUiEvent.PasswordRequired -> {
@@ -140,11 +149,27 @@ internal fun UniversalBackupCard(
                     context.toastShort("Universal backup restored successfully")
                 }
 
-                UniversalBackupUiEvent.RestoreError ->
-                    context.toastShort("Universal restore failed — the file may be damaged")
+                is UniversalBackupUiEvent.RestoreError ->
+                    failureLog = event.log
             }
             viewModel.consumeEvent(event)
         }
+    }
+
+    failureLog?.let { log ->
+        UniversalBackupFailureDialog(
+            log = log,
+            onDismiss = { failureLog = null },
+            onCopy = {
+                context.copyToClipboard(
+                    text = log,
+                    label = "Universal backup failure log",
+                    toast = "Failure log copied",
+                    showToast = false,
+                )
+                context.toastShort("Failure log copied")
+            },
+        )
     }
 
     SettingsLink(
@@ -277,7 +302,11 @@ internal fun UniversalBackupCard(
                                     pendingVoltShareFile = null
                                     pendingVoltShareUri = null
                                     pendingVoltShareAck = null
-                                    context.toastShort("Unable to prepare the VoltShare backup")
+                                    viewModel.reportExportFailure(
+                                        operation = "prepare-share",
+                                        uri = null,
+                                        exception = it,
+                                    )
                                 }
                             } else {
                                 exportLauncher.launch("2fas-universal-backup.universal")
@@ -313,6 +342,22 @@ private enum class UniversalBackupOperation {
 private enum class UniversalBackupSource {
     BACKUP,
     RESTORE,
+}
+
+@Composable
+private fun UniversalBackupFailureDialog(
+    log: String,
+    onDismiss: () -> Unit,
+    onCopy: () -> Unit,
+) {
+    InfoDialog(
+        onDismissRequest = onDismiss,
+        title = "Universal backup failed",
+        body = log,
+        positive = "Close",
+        negative = "Copy log",
+        onNegative = onCopy,
+    )
 }
 
 @Composable
@@ -384,7 +429,7 @@ private fun launchVoltShareVaultPicker(
 private fun Context.shareUniversalBackup(
     uri: Uri,
     acknowledgement: PendingIntent?,
-): Boolean {
+): Throwable? {
     val shareIntent = Intent(Intent.ACTION_SEND).apply {
         type = "application/octet-stream"
         putExtra(Intent.EXTRA_STREAM, uri)
@@ -395,13 +440,11 @@ private fun Context.shareUniversalBackup(
     }
     return try {
         startActivity(Intent.createChooser(shareIntent, "Share universal backup"))
-        true
-    } catch (_: ActivityNotFoundException) {
-        toastShort("No app can share this backup file")
-        false
-    } catch (_: SecurityException) {
-        toastShort("Unable to share this backup file")
-        false
+        null
+    } catch (exception: ActivityNotFoundException) {
+        exception
+    } catch (exception: SecurityException) {
+        exception
     }
 }
 

@@ -17,6 +17,8 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
+import java.io.PrintWriter
+import java.io.StringWriter
 
 internal class UniversalBackupViewModel(
     private val context: Application,
@@ -39,23 +41,56 @@ internal class UniversalBackupViewModel(
                     passwordProtected = passwordValue != null,
                     secretsUpdatedAt = secretsBackupProvider.backupUpdatedAt(),
                 ).toByteArray(Charsets.UTF_8)
+                UniversalBackupCodec.decode(json, serialized.toString(Charsets.UTF_8))
                 writeBackup(uri, serialized)
             }.onSuccess {
                 publishEvent(UniversalBackupUiEvent.ExportSuccess)
             }.onFailure { exception ->
-                Log.e(TAG, "Universal backup export failed for $uri", exception)
-                publishEvent(UniversalBackupUiEvent.ExportError)
+                reportExportFailure(
+                    operation = "export",
+                    uri = uri,
+                    exception = exception,
+                )
             }
         }
     }
 
+    fun reportExportFailure(
+        operation: String,
+        uri: Uri?,
+        exception: Throwable,
+    ) {
+        Log.e(TAG, "Universal backup $operation failed${uri?.let { " for $it" }.orEmpty()}", exception)
+        publishEvent(
+            UniversalBackupUiEvent.ExportError(
+                failureLog(
+                    operation = operation,
+                    uri = uri,
+                    exception = exception,
+                ),
+            ),
+        )
+    }
+
     fun restore(uri: Uri, password: String? = null) {
         viewModelScope.launch(Dispatchers.IO) {
-            val envelope = runCatching { readEnvelope(uri) }
-                .getOrElse {
-                    publishEvent(UniversalBackupUiEvent.RestoreError)
-                    return@launch
-                }
+            val envelope = try {
+                readEnvelope(uri)
+            } catch (exception: Exception) {
+                reportRestoreFailure(
+                    operation = "restore/read",
+                    uri = uri,
+                    exception = exception,
+                )
+                return@launch
+            } catch (throwable: Throwable) {
+                reportRestoreFailure(
+                    operation = "restore/read",
+                    uri = uri,
+                    exception = throwable,
+                )
+                return@launch
+            }
 
             if (envelope.passwordProtected && password.isNullOrEmpty()) {
                 publishEvent(UniversalBackupUiEvent.PasswordRequired(uri))
@@ -88,10 +123,31 @@ internal class UniversalBackupViewModel(
             }.onFailure { exception ->
                 when (exception) {
                     is DecryptWrongPassword -> publishEvent(UniversalBackupUiEvent.WrongPassword)
-                    else -> publishEvent(UniversalBackupUiEvent.RestoreError)
+                    else -> reportRestoreFailure(
+                        operation = "restore/import",
+                        uri = uri,
+                        exception = exception,
+                    )
                 }
             }
         }
+    }
+
+    private fun reportRestoreFailure(
+        operation: String,
+        uri: Uri,
+        exception: Throwable,
+    ) {
+        Log.e(TAG, "Universal backup $operation failed for $uri", exception)
+        publishEvent(
+            UniversalBackupUiEvent.RestoreError(
+                failureLog(
+                    operation = operation,
+                    uri = uri,
+                    exception = exception,
+                ),
+            ),
+        )
     }
 
     fun consumeEvent(event: UniversalBackupUiEvent) {
@@ -117,14 +173,40 @@ internal class UniversalBackupViewModel(
         val resolver = context.contentResolver
         val output = runCatching {
             resolver.openOutputStream(uri, "wt")
-        }.getOrElse {
+        }.getOrNull() ?: runCatching {
             resolver.openOutputStream(uri, "w")
-        } ?: error("Unable to open universal backup file")
+        }.getOrNull() ?: error("Unable to open universal backup file")
 
         output.use {
             it.write(bytes)
             it.flush()
         }
+
+        val descriptor = runCatching {
+            resolver.openAssetFileDescriptor(uri, "r")
+        }.getOrNull()
+        descriptor?.use {
+            if (descriptor.length >= 0) {
+                require(descriptor.length == bytes.size.toLong()) {
+                    "Universal backup write was incomplete: expected ${bytes.size} bytes, got ${descriptor.length}"
+                }
+            }
+        }
+    }
+
+    private fun failureLog(
+        operation: String,
+        uri: Uri?,
+        exception: Throwable,
+    ): String {
+        val stackTrace = StringWriter()
+        PrintWriter(stackTrace).use { writer ->
+            writer.println("2FAS universal backup $operation failure")
+            writer.println("URI: ${uri ?: "<not available>"}")
+            writer.println()
+            exception.printStackTrace(writer)
+        }
+        return stackTrace.toString()
     }
 
     private companion object {
@@ -139,9 +221,9 @@ internal data class UniversalBackupUiState(
 
 internal sealed interface UniversalBackupUiEvent {
     data object ExportSuccess : UniversalBackupUiEvent
-    data object ExportError : UniversalBackupUiEvent
+    data class ExportError(val log: String) : UniversalBackupUiEvent
     data class PasswordRequired(val uri: Uri) : UniversalBackupUiEvent
     data object WrongPassword : UniversalBackupUiEvent
     data object RestoreSuccess : UniversalBackupUiEvent
-    data object RestoreError : UniversalBackupUiEvent
+    data class RestoreError(val log: String) : UniversalBackupUiEvent
 }
