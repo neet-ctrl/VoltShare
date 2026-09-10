@@ -2402,7 +2402,7 @@ private fun FileThumbnail(vault: VaultRepository, file: VaultFile) {
 
 private fun createFileThumbnail(context: android.content.Context, vault: VaultRepository, file: VaultFile): Bitmap? {
     val prepared = vault.prepareViewing(file) ?: return null
-    return try {
+    return runCatching {
         when {
             isImage(file) -> {
                 val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
@@ -2451,7 +2451,7 @@ private fun createFileThumbnail(context: android.content.Context, vault: VaultRe
             }
             else -> null
         }
-    }
+    }.getOrNull()
 }
 
 private fun calculateSampleSize(width: Int, height: Int, targetWidth: Int, targetHeight: Int): Int {
