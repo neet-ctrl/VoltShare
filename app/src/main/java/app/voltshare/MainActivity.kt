@@ -248,6 +248,13 @@ data class InstalledAppChoice(
     val icon: Drawable? = null,
 )
 
+private data class FileActionTileSpec(
+    val icon: ImageVector,
+    val title: String,
+    val onClick: () -> Unit,
+    val destructive: Boolean = false,
+)
+
 open class MainActivity : FragmentActivity() {
     private lateinit var vault: VaultRepository
     private lateinit var lockManager: LockManager
@@ -1015,6 +1022,29 @@ private fun VoltShareApp(
             onSelect = {
                 selectedFileIds = selectedFileIds + target.id
                 fileActionTarget = null
+            },
+            onShare = {
+                fileActionTarget = null
+                if (target.locked && lockEnabled) {
+                    Toast.makeText(activity, "Unlock this file before sharing it", Toast.LENGTH_SHORT).show()
+                } else {
+                    scope.launch {
+                        val result = withContext(Dispatchers.IO) {
+                            prepareVaultShareUri(activity, vault, target)
+                        }
+                        result.fold(
+                            onSuccess = { uri -> launchShareSheet(activity, target, uri) },
+                            onFailure = {
+                                Toast.makeText(
+                                    activity,
+                                    "Could not share ${target.name}: ${it.message ?: "storage error"}",
+                                    Toast.LENGTH_LONG,
+                                ).show()
+                            },
+                        )
+                        }
+                    }
+                }
             },
         )
     }
@@ -5175,6 +5205,38 @@ private fun openFileWith(context: android.content.Context, file: File, mimeType:
     }
 }
 
+private fun prepareVaultShareUri(
+    context: MainActivity,
+    vault: VaultRepository,
+    file: VaultFile,
+): Result<Uri> = runCatching {
+    val source = vault.storedFile(file)
+    check(source.isFile) { "The vault file is no longer available." }
+    val shareDirectory = File(context.cacheDir, "voltshare-share-${UUID.randomUUID()}").apply {
+        check(mkdirs() || isDirectory) { "Could not prepare the share file." }
+    }
+    val shareFile = File(shareDirectory, safeFileName(file.name))
+    source.inputStream().use { input ->
+        shareFile.outputStream().use { output -> input.copyTo(output, 1024 * 1024) }
+    }
+    check(shareFile.length() == source.length()) { "The share copy was incomplete." }
+    FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", shareFile)
+}
+
+private fun launchShareSheet(context: MainActivity, file: VaultFile, uri: Uri) {
+    val intent = Intent(Intent.ACTION_SEND).apply {
+        type = file.mimeType.ifBlank { shareMimeFromName(file.name) }
+        putExtra(Intent.EXTRA_STREAM, uri)
+        clipData = ClipData.newRawUri(file.name, uri)
+        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+    }
+    runCatching {
+        context.startActivity(Intent.createChooser(intent, "Share ${file.name}"))
+    }.onFailure {
+        Toast.makeText(context, "No compatible app was found", Toast.LENGTH_SHORT).show()
+    }
+}
+
 private const val MAX_TEXT_VIEW_BYTES = 8 * 1024 * 1024
 
 private fun findTextMatches(text: String, query: String): List<Int> {
@@ -5540,20 +5602,37 @@ private fun FileActionDialog(
     onDelete: () -> Unit,
     onMove: () -> Unit,
     onSelect: () -> Unit,
+    onShare: () -> Unit,
 ) {
+    val actions = listOf(
+        FileActionTileSpec(Icons.Default.Edit, "Rename", onRename),
+        FileActionTileSpec(
+            if (file.locked) Icons.Default.LockOpen else Icons.Default.Lock,
+            if (file.locked) "Unlock" else "Lock",
+            onToggleLock,
+        ),
+        FileActionTileSpec(Icons.Default.DriveFileMove, "Move", onMove),
+        FileActionTileSpec(Icons.Default.FolderOpen, "Save", onSaveToDevice),
+        FileActionTileSpec(Icons.Default.SelectAll, "Select", onSelect),
+        FileActionTileSpec(Icons.Default.Share, "Share", onShare),
+        FileActionTileSpec(Icons.Default.Delete, "Delete", onDelete, destructive = true),
+    )
     Dialog(
         onDismissRequest = onDismiss,
         properties = DialogProperties(usePlatformDefaultWidth = false),
     ) {
         Surface(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 18.dp),
-            shape = RoundedCornerShape(30.dp),
-            color = VoltSurfaceRaised,
-            border = BorderStroke(1.dp, VoltGreen.copy(alpha = 0.3f)),
-            shadowElevation = 26.dp,
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+            shape = RoundedCornerShape(28.dp),
+            color = Color(0xFF151B19),
+            border = BorderStroke(1.dp, VoltGreen.copy(alpha = 0.38f)),
+            shadowElevation = 30.dp,
         ) {
-            Column(Modifier.padding(22.dp)) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.padding(horizontal = 16.dp, vertical = 15.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
                     Box(
                         modifier = Modifier.size(50.dp).background(VoltGreen.copy(alpha = 0.12f), CircleShape),
                         contentAlignment = Alignment.Center,
@@ -5562,82 +5641,102 @@ private fun FileActionDialog(
                     }
                     Spacer(Modifier.width(13.dp))
                     Column(modifier = Modifier.weight(1f)) {
-                        Text("File actions", color = VoltGreen, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.5.sp)
-                        Spacer(Modifier.height(3.dp))
-                        Text(file.name, color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Black, maxLines = 1)
-                        Text(file.folderPath, color = VoltTextMuted, fontSize = 11.sp, maxLines = 1)
+                        Text("FILE ACTIONS", color = VoltGreen, fontSize = 10.sp, fontWeight = FontWeight.Black, letterSpacing = 1.7.sp)
+                        Spacer(Modifier.height(4.dp))
+                        Text(file.name, color = Color.White, fontSize = 17.sp, fontWeight = FontWeight.Black, maxLines = 1)
+                        Text(file.folderPath, color = VoltTextMuted, fontSize = 10.sp, maxLines = 1)
                     }
                     IconButton(onClick = onDismiss) { Icon(Icons.Default.Close, "Close", tint = VoltTextMuted) }
                 }
-                Spacer(Modifier.height(14.dp))
+                Spacer(Modifier.height(12.dp))
                 Surface(
                     modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(17.dp),
-                    color = VoltGreen.copy(alpha = 0.09f),
-                    border = BorderStroke(1.dp, VoltGreen.copy(alpha = 0.22f)),
+                    shape = RoundedCornerShape(16.dp),
+                    color = VoltGreen.copy(alpha = 0.085f),
+                    border = BorderStroke(1.dp, VoltGreen.copy(alpha = 0.24f)),
                 ) {
                     Row(
-                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
+                        modifier = Modifier.padding(horizontal = 13.dp, vertical = 9.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Icon(
                             Icons.Default.Description,
                             contentDescription = null,
                             tint = VoltGreen,
-                            modifier = Modifier.size(19.dp),
+                            modifier = Modifier.size(18.dp),
                         )
-                        Spacer(Modifier.width(10.dp))
+                        Spacer(Modifier.width(9.dp))
                         Column {
                             Text(
-                                "File size",
+                                "SIZE",
                                 color = VoltTextMuted,
-                                fontSize = 10.sp,
-                                fontWeight = FontWeight.Bold,
-                                letterSpacing = 1.1.sp,
+                                fontSize = 9.sp,
+                                fontWeight = FontWeight.Black,
+                                letterSpacing = 1.3.sp,
                             )
                             Text(
                                 formatReadableFileSize(file.sizeBytes),
                                 color = Color.White,
-                                fontSize = 13.sp,
+                                fontSize = 12.sp,
                                 fontWeight = FontWeight.Bold,
                             )
                         }
                     }
                 }
-                Spacer(Modifier.height(17.dp))
-                FileActionRow(Icons.Default.Edit, "Rename", "Change the display name", onRename)
-                FileActionRow(if (file.locked) Icons.Default.LockOpen else Icons.Default.Lock, if (file.locked) "Unlock preview" else "Lock preview", "Require your vault lock before opening", onToggleLock)
-                FileActionRow(Icons.Default.DriveFileMove, "Move", "Choose another folder", onMove)
-                FileActionRow(Icons.Default.FolderOpen, "Save to device", "Choose a folder in device storage", onSaveToDevice)
-                FileActionRow(Icons.Default.SelectAll, "Select", "Add this file to bulk actions", onSelect)
-                FileActionRow(Icons.Default.Delete, "Delete", "Permanently remove this file", onDelete, destructive = true)
+                Spacer(Modifier.height(13.dp))
+                actions.chunked(3).forEachIndexed { rowIndex, row ->
+                    if (rowIndex > 0) Spacer(Modifier.height(8.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        row.forEach { action ->
+                            FileActionTile(action, Modifier.weight(1f))
+                        }
+                        repeat(3 - row.size) {
+                            Spacer(Modifier.weight(1f))
+                        }
+                    }
+                }
             }
         }
     }
 }
 
 @Composable
-private fun FileActionRow(
-    icon: ImageVector,
-    title: String,
-    subtitle: String,
-    onClick: () -> Unit,
-    destructive: Boolean = false,
+private fun FileActionTile(
+    action: FileActionTileSpec,
+    modifier: Modifier = Modifier,
 ) {
     Surface(
-        modifier = Modifier.fillMaxWidth().clickable(onClick = onClick),
-        color = Color.Transparent,
+        modifier = modifier.height(72.dp).clickable(onClick = action.onClick),
+        color = if (action.destructive) Color(0xFFFF6B6B).copy(alpha = 0.08f) else Color.White.copy(alpha = 0.045f),
         shape = RoundedCornerShape(17.dp),
+        border = BorderStroke(
+            1.dp,
+            if (action.destructive) Color(0xFFFF8A80).copy(alpha = 0.28f) else Color.White.copy(alpha = 0.07f),
+        ),
     ) {
         Row(
-            modifier = Modifier.padding(vertical = 12.dp, horizontal = 8.dp),
+            modifier = Modifier.fillMaxSize().padding(horizontal = 5.dp, vertical = 8.dp),
+            horizontalArrangement = Arrangement.Center,
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Icon(icon, null, tint = if (destructive) Color(0xFFFF8A80) else VoltGreen, modifier = Modifier.size(21.dp))
-            Spacer(Modifier.width(13.dp))
-            Column {
-                Text(title, color = if (destructive) Color(0xFFFF8A80) else Color.White, fontWeight = FontWeight.Bold)
-                Text(subtitle, color = VoltTextMuted, fontSize = 11.sp)
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Icon(
+                    action.icon,
+                    contentDescription = action.title,
+                    tint = if (action.destructive) Color(0xFFFF8A80) else VoltGreen,
+                    modifier = Modifier.size(22.dp),
+                )
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    action.title,
+                    color = if (action.destructive) Color(0xFFFF8A80) else Color.White,
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                )
             }
         }
     }
