@@ -4,6 +4,7 @@ import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.drawable.Drawable
 import android.graphics.pdf.PdfRenderer
+import android.content.ClipData
 import android.content.Intent
 import android.content.pm.ApplicationInfo
 import android.content.pm.PackageManager
@@ -207,27 +208,33 @@ data class InstalledAppChoice(
     val icon: Drawable? = null,
 )
 
-class MainActivity : FragmentActivity() {
+open class MainActivity : FragmentActivity() {
     private lateinit var vault: VaultRepository
     private lateinit var lockManager: LockManager
     private lateinit var transfer: PeerTransferManager
     private val installScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private var pendingIncomingShareState by mutableStateOf<IncomingShare?>(null)
+    private var vaultPickerRequestedState by mutableStateOf(false)
     private var pendingInstallFile: File? = null
     private var installPermissionOpened = false
 
     val pendingIncomingShare: IncomingShare?
         get() = pendingIncomingShareState
 
+    val vaultPickerRequested: Boolean
+        get() = vaultPickerRequestedState
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         pendingIncomingShareState = intent.toIncomingShare()
+        vaultPickerRequestedState = intent.action == VaultShareContract.ACTION_PICK_VAULT_FILES
         vault = VaultRepository(this)
         lockManager = LockManager(this)
         transfer = PeerTransferManager(this, vault)
+        VaultSession.unlocked = false
         setContent {
             VoltShareTheme {
-                VoltShareApp(this, vault, lockManager, transfer)
+                VoltShareApp(this, vault, lockManager, transfer, vaultPickerRequested)
             }
         }
     }
@@ -236,10 +243,36 @@ class MainActivity : FragmentActivity() {
         super.onNewIntent(intent)
         setIntent(intent)
         pendingIncomingShareState = intent.toIncomingShare()
+        vaultPickerRequestedState = intent.action == VaultShareContract.ACTION_PICK_VAULT_FILES
     }
 
     fun consumePendingIncomingShare() {
         pendingIncomingShareState = null
+    }
+
+    fun completeVaultPicker(files: List<VaultFile>) {
+        val uris = files.map { VaultShareContract.uriForFile(it.id) }
+        val result = Intent().apply {
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            if (uris.isNotEmpty()) {
+                data = uris.first()
+                clipData = ClipData.newUri(contentResolver, "VoltShare vault files", uris.first())
+                uris.drop(1).forEach { uri -> clipData?.addItem(ClipData.Item(uri)) }
+                callingPackage?.let { packageName ->
+                    uris.forEach { uri ->
+                        grantUriPermission(packageName, uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                    }
+                }
+            }
+            putExtra(Intent.EXTRA_ALLOW_MULTIPLE, uris.size > 1)
+        }
+        setResult(RESULT_OK, result)
+        finish()
+    }
+
+    fun cancelVaultPicker() {
+        setResult(RESULT_CANCELED)
+        finish()
     }
 
     fun canUseBiometric(): Boolean {
@@ -385,6 +418,7 @@ private fun VoltShareApp(
     vault: VaultRepository,
     lockManager: LockManager,
     transfer: PeerTransferManager,
+    vaultPickerRequested: Boolean,
 ) {
     var configured by remember { mutableStateOf(lockManager.isConfigured()) }
     var lockEnabled by remember { mutableStateOf(lockManager.isEnabled()) }
@@ -417,6 +451,7 @@ private fun VoltShareApp(
 
     BackHandler(enabled = configured && unlocked) {
         when {
+            vaultPickerRequested -> activity.cancelVaultPicker()
             viewerFile != null -> viewerFile = null
             fileToUnlock != null -> fileToUnlock = null
             showNewFolder -> showNewFolder = false
@@ -463,6 +498,10 @@ private fun VoltShareApp(
             fileLockDefault = false
             files = withContext(Dispatchers.IO) { vault.disableAllFileLocks() }
         }
+    }
+
+    LaunchedEffect(configured, unlocked) {
+        VaultSession.unlocked = configured && unlocked
     }
 
     LaunchedEffect(configured, unlocked, incomingShare) {
@@ -535,6 +574,41 @@ private fun VoltShareApp(
             biometricEnabled = biometricEnabled && activity.canUseBiometric(),
             onUnlock = { unlocked = true },
             onBiometric = { activity.authenticateWithBiometric { unlocked = true } },
+        )
+        return
+    }
+
+    if (vaultPickerRequested) {
+        FilesHome(
+            files = files,
+            folders = folders,
+            currentFolder = currentFolder,
+            primaryFolder = primaryFolder,
+            selectedFileIds = selectedFileIds,
+            onImport = {},
+            onFolderSelected = { currentFolder = it },
+            onCreateFolder = {},
+            onDeleteFolder = {},
+            onMakePrimary = {},
+            onOpen = { file ->
+                selectedFileIds = if (file.id in selectedFileIds) {
+                    selectedFileIds - file.id
+                } else {
+                    selectedFileIds + file.id
+                }
+            },
+            onToggleLock = {},
+            onReorder = { _, _ -> },
+            onReorderTo = { _, _ -> },
+            onLongPress = {},
+            onDeleteFile = {},
+            onClearSelection = { selectedFileIds = emptySet() },
+            onDeleteSelected = {},
+            onMoveSelected = {},
+            onShareSelected = { activity.completeVaultPicker(files.filter { it.id in selectedFileIds }) },
+            vault = vault,
+            selectionOnly = true,
+            onConfirmSelection = { activity.completeVaultPicker(files.filter { it.id in selectedFileIds }) },
         )
         return
     }
@@ -1352,6 +1426,8 @@ private fun FilesHome(
     onMoveSelected: () -> Unit,
     onShareSelected: () -> Unit,
     vault: VaultRepository,
+    selectionOnly: Boolean = false,
+    onConfirmSelection: (() -> Unit)? = null,
 ) {
     var searchQuery by remember { mutableStateOf("") }
     var searchOpen by remember { mutableStateOf(false) }
@@ -1452,7 +1528,7 @@ private fun FilesHome(
             ) {
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        "PRIVATE LIBRARY",
+                        if (selectionOnly) "VOLT SHARE VAULT" else "PRIVATE LIBRARY",
                         color = VoltGreen,
                         fontSize = 11.sp,
                         fontWeight = FontWeight.Bold,
@@ -1460,12 +1536,18 @@ private fun FilesHome(
                     )
                     Spacer(Modifier.height(7.dp))
                     Text(
-                        if (currentFolder == "/") "Your files" else currentFolder.substringAfterLast('/'),
+                        if (selectionOnly) {
+                            if (currentFolder == "/") "Choose files" else currentFolder.substringAfterLast('/')
+                        } else if (currentFolder == "/") {
+                            "Your files"
+                        } else {
+                            currentFolder.substringAfterLast('/')
+                        },
                         color = Color.White,
                         style = MaterialTheme.typography.headlineMedium,
                     )
                     Text(
-                        "Private, organized, and only visible to you",
+                        if (selectionOnly) "Select one or more files to attach to the other app" else "Private, organized, and only visible to you",
                         color = VoltTextMuted,
                         fontSize = 12.sp,
                     )
@@ -1594,6 +1676,7 @@ private fun FilesHome(
                     dropTargetBelow = false
                     reorderMode = !reorderMode
                 },
+                managementEnabled = !selectionOnly,
             )
         }
         val libraryEmpty = visibleFolders.isEmpty() && visibleFiles.isEmpty()
@@ -1657,6 +1740,7 @@ private fun FilesHome(
                                 onMakePrimary = { onMakePrimary(folder) },
                                 onDelete = { onDeleteFolder(folder) },
                                 compact = true,
+                                selectionOnly = selectionOnly,
                             )
                             if (visibleFiles.isNotEmpty() || folder != visibleFolders.last()) {
                                 Divider(color = Color.White.copy(alpha = 0.06f), modifier = Modifier.padding(horizontal = 14.dp))
@@ -1702,18 +1786,26 @@ private fun FilesHome(
         }
         if (selectedFileIds.isNotEmpty()) {
             item {
-                SelectionBar(
-                    selectedCount = selectedFileIds.size,
-                    onShare = onShareSelected,
-                    onMove = onMoveSelected,
-                    onDelete = onDeleteSelected,
-                    onClear = onClearSelection,
-                )
+                if (selectionOnly && onConfirmSelection != null) {
+                    PickerSelectionBar(
+                        selectedCount = selectedFileIds.size,
+                        onConfirm = onConfirmSelection,
+                        onClear = onClearSelection,
+                    )
+                } else {
+                    SelectionBar(
+                        selectedCount = selectedFileIds.size,
+                        onShare = onShareSelected,
+                        onMove = onMoveSelected,
+                        onDelete = onDeleteSelected,
+                        onClear = onClearSelection,
+                    )
+                }
             }
         }
         item {
             Text(
-                "Your files stay inside VoltShare’s private app storage.",
+                if (selectionOnly) "Selected files are shared read-only with the requesting app." else "Your files stay inside VoltShare’s private app storage.",
                 color = VoltTextMuted.copy(alpha = 0.72f),
                 fontSize = 11.sp,
                 modifier = Modifier.padding(top = 4.dp, bottom = 12.dp),
@@ -1871,6 +1963,7 @@ private fun FolderHeaderCard(
     dropTargetFileName: String? = null,
     dropTargetBelow: Boolean = false,
     onToggleReorder: () -> Unit,
+    managementEnabled: Boolean = true,
 ) {
     Surface(
         modifier = Modifier
@@ -1907,7 +2000,7 @@ private fun FolderHeaderCard(
                     fontSize = 11.sp,
                 )
             }
-            if (!reorderMode) {
+            if (!reorderMode && managementEnabled) {
                 IconButton(onClick = onCreateFolder) {
                     Icon(Icons.Default.Add, "Create folder", tint = VoltGreen)
                 }
@@ -1943,7 +2036,7 @@ private fun FolderHeaderCard(
                     maxLines = if (reorderMode) 2 else 1,
                     modifier = Modifier.weight(1f),
                 )
-                if (!reorderMode) {
+                if (!reorderMode && managementEnabled) {
                     TextButton(
                         onClick = onImport,
                         colors = ButtonDefaults.textButtonColors(contentColor = VoltGreen),
@@ -1953,13 +2046,15 @@ private fun FolderHeaderCard(
                         Text("Import", fontSize = 12.sp, fontWeight = FontWeight.Bold)
                     }
                 }
-                TextButton(
-                    onClick = onToggleReorder,
-                    colors = ButtonDefaults.textButtonColors(contentColor = VoltGreen),
-                ) {
-                    Icon(Icons.Default.DragHandle, null, modifier = Modifier.size(17.dp))
-                    Spacer(Modifier.width(5.dp))
-                    Text(if (reorderMode) "Done" else "Reorder", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                if (managementEnabled) {
+                    TextButton(
+                        onClick = onToggleReorder,
+                        colors = ButtonDefaults.textButtonColors(contentColor = VoltGreen),
+                    ) {
+                        Icon(Icons.Default.DragHandle, null, modifier = Modifier.size(17.dp))
+                        Spacer(Modifier.width(5.dp))
+                        Text(if (reorderMode) "Done" else "Reorder", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                    }
                 }
             }
         }
