@@ -1,3 +1,4 @@
 - [Share transfer state](share-transfer-state.md) — keep hosting, discovery, and batch-transfer activity separate so device controls stay usable during sends.
 - [Android export and Incognito quirks](android-export-incognito-quirks.md) — Chrome and Android content providers need explicit launch/write modes for reliable behavior.
 - [Universal backup diagnostics](universal-backup-diagnostics.md) — export and restore failures need immediate full-log copy; wrong-password retry stays a separate user flow.
+- [Large universal backups](universal-backup-streaming.md) — new user-selected backups use an authenticated streaming container; legacy JSON backups remain restorable.
