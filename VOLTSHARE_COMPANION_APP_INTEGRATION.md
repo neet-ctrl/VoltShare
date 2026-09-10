@@ -93,9 +93,11 @@ The complete 2FA-specific verification checklist is in
 
 The same VoltShare bridge is also used by the 2FA app's Universal Backup card:
 
-- **Universal backup file → Open in VoltShare Share** creates the normal
-  universal backup with the existing view model, sends it as an explicit
-  `ACTION_SEND` with `EXTRA_STREAM`, and opens VoltShare's Share tab.
+- **Universal backup file → Share via apps** creates the normal universal
+  backup with the existing view model, sends it as `ACTION_SEND` with
+  `EXTRA_STREAM`, and opens Android's normal share chooser. VoltShare can
+  receive it through its normal share flow; other compatible apps can receive
+  the file as well.
 - **Restore universal backup file → VoltShare Vault** opens the protected
   multi-select vault picker and passes one selected returned URI into the
   existing universal restore flow.
@@ -122,7 +124,7 @@ private val voltSharePicker =
 
 private fun openVoltShareVault() {
     val intent = Intent("app.voltshare.action.PICK_VAULT_FILES").apply {
-        // The action is explicit by package so another app cannot be selected.
+        // The picker remains explicit by package so another app cannot be selected.
         setPackage("app.voltshare")
     }
 
