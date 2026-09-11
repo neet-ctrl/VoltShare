@@ -5,3 +5,4 @@
 - [2FA build inputs](twofa-build-inputs.md) — local Android compilation needs the private config supplied by CI; encrypted repository copies are not enough.
 - [APK installer naming](android-installer-file-type.md) — vault payload files use an internal `.data` suffix, so install routing must use the recorded original filename.
 - [APK install confirmation](android-installer-confirmation.md) — PackageInstaller can report pending user action before success; launch its confirmation intent and keep the callback reusable.
+- [Compose drag reordering](compose-drag-reordering.md) — moving rows need stable keys and latest callbacks so an active long-press drag can cross multiple positions.

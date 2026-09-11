@@ -178,6 +178,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.key
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -2283,38 +2284,40 @@ private fun FilesHome(
                             }
                         }
                         visibleFiles.forEach { file ->
-                            FileRow(
-                                file = file,
-                                vault = vault,
-                                onOpen = onOpen,
-                                onPin = { onPinFile(file) },
-                                onMoveUp = { reorderDirectFile(file, -1) },
-                                onMoveDown = { reorderDirectFile(file, 1) },
-                                allowReorder = reorderMode && !searching,
-                                onReorder = { delta -> reorderDirectFile(file, delta) },
-                                onDragStart = {
-                                    draggedFileId = file.id
-                                    dropTargetFileId = file.id
-                                    dropTargetBelow = false
-                                },
-                                onDragEnd = {
-                                    draggedFileId = null
-                                    dropTargetFileId = null
-                                    dropTargetBelow = false
-                                },
-                                onLongPress = { onLongPress(file) },
-                                onDelete = { onDeleteFile(file) },
-                                isSelected = file.id in selectedFileIds,
-                                selectionMode = selectedFileIds.isNotEmpty(),
-                                isPinned = file.pinned,
-                                reorderMode = reorderMode,
-                                dragging = draggedFileId == file.id,
-                                dropTarget = dropTargetFileId == file.id,
-                                dropTargetBelow = dropTargetBelow,
-                                compact = true,
-                            )
-                            if (file != visibleFiles.last()) {
-                                Divider(color = Color.White.copy(alpha = 0.06f), modifier = Modifier.padding(horizontal = 14.dp))
+                            key(file.id) {
+                                FileRow(
+                                    file = file,
+                                    vault = vault,
+                                    onOpen = onOpen,
+                                    onPin = { onPinFile(file) },
+                                    onMoveUp = { reorderDirectFile(file, -1) },
+                                    onMoveDown = { reorderDirectFile(file, 1) },
+                                    allowReorder = reorderMode && !searching,
+                                    onReorder = { delta -> reorderDirectFile(file, delta) },
+                                    onDragStart = {
+                                        draggedFileId = file.id
+                                        dropTargetFileId = file.id
+                                        dropTargetBelow = false
+                                    },
+                                    onDragEnd = {
+                                        draggedFileId = null
+                                        dropTargetFileId = null
+                                        dropTargetBelow = false
+                                    },
+                                    onLongPress = { onLongPress(file) },
+                                    onDelete = { onDeleteFile(file) },
+                                    isSelected = file.id in selectedFileIds,
+                                    selectionMode = selectedFileIds.isNotEmpty(),
+                                    isPinned = file.pinned,
+                                    reorderMode = reorderMode,
+                                    dragging = draggedFileId == file.id,
+                                    dropTarget = dropTargetFileId == file.id,
+                                    dropTargetBelow = dropTargetBelow,
+                                    compact = true,
+                                )
+                                if (file != visibleFiles.last()) {
+                                    Divider(color = Color.White.copy(alpha = 0.06f), modifier = Modifier.padding(horizontal = 14.dp))
+                                }
                             }
                         }
                     }
@@ -2896,6 +2899,10 @@ private fun FileRow(
     val icon = fileIcon(file)
     var dragDistance by remember(file.id) { mutableStateOf(0f) }
     var isDragging by remember(file.id) { mutableStateOf(false) }
+    val currentOnDrag = rememberUpdatedState(onDrag)
+    val currentOnReorder = rememberUpdatedState(onReorder)
+    val currentOnDragStart = rememberUpdatedState(onDragStart)
+    val currentOnDragEnd = rememberUpdatedState(onDragEnd)
     val accent = if (file.locked) Color(0xFF9B7CFF) else VoltGreen
     val visuallyDragging = dragging || isDragging
     val rowContent: @Composable ColumnScope.() -> Unit = {
@@ -2955,28 +2962,28 @@ private fun FileRow(
                                 onDragStart = {
                                     isDragging = true
                                     dragDistance = 0f
-                                    onDragStart()
+                                    currentOnDragStart.value()
                                 },
                                 onDragCancel = {
                                     isDragging = false
                                     dragDistance = 0f
-                                    onDragEnd()
+                                    currentOnDragEnd.value()
                                 },
                                 onDragEnd = {
                                     isDragging = false
                                     dragDistance = 0f
-                                    onDragEnd()
+                                    currentOnDragEnd.value()
                                 },
                                 onDrag = { change, dragAmount ->
                                     change.consume()
                                     dragDistance += dragAmount.y
                                     if (dragDistance <= -48f) {
-                                        if (reorderMode) onReorder(-1) else onMoveUp()
-                                        onDrag(dragDistance)
+                                        if (reorderMode) currentOnReorder.value(-1) else onMoveUp()
+                                        currentOnDrag.value(dragDistance)
                                         dragDistance = 0f
                                     } else if (dragDistance >= 48f) {
-                                        if (reorderMode) onReorder(1) else onMoveDown()
-                                        onDrag(dragDistance)
+                                        if (reorderMode) currentOnReorder.value(1) else onMoveDown()
+                                        currentOnDrag.value(dragDistance)
                                         dragDistance = 0f
                                     }
                                 },
@@ -3036,16 +3043,18 @@ private fun FileRow(
             alpha = if (visuallyDragging) 0.9f else 1f
             rotationZ = if (visuallyDragging) -0.6f else 0f
         }
-        .pointerInput(file.id, selectionMode, reorderMode) {
-            detectTapGestures(
-                onTap = {
-                    if (!reorderMode) onOpen(file)
-                },
-                onLongPress = {
-                    if (!reorderMode) onLongPress()
-                },
-            )
-        }
+        .then(
+            if (!reorderMode) {
+                Modifier.pointerInput(file.id, selectionMode) {
+                    detectTapGestures(
+                        onTap = { onOpen(file) },
+                        onLongPress = { onLongPress() },
+                    )
+                }
+            } else {
+                Modifier
+            },
+        )
     if (compact) {
         Column(
             modifier = rowModifier
