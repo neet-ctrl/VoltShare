@@ -94,6 +94,7 @@ import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Code
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.ContentPaste
 import androidx.compose.material.icons.filled.Delete
@@ -117,6 +118,7 @@ import androidx.compose.material.icons.filled.NavigateNext
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PictureAsPdf
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Public
 import androidx.compose.material.icons.filled.PushPin
 import androidx.compose.material.icons.filled.Replay
 import androidx.compose.material.icons.filled.Replay10
@@ -240,6 +242,7 @@ private val VoltSurfaceRaised = Color(0xFF1B1F1E)
 private val VoltTextMuted = Color.White.copy(alpha = 0.52f)
 private val VoltTeal = Color(0xFF00796B)
 private const val SCREENSHOT_UNLOCK_DURATION_MS = 5 * 60 * 1000L
+private const val GITHUB_REPOSITORY_URL = "https://github.com/neet-ctrl/VoltShare"
 
 data class IncomingShare(
     val uris: List<Uri> = emptyList(),
@@ -4402,6 +4405,7 @@ private fun SecurityHome(
     onRestoreBackup: () -> Unit,
     onLockNow: () -> Unit,
 ) {
+    val context = LocalContext.current
     LazyColumn(
         modifier = Modifier.fillMaxSize().background(VoltBlack),
         contentPadding = PaddingValues(horizontal = 20.dp, vertical = 22.dp),
@@ -4674,6 +4678,70 @@ private fun SecurityHome(
                         )
                     }
                 }
+            }
+        }
+        item {
+            DeveloperInfoCard(
+                onOpenRepository = {
+                    val intent = Intent(Intent.ACTION_VIEW, Uri.parse(GITHUB_REPOSITORY_URL))
+                    runCatching {
+                        context.startActivity(intent)
+                    }.onFailure {
+                        Toast.makeText(context, "Could not open GitHub", Toast.LENGTH_SHORT).show()
+                    }
+                },
+            )
+        }
+    }
+}
+
+@Composable
+private fun DeveloperInfoCard(onOpenRepository: () -> Unit) {
+    GlassCard(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onOpenRepository),
+        accent = VoltGreen,
+        padding = 18.dp,
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Box(
+                modifier = Modifier
+                    .size(52.dp)
+                    .background(
+                        Brush.linearGradient(
+                            listOf(VoltGreen.copy(alpha = 0.2f), VoltTeal.copy(alpha = 0.18f)),
+                        ),
+                        RoundedCornerShape(17.dp),
+                    )
+                    .border(1.dp, VoltGreen.copy(alpha = 0.38f), RoundedCornerShape(17.dp)),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(Icons.Default.Code, "Open VoltShare on GitHub", tint = VoltGreen, modifier = Modifier.size(26.dp))
+            }
+            Spacer(Modifier.width(13.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text("DEVELOPED BY", color = VoltGreen, fontSize = 10.sp, fontWeight = FontWeight.Black, letterSpacing = 1.5.sp)
+                Spacer(Modifier.height(4.dp))
+                Text("Shakti Kumar", color = Color.White, fontSize = 17.sp, fontWeight = FontWeight.Bold)
+                Spacer(Modifier.height(5.dp))
+                Text("neet-ctrl/VoltShare", color = VoltTextMuted, fontSize = 12.sp)
+            }
+            Icon(Icons.Default.ArrowForward, "Open GitHub repository", tint = VoltGreen, modifier = Modifier.size(21.dp))
+        }
+        Spacer(Modifier.height(14.dp))
+        Surface(
+            modifier = Modifier.fillMaxWidth(),
+            color = Color.Black.copy(alpha = 0.16f),
+            shape = RoundedCornerShape(14.dp),
+        ) {
+            Row(
+                modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Icon(Icons.Default.Public, null, tint = VoltTeal, modifier = Modifier.size(17.dp))
+                Spacer(Modifier.width(8.dp))
+                Text("Tap to view the project on GitHub", color = VoltTextMuted, fontSize = 11.sp)
             }
         }
     }
